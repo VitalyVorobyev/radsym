@@ -88,32 +88,32 @@ Literature: Loy & Zelinsky, ECCV 2002 / TPAMI 2003
 
 ### Milestone 3.1: Annulus sampling
 
-- [ ] `AnnulusSamplingConfig` (angular samples, radial samples)
-- [ ] `sample_annulus` — circular annulus gradient sampling
-- [ ] `sample_elliptical_annulus` — elliptical variant
-- [ ] Tests: sampling on synthetic ring, angular coverage verification
+- [x] `AnnulusSamplingConfig` (angular samples, radial samples)
+- [x] `sample_annulus` — circular annulus gradient sampling
+- [x] `sample_elliptical_annulus` — elliptical variant (accepts `&Ellipse`)
+- [x] Tests: sampling on synthetic ring, angular coverage verification
 
 ### Milestone 3.2: Profiles
 
-- [ ] `RadialProfile` type (values, radii, center)
-- [ ] `compute_radial_profile` — azimuthally-averaged radial profile
-- [ ] `compute_normal_profile` — profile along ellipse normal
-- [ ] Tests: profile of synthetic ring shows peaks at edges
+- [x] `RadialProfile` type (values, radii, center)
+- [x] `compute_radial_profile` — azimuthally-averaged radial profile
+- [x] `compute_normal_profile` — profile along ellipse normal (accepts `&Ellipse`)
+- [x] Tests: profile of synthetic ring shows peaks at edges
 
 ### Milestone 3.3: Hypothesis types
 
-- [ ] `CircleHypothesis`, `EllipseHypothesis` (geometry + confidence)
-- [ ] `AnnulusHypothesis`, `ConcentricPairHypothesis`
-- [ ] Conversion: `CircleHypothesis` → `EllipseHypothesis`
+- [x] `CircleHypothesis`, `EllipseHypothesis` (geometry + confidence)
+- [x] `AnnulusHypothesis`, `ConcentricPairHypothesis`
+- [x] Conversion: `CircleHypothesis` → `EllipseHypothesis`
 
 ### Milestone 3.4: Support scoring
 
-- [ ] `SupportEvidence` type (gradient samples, angular coverage, alignment)
-- [ ] `SupportScore` type (total, ringness, polarity consistency, coverage, degeneracy)
-- [ ] `score_circle_support` — gradient alignment + coverage scoring
-- [ ] `score_ellipse_support`
-- [ ] `angular_coverage` function
-- [ ] Tests: high score for centered circle, low for offset, degeneracy flags
+- [x] `SupportEvidence` type (gradient samples, angular coverage, alignment)
+- [x] `SupportScore` type (total, ringness, polarity consistency, coverage, degeneracy)
+- [x] `score_circle_support` — gradient alignment + coverage scoring
+- [x] `score_ellipse_support`
+- [x] `angular_coverage` function
+- [x] Tests: high score for centered circle, low for offset, degeneracy flags
 
 ---
 
@@ -257,7 +257,7 @@ Literature: Ni, Singh, Bahlmann, CVPR 2012
 
 | Algorithm | Module | Source | Fidelity | Status |
 |-----------|--------|--------|----------|--------|
-| FRST | `propose::frst` | Loy & Zelinsky 2002/2003 | reference + production | not started |
+| FRST | `propose::frst` | Loy & Zelinsky 2002/2003 | reference + production | done |
 | RSD | `propose::rsd` | Barnes et al. 2008 | production | not started |
 | Parthasarathy radial center | `refine::radial_center` | Parthasarathy 2012 | reference + production | not started |
 | GST | — | Reisfeld et al. 1995 | reference | deferred |

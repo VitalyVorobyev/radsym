@@ -38,3 +38,8 @@ pub use crate::core::polarity::Polarity;
 pub use crate::propose::extract::{extract_proposals, ResponseMap};
 pub use crate::propose::frst::{frst_response, frst_response_single, FrstConfig};
 pub use crate::propose::seed::{Proposal, ProposalSource, SeedPoint};
+pub use crate::support::evidence::SupportEvidence;
+pub use crate::support::hypothesis::{
+    AnnulusHypothesis, CircleHypothesis, ConcentricPairHypothesis, EllipseHypothesis,
+};
+pub use crate::support::score::{ScoringConfig, SupportScore};
