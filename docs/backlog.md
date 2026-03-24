@@ -121,37 +121,37 @@ Literature: Loy & Zelinsky, ECCV 2002 / TPAMI 2003
 
 ### Milestone 4.1: Parthasarathy radial center (reference)
 
-- [ ] `RadialCenterConfig` (patch_radius)
-- [ ] `radial_center_refine` — closed-form weighted LS intersection of gradient lines
-- [ ] Roberts-cross gradient on half-pixel grid (per original paper)
-- [ ] Tests: subpixel accuracy on synthetic Gaussian blob, synthetic ring
+- [x] `RadialCenterConfig` (patch_radius, gradient_threshold)
+- [x] `radial_center_refine` — closed-form weighted LS intersection of gradient lines
+- [x] Roberts-cross gradient on half-pixel grid (per original paper)
+- [x] Tests: subpixel accuracy on synthetic Gaussian blob, synthetic ring
 - [ ] Benchmark: refinement time per seed
 
 Literature: Parthasarathy, Nature Methods 2012
 
 ### Milestone 4.2: Radial center (production)
 
-- [ ] Production variant with Sobel gradient
-- [ ] Gradient magnitude weighting
-- [ ] Tests: compare reference vs production accuracy
+- [x] `radial_center_refine_from_gradient` — production variant with Sobel gradient
+- [x] Gradient magnitude squared weighting (Parthasarathy scheme)
+- [x] Tests: compare reference vs production accuracy and consistency
 
 ### Milestone 4.3: RefinementResult
 
-- [ ] `RefinementResult<H>` with status, residual, uncertainty
-- [ ] `RefinementStatus` enum (Converged, MaxIterations, Degenerate, OutOfBounds)
-- [ ] Tests: degeneracy detection
+- [x] `RefinementResult<H>` with status, residual, iterations
+- [x] `RefinementStatus` enum (Converged, MaxIterations, Degenerate, OutOfBounds)
+- [x] Tests: convergence and degeneracy detection
 
 ### Milestone 4.4: Circle refinement
 
-- [ ] `CircleRefineConfig`
-- [ ] `refine_circle` — iterative gradient-based circle parameter update
-- [ ] Tests: convergence from noisy initial estimate
+- [x] `CircleRefineConfig`
+- [x] `refine_circle` — iterative center + radius update via radial center + annulus sampling
+- [x] Tests: convergence from noisy initial estimate, degeneracy on empty image
 
 ### Milestone 4.5: Ellipse refinement
 
-- [ ] `EllipseRefineConfig`
-- [ ] `refine_ellipse` — iterative ellipse parameter update
-- [ ] Tests: convergence on synthetic ellipse
+- [x] `EllipseRefineConfig`
+- [x] `refine_ellipse` — iterative ellipse parameter update via covariance fitting
+- [x] Tests: convergence on synthetic circle-as-ellipse, degeneracy on empty image
 
 ---
 
@@ -259,7 +259,7 @@ Literature: Ni, Singh, Bahlmann, CVPR 2012
 |-----------|--------|--------|----------|--------|
 | FRST | `propose::frst` | Loy & Zelinsky 2002/2003 | reference + production | done |
 | RSD | `propose::rsd` | Barnes et al. 2008 | production | not started |
-| Parthasarathy radial center | `refine::radial_center` | Parthasarathy 2012 | reference + production | not started |
+| Parthasarathy radial center | `refine::radial_center` | Parthasarathy 2012 | reference + production | done |
 | GST | — | Reisfeld et al. 1995 | reference | deferred |
 | Iterative voting | — | Parvin et al. 2007 | experimental | deferred |
 | GFRS | `affine::propose` | Ni et al. 2012 | experimental | not started |

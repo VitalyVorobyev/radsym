@@ -43,3 +43,10 @@ pub use crate::support::hypothesis::{
     AnnulusHypothesis, CircleHypothesis, ConcentricPairHypothesis, EllipseHypothesis,
 };
 pub use crate::support::score::{ScoringConfig, SupportScore};
+
+pub use crate::refine::circle::{refine_circle, CircleRefineConfig};
+pub use crate::refine::ellipse::{refine_ellipse, EllipseRefineConfig};
+pub use crate::refine::radial_center::{
+    radial_center_refine, radial_center_refine_from_gradient, RadialCenterConfig,
+};
+pub use crate::refine::result::{RefinementResult, RefinementStatus};
