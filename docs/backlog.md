@@ -55,26 +55,26 @@
 
 ### Milestone 2.1: FRST reference implementation
 
-- [ ] `SeedPoint` type (position + score)
-- [ ] `Proposal` type (seed + scale_hint + polarity + source)
-- [ ] `FrstConfig` with defaults (radii, alpha, gradient threshold, polarity, sigma)
-- [ ] `frst_response_single` — single-radius O_n/M_n accumulation + Gaussian smoothing
-- [ ] `frst_response` — multi-radius summation
-- [ ] Tests: synthetic bright disk, dark disk, concentric rings
+- [x] `SeedPoint` type (position + score)
+- [x] `Proposal` type (seed + scale_hint + polarity + source)
+- [x] `FrstConfig` with defaults (radii, alpha, gradient threshold, polarity, sigma)
+- [x] `frst_response_single` — single-radius O_n/M_n accumulation + Gaussian smoothing
+- [x] `frst_response` — multi-radius summation
+- [x] Tests: synthetic bright disk, dark disk, concentric rings, multi-target, dimensions, threshold
 - [ ] Benchmark: FRST response time vs image size (512², 1024², 2048²)
 
 Literature: Loy & Zelinsky, ECCV 2002 / TPAMI 2003
 
 ### Milestone 2.2: Proposal extraction
 
-- [ ] `ResponseMap` wrapper type
-- [ ] `extract_proposals` using NMS
-- [ ] Tests: correct count from multi-peak response, deterministic ordering
+- [x] `ResponseMap` wrapper type
+- [x] `extract_proposals` using NMS
+- [x] Tests: correct count from multi-peak response, budget enforcement
 
 ### Milestone 2.3: FRST production tuning
 
-- [ ] Gradient magnitude thresholding (beta parameter)
-- [ ] Polarity-selective voting (bright-only, dark-only)
+- [x] Gradient magnitude thresholding (beta parameter)
+- [x] Polarity-selective voting (bright-only, dark-only)
 - [ ] Optional rayon parallelism for multi-radius computation
 - [ ] Benchmarks: gradient threshold effect, rayon vs sequential
 

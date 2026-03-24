@@ -183,6 +183,7 @@ impl ImageView<'_, u8> {
 /// Owned contiguous image buffer.
 ///
 /// Generic over element type `T`. Stride always equals width (contiguous rows).
+#[derive(Debug)]
 pub struct OwnedImage<T> {
     data: Vec<T>,
     width: usize,
