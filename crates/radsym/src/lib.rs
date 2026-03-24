@@ -37,6 +37,7 @@ pub use crate::core::image_view::{ImageView, OwnedImage};
 pub use crate::core::polarity::Polarity;
 pub use crate::propose::extract::{extract_proposals, ResponseMap};
 pub use crate::propose::frst::{frst_response, frst_response_single, FrstConfig};
+pub use crate::propose::rsd::{rsd_response, RsdConfig};
 pub use crate::propose::seed::{Proposal, ProposalSource, SeedPoint};
 pub use crate::support::evidence::SupportEvidence;
 pub use crate::support::hypothesis::{

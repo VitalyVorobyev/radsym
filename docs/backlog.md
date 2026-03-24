@@ -161,9 +161,9 @@ Literature: Barnes, Zelinsky, Fletcher, IEEE T-ITS 2008
 
 ### Milestone 5.1: RSD-style proposal
 
-- [ ] `RsdConfig` with proposal budget
-- [ ] `rsd_response` — simplified magnitude-only voting
-- [ ] Budget-aware early termination
+- [x] `RsdConfig` with gradient threshold, polarity, smoothing
+- [x] `rsd_response` — simplified magnitude-only voting (single + multi-radius)
+- [x] Tests: bright disk detection, multi-target, dimensions, gradient threshold
 - [ ] Benchmark: RSD vs FRST speed and recall comparison
 
 ### Milestone 5.2: Dense-scene tuning
@@ -179,13 +179,15 @@ Literature: Ni, Singh, Bahlmann, CVPR 2012
 
 ### Milestone 6.1: Affine types
 
-- [ ] `AffineMap` type behind `affine` feature gate
-- [ ] Affine parameter sampling strategy
+- [x] `AffineMap` type behind `affine` feature gate (2×2 matrix with compose, inverse, apply)
+- [x] `sample_affine_maps` — rotation × anisotropic scaling parameter sampling
+- [x] Tests: identity, rotation, inverse, composition, singularity
 
 ### Milestone 6.2: GFRS-style response
 
-- [ ] `affine_frst_response` — voting with affine-transformed gradient offsets
-- [ ] Tests: detect synthetic ellipse that isotropic FRST misses
+- [x] `affine_frst_response_single` — voting with affine-warped gradient offsets
+- [x] `affine_frst_responses` — multi-map responses sorted by peak
+- [x] Tests: detect synthetic ellipse center, response ordering
 - [ ] Benchmark: affine-aware vs isotropic cost/benefit
 
 ---
@@ -194,15 +196,15 @@ Literature: Ni, Singh, Bahlmann, CVPR 2012
 
 ### Milestone 7.1: Heatmap export
 
-- [ ] `DiagnosticImage` type (RGBA buffer)
-- [ ] `response_heatmap` — map f32 response to colormap RGBA
+- [x] `DiagnosticImage` type (RGBA buffer with set/get pixel)
+- [x] `response_heatmap` — map f32 response to colormap RGBA (Jet, Hot, Magma)
 - [ ] Feature-gated PNG export via `image` crate
 
 ### Milestone 7.2: Overlays
 
-- [ ] `overlay_proposals` — draw seed markers
-- [ ] `overlay_circle`, `overlay_ellipse`
-- [ ] `overlay_annulus_samples`
+- [x] `overlay_proposals` — draw seed markers
+- [x] `overlay_circle`, `overlay_ellipse` — shape outlines
+- [x] `overlay_marker` — cross marker at position
 
 ### Milestone 7.3: Data export
 
@@ -258,11 +260,11 @@ Literature: Ni, Singh, Bahlmann, CVPR 2012
 | Algorithm | Module | Source | Fidelity | Status |
 |-----------|--------|--------|----------|--------|
 | FRST | `propose::frst` | Loy & Zelinsky 2002/2003 | reference + production | done |
-| RSD | `propose::rsd` | Barnes et al. 2008 | production | not started |
+| RSD | `propose::rsd` | Barnes et al. 2008 | production | done |
 | Parthasarathy radial center | `refine::radial_center` | Parthasarathy 2012 | reference + production | done |
 | GST | — | Reisfeld et al. 1995 | reference | deferred |
 | Iterative voting | — | Parvin et al. 2007 | experimental | deferred |
-| GFRS | `affine::propose` | Ni et al. 2012 | experimental | not started |
+| GFRS | `affine::propose` | Ni et al. 2012 | experimental | done |
 
 ---
 
