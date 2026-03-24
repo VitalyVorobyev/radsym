@@ -217,10 +217,10 @@ Literature: Ni, Singh, Bahlmann, CVPR 2012
 
 ### Milestone 8.1: Rustdoc
 
-- [ ] Module-level doc comments for every module
-- [ ] Type-level and function-level doc comments
-- [ ] Crate-level doc with quick-start example in `lib.rs`
-- [ ] Literature traceability doc comments on algorithm implementations
+- [x] Module-level doc comments for every module
+- [x] Type-level and function-level doc comments
+- [x] Crate-level doc with quick-start example in `lib.rs` (tested)
+- [x] Literature traceability doc comments on algorithm implementations
 
 ### Milestone 8.2: Examples
 
@@ -231,8 +231,9 @@ Literature: Ni, Singh, Bahlmann, CVPR 2012
 
 ### Milestone 8.3: CI
 
-- [ ] GitHub Actions: fmt, clippy, test (all features), test (no default features)
-- [ ] MSRV check (1.80)
+- [x] GitHub Actions: fmt, clippy, test (all features), test (no default features)
+- [x] MSRV check (1.80)
+- [x] Documentation build with warnings-as-errors
 
 ### Milestone 8.4: crates.io preparation
 
