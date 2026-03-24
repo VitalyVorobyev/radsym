@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/radsym",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+rust-version = "1.80"
+authors = ["Vitaly Vorobyev <vit.vorobiev@gmail.com>"]
+repository = "https://github.com/VitalyVorobyev/radsym"
+homepage = "https://github.com/VitalyVorobyev/radsym"

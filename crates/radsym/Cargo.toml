@@ -1,0 +1,48 @@
+[package]
+name = "radsym"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Radial symmetry detection: center proposals, local support analysis, scoring, and refinement"
+documentation = "https://docs.rs/radsym"
+readme = "../../README.md"
+categories = ["algorithms", "multimedia::images", "science"]
+keywords = ["radial-symmetry", "image-processing", "circle-detection", "center-voting", "computer-vision"]
+include = [
+    "src/**",
+    "Cargo.toml",
+]
+
+[dependencies]
+nalgebra = "0.33"
+thiserror = "2"
+rayon = { version = "1", optional = true }
+image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg"] }
+tracing = { version = "0.1", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+
+[dev-dependencies]
+rand = "0.9"
+criterion = "0.5"
+approx = "0.5"
+
+[features]
+default = []
+rayon = ["dep:rayon"]
+image-io = ["dep:image"]
+tracing = ["dep:tracing"]
+affine = []
+serde = ["dep:serde", "nalgebra/serde-serialize"]
+
+# Benchmarks will be added when proposal and refinement modules are implemented.
+# [[bench]]
+# name = "frst"
+# harness = false
+#
+# [[bench]]
+# name = "radial_center"
+# harness = false
