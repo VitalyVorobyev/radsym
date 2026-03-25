@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/radsym",
+    "crates/radsym-py",
 ]
 
 [workspace.package]

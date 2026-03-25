@@ -5,3 +5,8 @@ Cargo.lock
 *~
 .DS_Store
 testdata
+.venv
+output
+__pycache__
+*.pyc
+.pytest_cache

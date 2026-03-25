@@ -250,12 +250,15 @@ Literature: Ni, Singh, Bahlmann, CVPR 2012
 
 ### Milestone 9.1: radsym-py crate
 
-- [ ] `crates/radsym-py/Cargo.toml` with PyO3 + maturin
-- [ ] Numpy ndarray image interop
-- [ ] Expose proposal generation
-- [ ] Expose support scoring
-- [ ] Expose refinement
-- [ ] Python tests
+- [x] `crates/radsym-py/Cargo.toml` with PyO3 0.25 + maturin
+- [x] Numpy ndarray image interop (uint8 input, float32/uint8 output)
+- [x] Expose gradient computation (sobel_gradient)
+- [x] Expose proposal generation (frst_response, rsd_response, extract_proposals)
+- [x] Expose support scoring (score_circle_support, score_ellipse_support)
+- [x] Expose refinement (refine_circle, refine_ellipse, radial_center_refine)
+- [x] Expose diagnostics (response_heatmap, overlay_circle/ellipse, save_diagnostic, load_grayscale)
+- [x] Full Python class wrappers with docstrings and __repr__ for all types
+- [x] 27 Python tests (pipeline, types, diagnostics) — all passing
 
 ---
 

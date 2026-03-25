@@ -1,0 +1,18 @@
+[package]
+name = "radsym-py"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+description = "Python bindings for the radsym radial symmetry detection library"
+publish = false
+
+[lib]
+name = "radsym_py"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.25", features = ["extension-module"] }
+numpy = "0.25"
+radsym = { path = "../radsym", features = ["image-io", "serde"] }
