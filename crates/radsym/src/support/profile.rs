@@ -181,13 +181,7 @@ mod tests {
         let data = vec![1.0f32; size * size];
         let img = OwnedImage::from_vec(data, size, size).unwrap();
         let ellipse = Ellipse::new(PixelCoord::new(20.0, 20.0), 10.0, 10.0, 0.0);
-        let profile = compute_normal_profile(
-            &img.view(),
-            &ellipse,
-            0.0,
-            5.0,
-            11,
-        );
+        let profile = compute_normal_profile(&img.view(), &ellipse, 0.0, 5.0, 11);
         assert_eq!(profile.len(), 11);
     }
 }
