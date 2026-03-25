@@ -21,7 +21,7 @@
 ### Milestone 1.2: Core types
 
 - [x] `scalar.rs` — `Scalar = f32` alias
-- [x] `coords.rs` — `PixelCoord`, `PixelIndex`, `ImagePoint` newtype
+- [x] `coords.rs` — `PixelCoord`, `PixelIndex` (ImagePoint removed as unused)
 - [x] `geometry.rs` — `Circle`, `Ellipse`, `Annulus`, `Circle→Ellipse` conversion
 - [x] `polarity.rs` — `Polarity` enum (Bright/Dark/Both)
 - [x] `error.rs` — `RadSymError` enum via thiserror, `Result<T>` alias
@@ -61,7 +61,7 @@
 - [x] `frst_response_single` — single-radius O_n/M_n accumulation + Gaussian smoothing
 - [x] `frst_response` — multi-radius summation
 - [x] Tests: synthetic bright disk, dark disk, concentric rings, multi-target, dimensions, threshold
-- [ ] Benchmark: FRST response time vs image size (512², 1024², 2048²)
+- [x] Benchmark: FRST response time vs image size (256², 512², 1024²)
 
 Literature: Loy & Zelinsky, ECCV 2002 / TPAMI 2003
 
@@ -78,9 +78,11 @@ Literature: Loy & Zelinsky, ECCV 2002 / TPAMI 2003
 - [ ] Optional rayon parallelism for multi-radius computation
 - [ ] Benchmarks: gradient threshold effect, rayon vs sequential
 
-### Milestone 2.4: Basic proposal example
+### Milestone 2.4: Examples
 
-- [ ] `examples/basic_proposal.rs` — load image, compute FRST, extract proposals
+- [x] `examples/detect_rings.rs` — load image, compute FRST, extract proposals, score, refine
+- [x] `examples/detect_highlight.rs` — single target with ellipse refinement
+- [x] JSON config files for all examples (`examples/configs/`)
 
 ---
 
@@ -125,7 +127,7 @@ Literature: Loy & Zelinsky, ECCV 2002 / TPAMI 2003
 - [x] `radial_center_refine` — closed-form weighted LS intersection of gradient lines
 - [x] Roberts-cross gradient on half-pixel grid (per original paper)
 - [x] Tests: subpixel accuracy on synthetic Gaussian blob, synthetic ring
-- [ ] Benchmark: refinement time per seed
+- [x] Benchmark: refinement time per seed (radial_center + refine_circle)
 
 Literature: Parthasarathy, Nature Methods 2012
 
@@ -164,7 +166,7 @@ Literature: Barnes, Zelinsky, Fletcher, IEEE T-ITS 2008
 - [x] `RsdConfig` with gradient threshold, polarity, smoothing
 - [x] `rsd_response` — simplified magnitude-only voting (single + multi-radius)
 - [x] Tests: bright disk detection, multi-target, dimensions, gradient threshold
-- [ ] Benchmark: RSD vs FRST speed and recall comparison
+- [x] Benchmark: RSD response time vs image size (256², 512², 1024²)
 
 ### Milestone 5.2: Dense-scene tuning
 
@@ -188,7 +190,7 @@ Literature: Ni, Singh, Bahlmann, CVPR 2012
 - [x] `affine_frst_response_single` — voting with affine-warped gradient offsets
 - [x] `affine_frst_responses` — multi-map responses sorted by peak
 - [x] Tests: detect synthetic ellipse center, response ordering
-- [ ] Benchmark: affine-aware vs isotropic cost/benefit
+- [ ] Benchmark: affine-aware vs isotropic cost/benefit (deferred)
 
 ---
 
@@ -198,7 +200,7 @@ Literature: Ni, Singh, Bahlmann, CVPR 2012
 
 - [x] `DiagnosticImage` type (RGBA buffer with set/get pixel)
 - [x] `response_heatmap` — map f32 response to colormap RGBA (Jet, Hot, Magma)
-- [ ] Feature-gated PNG export via `image` crate
+- [x] Feature-gated PNG export via `image` crate (`diagnostics/export.rs`, `core/io.rs`)
 
 ### Milestone 7.2: Overlays
 
@@ -208,7 +210,8 @@ Literature: Ni, Singh, Bahlmann, CVPR 2012
 
 ### Milestone 7.3: Data export
 
-- [ ] JSON export of proposals and scores (serde feature)
+- [x] Serde derives on all public config, result, and geometry types
+- [ ] JSON export of proposals and scores (convenience functions)
 - [ ] Radial profile data export
 
 ---
@@ -224,10 +227,10 @@ Literature: Ni, Singh, Bahlmann, CVPR 2012
 
 ### Milestone 8.2: Examples
 
-- [ ] `examples/basic_proposal.rs`
-- [ ] `examples/support_scoring.rs`
-- [ ] `examples/radial_center_refine.rs`
-- [ ] `examples/diagnostics_export.rs`
+- [x] `examples/detect_rings.rs` — FRST + scoring + circle refinement on ring grid
+- [x] `examples/detect_highlight.rs` — single target with ellipse refinement
+- [x] `examples/radial_center_demo.rs` — subpixel center refinement accuracy
+- [x] `examples/diagnostics_demo.rs` — heatmap + circle overlay export
 
 ### Milestone 8.3: CI
 

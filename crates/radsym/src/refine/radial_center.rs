@@ -24,6 +24,7 @@ use super::result::{RefinementResult, RefinementStatus};
 
 /// Configuration for radial center refinement.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RadialCenterConfig {
     /// Half-width of the patch around the seed (in pixels).
     /// The full patch is `(2*patch_radius+1)²`.

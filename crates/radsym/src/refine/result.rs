@@ -7,6 +7,8 @@ use crate::core::scalar::Scalar;
 
 /// Status of a refinement procedure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum RefinementStatus {
     /// Converged within the requested tolerance.
     Converged,
@@ -20,6 +22,14 @@ pub enum RefinementStatus {
 
 /// Result of a local refinement procedure.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "H: serde::Serialize",
+        deserialize = "H: serde::de::DeserializeOwned"
+    ))
+)]
 pub struct RefinementResult<H> {
     /// The refined hypothesis.
     pub hypothesis: H,

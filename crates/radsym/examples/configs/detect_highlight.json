@@ -1,0 +1,16 @@
+{
+  "image_path": "testdata/surf1.png",
+  "polarity": "Bright",
+  "radius_hint": 30.0,
+  "frst": {
+    "radii": [20, 25, 30, 35, 40],
+    "alpha": 2.0,
+    "gradient_threshold": 3.0,
+    "smoothing_factor": 0.5
+  },
+  "nms": {
+    "radius": 20,
+    "threshold": 0.01,
+    "max_detections": 5
+  }
+}

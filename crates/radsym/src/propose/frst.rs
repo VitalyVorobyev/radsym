@@ -37,6 +37,7 @@ use crate::core::scalar::Scalar;
 
 /// Configuration for FRST response computation.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FrstConfig {
     /// Set of discrete radii to test (in pixels).
     pub radii: Vec<u32>,
@@ -112,14 +113,8 @@ pub fn frst_response_single(
             let px_neg = x as i32 - (dx * n as Scalar).round() as i32;
             let py_neg = y as i32 - (dy * n as Scalar).round() as i32;
 
-            let vote_pos = match config.polarity {
-                Polarity::Bright | Polarity::Both => true,
-                Polarity::Dark => false,
-            };
-            let vote_neg = match config.polarity {
-                Polarity::Dark | Polarity::Both => true,
-                Polarity::Bright => false,
-            };
+            let vote_pos = config.polarity.votes_positive();
+            let vote_neg = config.polarity.votes_negative();
 
             if vote_pos
                 && px_pos >= 0
@@ -170,7 +165,7 @@ pub fn frst_response_single(
     // Gaussian smoothing
     let sigma = config.smoothing_factor * radius as Scalar;
     if sigma > 0.5 {
-        gaussian_blur_inplace(&mut f_n, sigma);
+        crate::core::blur::gaussian_blur_inplace(&mut f_n, sigma);
     }
 
     Ok(f_n)
@@ -194,65 +189,6 @@ pub fn frst_response(gradient: &GradientField, config: &FrstConfig) -> Result<Ow
     }
 
     Ok(response)
-}
-
-// ---------------------------------------------------------------------------
-// Gaussian blur (separable, in-place)
-// ---------------------------------------------------------------------------
-
-/// Separable Gaussian blur on an OwnedImage<f32>.
-fn gaussian_blur_inplace(image: &mut OwnedImage<Scalar>, sigma: Scalar) {
-    let w = image.width();
-    let h = image.height();
-
-    // Kernel radius: 3*sigma, clamped to a reasonable size
-    let krad = (3.0 * sigma).ceil() as usize;
-    if krad == 0 {
-        return;
-    }
-    let ksize = 2 * krad + 1;
-
-    // Build 1D Gaussian kernel
-    let mut kernel = vec![0.0f32; ksize];
-    let s2 = 2.0 * sigma * sigma;
-    let mut sum = 0.0f32;
-    for (i, k) in kernel.iter_mut().enumerate() {
-        let d = i as Scalar - krad as Scalar;
-        *k = (-d * d / s2).exp();
-        sum += *k;
-    }
-    for k in &mut kernel {
-        *k /= sum;
-    }
-
-    // Horizontal pass
-    let mut buf = vec![0.0f32; w * h];
-    let data = image.data();
-    for y in 0..h {
-        for x in 0..w {
-            let mut acc = 0.0f32;
-            for (ki, &kv) in kernel.iter().enumerate() {
-                let sx = x as i32 + ki as i32 - krad as i32;
-                let sx = sx.clamp(0, w as i32 - 1) as usize;
-                acc += data[y * w + sx] * kv;
-            }
-            buf[y * w + x] = acc;
-        }
-    }
-
-    // Vertical pass
-    let out = image.data_mut();
-    for y in 0..h {
-        for x in 0..w {
-            let mut acc = 0.0f32;
-            for (ki, &kv) in kernel.iter().enumerate() {
-                let sy = y as i32 + ki as i32 - krad as i32;
-                let sy = sy.clamp(0, h as i32 - 1) as usize;
-                acc += buf[sy * w + x] * kv;
-            }
-            out[y * w + x] = acc;
-        }
-    }
 }
 
 #[cfg(test)]

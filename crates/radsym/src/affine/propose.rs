@@ -26,6 +26,7 @@ use super::transform::AffineMap;
 
 /// Configuration for affine-aware FRST response.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AffineFrstConfig {
     /// Radius for voting (single radius for simplicity).
     pub radius: u32,
@@ -119,7 +120,7 @@ pub fn affine_frst_response_single(
     // Gaussian smoothing
     let sigma = smoothing_factor * radius as Scalar;
     if sigma > 0.5 {
-        gaussian_blur_inplace(acc.data_mut(), w, h, sigma);
+        crate::core::blur::gaussian_blur_inplace(&mut acc, sigma);
     }
 
     Ok(acc)
@@ -157,51 +158,6 @@ pub fn affine_frst_responses(
     responses.sort_by(|a, b| b.peak_value.partial_cmp(&a.peak_value).unwrap());
 
     Ok(responses)
-}
-
-/// Separable Gaussian blur (same as RSD/FRST modules).
-fn gaussian_blur_inplace(data: &mut [Scalar], w: usize, h: usize, sigma: Scalar) {
-    let ksize = ((sigma * 3.0).ceil() as usize) * 2 + 1;
-    let half = ksize / 2;
-    let mut kernel = vec![0.0f32; ksize];
-    let inv_2s2 = 1.0 / (2.0 * sigma * sigma);
-    let mut ksum = 0.0f32;
-    for (i, k) in kernel.iter_mut().enumerate() {
-        let d = i as f32 - half as f32;
-        *k = (-d * d * inv_2s2).exp();
-        ksum += *k;
-    }
-    for k in &mut kernel {
-        *k /= ksum;
-    }
-
-    let mut row_buf = vec![0.0f32; w];
-    for y in 0..h {
-        for (x, rb) in row_buf.iter_mut().enumerate() {
-            let mut val = 0.0f32;
-            for (ki, &kv) in kernel.iter().enumerate() {
-                let sx = (x as i32 + ki as i32 - half as i32).clamp(0, w as i32 - 1) as usize;
-                val += data[y * w + sx] * kv;
-            }
-            *rb = val;
-        }
-        data[y * w..y * w + w].copy_from_slice(&row_buf);
-    }
-
-    let mut col_buf = vec![0.0f32; h];
-    for x in 0..w {
-        for (y, cb) in col_buf.iter_mut().enumerate() {
-            let mut val = 0.0f32;
-            for (ki, &kv) in kernel.iter().enumerate() {
-                let sy = (y as i32 + ki as i32 - half as i32).clamp(0, h as i32 - 1) as usize;
-                val += data[sy * w + x] * kv;
-            }
-            *cb = val;
-        }
-        for (y, &cv) in col_buf.iter().enumerate() {
-            data[y * w + x] = cv;
-        }
-    }
 }
 
 #[cfg(test)]

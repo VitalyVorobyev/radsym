@@ -10,11 +10,11 @@ use crate::core::scalar::Scalar;
 #[derive(Debug, Clone)]
 pub struct DiagnosticImage {
     /// RGBA pixel data, row-major.
-    pub data: Vec<u8>,
+    pub(crate) data: Vec<u8>,
     /// Image width in pixels.
-    pub width: usize,
+    width: usize,
     /// Image height in pixels.
-    pub height: usize,
+    height: usize,
 }
 
 impl DiagnosticImage {
@@ -25,6 +25,30 @@ impl DiagnosticImage {
             width,
             height,
         }
+    }
+
+    /// Image width in pixels.
+    #[inline]
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    /// Image height in pixels.
+    #[inline]
+    pub fn height(&self) -> usize {
+        self.height
+    }
+
+    /// The raw RGBA pixel data.
+    #[inline]
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Consume the image, returning the raw RGBA pixel data.
+    #[inline]
+    pub fn into_data(self) -> Vec<u8> {
+        self.data
     }
 
     /// Set a pixel at (x, y) to the given RGBA color.
@@ -55,6 +79,8 @@ impl DiagnosticImage {
 
 /// Available colormaps for heatmap rendering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum Colormap {
     /// Blue → cyan → green → yellow → red (jet-like).
     Jet,
@@ -132,9 +158,9 @@ mod tests {
     fn heatmap_dimensions() {
         let response = OwnedImage::from_vec(vec![0.0f32; 16], 4, 4).unwrap();
         let hm = response_heatmap(&response, Colormap::Jet);
-        assert_eq!(hm.width, 4);
-        assert_eq!(hm.height, 4);
-        assert_eq!(hm.data.len(), 4 * 4 * 4);
+        assert_eq!(hm.width(), 4);
+        assert_eq!(hm.height(), 4);
+        assert_eq!(hm.data().len(), 4 * 4 * 4);
     }
 
     #[test]

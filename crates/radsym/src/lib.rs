@@ -34,7 +34,7 @@
 //! let response = radsym::frst_response(&gradient, &config).unwrap();
 //!
 //! // 3. Extract proposals via NMS
-//! let response_map = ResponseMap { data: response, source: ProposalSource::Frst };
+//! let response_map = ResponseMap::new(response, ProposalSource::Frst);
 //! let nms = NmsConfig { radius: 5, threshold: 0.0, max_detections: 5 };
 //! let proposals = extract_proposals(&response_map, &nms, Polarity::Bright);
 //!
@@ -94,3 +94,8 @@ pub use crate::refine::radial_center::{
     radial_center_refine, radial_center_refine_from_gradient, RadialCenterConfig,
 };
 pub use crate::refine::result::{RefinementResult, RefinementStatus};
+
+#[cfg(feature = "image-io")]
+pub use crate::core::io::load_grayscale;
+#[cfg(feature = "image-io")]
+pub use crate::diagnostics::export::{save_diagnostic, save_grayscale, save_response_map};

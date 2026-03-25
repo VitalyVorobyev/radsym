@@ -17,6 +17,7 @@ use super::result::{RefinementResult, RefinementStatus};
 
 /// Configuration for iterative ellipse refinement.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EllipseRefineConfig {
     /// Maximum number of refinement iterations.
     pub max_iterations: usize,

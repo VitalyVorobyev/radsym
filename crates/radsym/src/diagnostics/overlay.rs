@@ -16,7 +16,7 @@ pub fn overlay_circle(img: &mut DiagnosticImage, circle: &Circle, color: [u8; 4]
         let theta = 2.0 * std::f32::consts::PI * i as Scalar / n_points as Scalar;
         let x = (circle.center.x + circle.radius * theta.cos()).round() as i32;
         let y = (circle.center.y + circle.radius * theta.sin()).round() as i32;
-        if x >= 0 && (x as usize) < img.width && y >= 0 && (y as usize) < img.height {
+        if x >= 0 && (x as usize) < img.width() && y >= 0 && (y as usize) < img.height() {
             img.set_pixel(x as usize, y as usize, color);
         }
     }
@@ -37,7 +37,7 @@ pub fn overlay_ellipse(img: &mut DiagnosticImage, ellipse: &Ellipse, color: [u8;
         let x = (ellipse.center.x + lx * cos_a - ly * sin_a).round() as i32;
         let y = (ellipse.center.y + lx * sin_a + ly * cos_a).round() as i32;
 
-        if x >= 0 && (x as usize) < img.width && y >= 0 && (y as usize) < img.height {
+        if x >= 0 && (x as usize) < img.width() && y >= 0 && (y as usize) < img.height() {
             img.set_pixel(x as usize, y as usize, color);
         }
     }
@@ -57,13 +57,13 @@ pub fn overlay_marker(
 
     for dx in -s..=s {
         let px = cx + dx;
-        if px >= 0 && (px as usize) < img.width && cy >= 0 && (cy as usize) < img.height {
+        if px >= 0 && (px as usize) < img.width() && cy >= 0 && (cy as usize) < img.height() {
             img.set_pixel(px as usize, cy as usize, color);
         }
     }
     for dy in -s..=s {
         let py = cy + dy;
-        if cx >= 0 && (cx as usize) < img.width && py >= 0 && (py as usize) < img.height {
+        if cx >= 0 && (cx as usize) < img.width() && py >= 0 && (py as usize) < img.height() {
             img.set_pixel(cx as usize, py as usize, color);
         }
     }

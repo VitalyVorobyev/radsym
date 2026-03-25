@@ -2,6 +2,7 @@
 
 /// Errors that can occur in `radsym` operations.
 #[derive(thiserror::Error, Debug, Clone)]
+#[non_exhaustive]
 pub enum RadSymError {
     /// Image dimensions are invalid (zero or incompatible).
     #[error("invalid dimensions: width={width} height={height}")]
@@ -49,6 +50,14 @@ pub enum RadSymError {
     RefinementFailed {
         /// Description of the failure.
         reason: &'static str,
+    },
+
+    /// Image I/O error (feature-gated: `image-io`).
+    #[cfg(feature = "image-io")]
+    #[error("image I/O error: {reason}")]
+    ImageIo {
+        /// Description of the I/O failure.
+        reason: String,
     },
 }
 

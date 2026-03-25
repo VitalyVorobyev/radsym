@@ -5,6 +5,7 @@ use super::scalar::Scalar;
 
 /// A circle in image coordinates.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Circle {
     /// Center position (x = col, y = row).
     pub center: PixelCoord,
@@ -22,6 +23,7 @@ impl Circle {
 
 /// An ellipse in image coordinates.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ellipse {
     /// Center position (x = col, y = row).
     pub center: PixelCoord,
@@ -71,6 +73,7 @@ impl From<Circle> for Ellipse {
 
 /// A circular annulus (ring) in image coordinates.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Annulus {
     /// Center position.
     pub center: PixelCoord,

@@ -12,6 +12,7 @@ use super::evidence::{GradientSample, SupportEvidence};
 
 /// Configuration for annulus sampling.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AnnulusSamplingConfig {
     /// Number of angular samples around the annulus.
     pub num_angular_samples: usize,

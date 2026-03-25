@@ -10,9 +10,9 @@ use super::scalar::Scalar;
 /// Per-pixel gradient field storing separate x and y gradient components.
 pub struct GradientField {
     /// Horizontal gradient (dI/dx). Positive = intensity increases rightward.
-    pub gx: OwnedImage<Scalar>,
+    pub(crate) gx: OwnedImage<Scalar>,
     /// Vertical gradient (dI/dy). Positive = intensity increases downward.
-    pub gy: OwnedImage<Scalar>,
+    pub(crate) gy: OwnedImage<Scalar>,
 }
 
 impl GradientField {
@@ -26,6 +26,18 @@ impl GradientField {
     #[inline]
     pub fn height(&self) -> usize {
         self.gx.height()
+    }
+
+    /// Borrowed view of the horizontal gradient component.
+    #[inline]
+    pub fn gx(&self) -> ImageView<'_, Scalar> {
+        self.gx.view()
+    }
+
+    /// Borrowed view of the vertical gradient component.
+    #[inline]
+    pub fn gy(&self) -> ImageView<'_, Scalar> {
+        self.gy.view()
     }
 
     /// Gradient vector at pixel `(x, y)`.

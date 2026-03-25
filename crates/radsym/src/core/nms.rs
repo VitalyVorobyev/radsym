@@ -6,6 +6,7 @@ use super::scalar::Scalar;
 
 /// Configuration for non-maximum suppression.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NmsConfig {
     /// Suppression radius in pixels (half-window size).
     pub radius: usize,
@@ -27,6 +28,7 @@ impl Default for NmsConfig {
 
 /// A detected peak with position and score.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Peak {
     /// Peak position in pixel coordinates.
     pub position: PixelCoord,

@@ -6,6 +6,7 @@ use crate::core::scalar::Scalar;
 
 /// A candidate center location with a response score.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SeedPoint {
     /// Position in pixel coordinates (x = col, y = row).
     pub position: PixelCoord,
@@ -15,6 +16,8 @@ pub struct SeedPoint {
 
 /// Source algorithm that generated a proposal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum ProposalSource {
     /// Fast Radial Symmetry Transform (Loy & Zelinsky 2002).
     Frst,
@@ -29,6 +32,7 @@ pub enum ProposalSource {
 /// Proposals are the primary output of the `propose` module. They represent
 /// candidate center locations for downstream support analysis and refinement.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Proposal {
     /// The seed point (position + score).
     pub seed: SeedPoint,

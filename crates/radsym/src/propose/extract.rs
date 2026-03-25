@@ -11,9 +11,31 @@ use super::seed::{Proposal, ProposalSource, SeedPoint};
 #[derive(Debug)]
 pub struct ResponseMap {
     /// The response image.
-    pub data: OwnedImage<Scalar>,
+    data: OwnedImage<Scalar>,
     /// Source algorithm that produced this response.
-    pub source: ProposalSource,
+    source: ProposalSource,
+}
+
+impl ResponseMap {
+    /// Create a new response map.
+    pub fn new(data: OwnedImage<Scalar>, source: ProposalSource) -> Self {
+        Self { data, source }
+    }
+
+    /// Borrowed view of the response image.
+    pub fn view(&self) -> crate::core::image_view::ImageView<'_, Scalar> {
+        self.data.view()
+    }
+
+    /// Reference to the underlying response image.
+    pub fn response(&self) -> &OwnedImage<Scalar> {
+        &self.data
+    }
+
+    /// The source algorithm.
+    pub fn source(&self) -> ProposalSource {
+        self.source
+    }
 }
 
 /// Extract proposals from a response map using non-maximum suppression.
@@ -24,7 +46,7 @@ pub fn extract_proposals(
     nms_config: &NmsConfig,
     polarity: Polarity,
 ) -> Vec<Proposal> {
-    let peaks: Vec<Peak> = non_maximum_suppression(&response.data.view(), nms_config);
+    let peaks: Vec<Peak> = non_maximum_suppression(&response.view(), nms_config);
 
     peaks
         .into_iter()
@@ -35,7 +57,7 @@ pub fn extract_proposals(
             },
             scale_hint: None,
             polarity,
-            source: response.source,
+            source: response.source(),
         })
         .collect()
 }
@@ -51,10 +73,7 @@ mod tests {
         *response_data.get_mut(10, 10).unwrap() = 5.0;
         *response_data.get_mut(20, 20).unwrap() = 3.0;
 
-        let response = ResponseMap {
-            data: response_data,
-            source: ProposalSource::Frst,
-        };
+        let response = ResponseMap::new(response_data, ProposalSource::Frst);
 
         let nms = NmsConfig {
             radius: 3,
@@ -77,10 +96,7 @@ mod tests {
         *response_data.get_mut(15, 15).unwrap() = 2.0;
         *response_data.get_mut(30, 30).unwrap() = 3.0;
 
-        let response = ResponseMap {
-            data: response_data,
-            source: ProposalSource::Frst,
-        };
+        let response = ResponseMap::new(response_data, ProposalSource::Frst);
 
         let nms = NmsConfig {
             radius: 2,

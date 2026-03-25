@@ -22,6 +22,7 @@ use crate::core::scalar::Scalar;
 /// accumulator. Peaks in different accumulators indicate different
 /// elliptical symmetry orientations.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AffineMap {
     /// Element (0,0) of the 2×2 matrix.
     pub a: Scalar,

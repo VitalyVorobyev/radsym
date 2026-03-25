@@ -1,0 +1,16 @@
+{
+  "image_path": "testdata/ringgrid.png",
+  "polarity": "Dark",
+  "radius_hint": 12.0,
+  "frst": {
+    "radii": [8, 10, 12, 14, 16],
+    "alpha": 2.0,
+    "gradient_threshold": 2.0
+  },
+  "nms": {
+    "radius": 12,
+    "threshold": 0.01,
+    "max_detections": 30
+  },
+  "output_dir": "output"
+}

@@ -8,6 +8,7 @@ use crate::core::scalar::Scalar;
 
 /// A circle hypothesis with confidence.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CircleHypothesis {
     /// The circle geometry.
     pub circle: Circle,
@@ -25,6 +26,7 @@ impl CircleHypothesis {
 
 /// An ellipse hypothesis with confidence.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EllipseHypothesis {
     /// The ellipse geometry.
     pub ellipse: Ellipse,
@@ -54,6 +56,7 @@ impl From<CircleHypothesis> for EllipseHypothesis {
 
 /// An annulus (ring) hypothesis with confidence.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AnnulusHypothesis {
     /// The annulus geometry.
     pub annulus: Annulus,
@@ -74,6 +77,7 @@ impl AnnulusHypothesis {
 
 /// A concentric pair hypothesis: two ellipses sharing a center.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcentricPairHypothesis {
     /// Inner ellipse.
     pub inner: Ellipse,

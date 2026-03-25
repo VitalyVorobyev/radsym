@@ -27,6 +27,7 @@ use crate::core::scalar::Scalar;
 
 /// Configuration for RSD response computation.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RsdConfig {
     /// Set of discrete radii to test (in pixels).
     pub radii: Vec<u32>,
@@ -93,8 +94,8 @@ pub fn rsd_response_single(
             let px_neg = x as i32 - (dx * n as Scalar).round() as i32;
             let py_neg = y as i32 - (dy * n as Scalar).round() as i32;
 
-            let vote_pos = matches!(config.polarity, Polarity::Bright | Polarity::Both);
-            let vote_neg = matches!(config.polarity, Polarity::Dark | Polarity::Both);
+            let vote_pos = config.polarity.votes_positive();
+            let vote_neg = config.polarity.votes_negative();
 
             if vote_pos
                 && px_pos >= 0
@@ -119,7 +120,7 @@ pub fn rsd_response_single(
     // Gaussian smoothing
     let sigma = config.smoothing_factor * radius as Scalar;
     if sigma > 0.5 {
-        gaussian_blur_inplace(acc.data_mut(), w, h, sigma);
+        crate::core::blur::gaussian_blur_inplace(&mut acc, sigma);
     }
 
     Ok(acc)
@@ -141,53 +142,6 @@ pub fn rsd_response(gradient: &GradientField, config: &RsdConfig) -> Result<Owne
     }
 
     Ok(sum)
-}
-
-/// Separable Gaussian blur (same implementation as FRST module).
-fn gaussian_blur_inplace(data: &mut [Scalar], w: usize, h: usize, sigma: Scalar) {
-    let ksize = ((sigma * 3.0).ceil() as usize) * 2 + 1;
-    let half = ksize / 2;
-    let mut kernel = vec![0.0f32; ksize];
-    let inv_2s2 = 1.0 / (2.0 * sigma * sigma);
-    let mut ksum = 0.0f32;
-    for (i, k) in kernel.iter_mut().enumerate() {
-        let d = i as f32 - half as f32;
-        *k = (-d * d * inv_2s2).exp();
-        ksum += *k;
-    }
-    for k in &mut kernel {
-        *k /= ksum;
-    }
-
-    // Horizontal pass
-    let mut row_buf = vec![0.0f32; w];
-    for y in 0..h {
-        for (x, rb) in row_buf.iter_mut().enumerate() {
-            let mut val = 0.0f32;
-            for (ki, &kv) in kernel.iter().enumerate() {
-                let sx = (x as i32 + ki as i32 - half as i32).clamp(0, w as i32 - 1) as usize;
-                val += data[y * w + sx] * kv;
-            }
-            *rb = val;
-        }
-        data[y * w..y * w + w].copy_from_slice(&row_buf);
-    }
-
-    // Vertical pass
-    let mut col_buf = vec![0.0f32; h];
-    for x in 0..w {
-        for (y, cb) in col_buf.iter_mut().enumerate() {
-            let mut val = 0.0f32;
-            for (ki, &kv) in kernel.iter().enumerate() {
-                let sy = (y as i32 + ki as i32 - half as i32).clamp(0, h as i32 - 1) as usize;
-                val += data[sy * w + x] * kv;
-            }
-            *cb = val;
-        }
-        for (y, &cv) in col_buf.iter().enumerate() {
-            data[y * w + x] = cv;
-        }
-    }
 }
 
 #[cfg(test)]

@@ -13,6 +13,7 @@ use super::coverage::angular_coverage;
 
 /// Structured support score with component breakdown.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SupportScore {
     /// Combined total score in `[0, 1]`.
     pub total: Scalar,
@@ -28,6 +29,7 @@ pub struct SupportScore {
 
 /// Configuration for support scoring.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ScoringConfig {
     /// Annulus sampling configuration.
     pub sampling: AnnulusSamplingConfig,

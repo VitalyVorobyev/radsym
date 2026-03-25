@@ -29,6 +29,7 @@ serde = { version = "1", features = ["derive"], optional = true }
 rand = "0.9"
 criterion = "0.5"
 approx = "0.5"
+serde_json = "1"
 
 [features]
 default = []
@@ -38,11 +39,34 @@ tracing = ["dep:tracing"]
 affine = []
 serde = ["dep:serde", "nalgebra/serde-serialize"]
 
-# Benchmarks will be added when proposal and refinement modules are implemented.
-# [[bench]]
-# name = "frst"
-# harness = false
-#
-# [[bench]]
-# name = "radial_center"
-# harness = false
+[[bench]]
+name = "frst_bench"
+harness = false
+
+[[bench]]
+name = "rsd_bench"
+harness = false
+
+[[bench]]
+name = "refinement_bench"
+harness = false
+
+[[bench]]
+name = "scoring_bench"
+harness = false
+
+[[example]]
+name = "detect_rings"
+required-features = ["image-io", "serde"]
+
+[[example]]
+name = "detect_highlight"
+required-features = ["image-io", "serde"]
+
+[[example]]
+name = "radial_center_demo"
+required-features = ["image-io", "serde"]
+
+[[example]]
+name = "diagnostics_demo"
+required-features = ["image-io", "serde"]
