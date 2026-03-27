@@ -1,5 +1,6 @@
 """Test Python wrapper type construction, attributes, and repr."""
 
+import numpy as np
 import radsym
 
 
@@ -30,6 +31,22 @@ def test_ellipse_construction():
 def test_ellipse_default_angle():
     e = radsym.Ellipse((0.0, 0.0), 10.0, 5.0)
     assert e.angle == 0.0
+
+
+def test_homography_construction_from_flat_and_array():
+    h1 = radsym.Homography([1.0, 0.0, 10.0, 0.0, 1.0, 5.0, 0.0, 0.0, 1.0])
+    h2 = radsym.Homography(np.eye(3, dtype=np.float32))
+    assert len(h1.matrix) == 3
+    assert len(h1.matrix[0]) == 3
+    assert "Homography" in repr(h1)
+    assert h2.matrix[0][0] == 1.0
+
+
+def test_rectified_grid_construction():
+    grid = radsym.RectifiedGrid(128, 96)
+    assert grid.width == 128
+    assert grid.height == 96
+    assert "RectifiedGrid" in repr(grid)
 
 
 def test_frst_config_defaults():
@@ -83,8 +100,30 @@ def test_circle_refine_config():
 
 
 def test_ellipse_refine_config():
-    cfg = radsym.EllipseRefineConfig()
+    cfg = radsym.EllipseRefineConfig(ray_count=64, max_axis_ratio=1.6)
     assert "EllipseRefineConfig" in repr(cfg)
+    assert "ray_count=64" in repr(cfg)
+
+
+def test_homography_configs():
+    rerank = radsym.HomographyRerankConfig(ray_count=48)
+    refine = radsym.HomographyEllipseRefineConfig(ray_count=72)
+    assert "HomographyRerankConfig" in repr(rerank)
+    assert "HomographyEllipseRefineConfig" in repr(refine)
+
+
+def test_removed_boundary_mode_kwargs():
+    try:
+        radsym.EllipseRefineConfig(edge_mode="best")
+        assert False, "should have raised TypeError"
+    except TypeError:
+        pass
+
+    try:
+        radsym.HomographyEllipseRefineConfig(max_candidates_per_sector=2)
+        assert False, "should have raised TypeError"
+    except TypeError:
+        pass
 
 
 def test_radial_center_config():

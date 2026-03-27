@@ -6,10 +6,12 @@
 use crate::core::coords::PixelCoord;
 use crate::core::geometry::{Circle, Ellipse};
 use crate::core::gradient::GradientField;
+use crate::core::homography::Homography;
 use crate::core::scalar::Scalar;
+use nalgebra::Vector2;
 
 use super::annulus::{sample_annulus, sample_elliptical_annulus, AnnulusSamplingConfig};
-use super::coverage::angular_coverage;
+use super::coverage::{angular_coverage, ellipse_angular_coverage};
 
 /// Structured support score with component breakdown.
 #[derive(Debug, Clone, Copy)]
@@ -119,15 +121,7 @@ pub fn score_ellipse_support(
     let is_degenerate = evidence.sample_count < config.min_samples;
     let ringness = evidence.mean_gradient_alignment;
 
-    // For ellipse, estimate angular coverage using the mean radius
-    let mean_radius = (ellipse.semi_major + ellipse.semi_minor) / 2.0;
-    let cov = angular_coverage(
-        gradient,
-        ellipse.center,
-        mean_radius,
-        0.5,
-        config.sampling.num_angular_samples,
-    );
+    let cov = ellipse_angular_coverage(gradient, ellipse, 0.5, config.sampling.num_angular_samples);
 
     let total = if is_degenerate {
         0.0
@@ -140,6 +134,106 @@ pub fn score_ellipse_support(
         ringness,
         polarity_consistency: 1.0,
         angular_coverage: cov,
+        is_degenerate,
+    }
+}
+
+/// Score support for a rectified-frame circle by sampling in rectified angle
+/// and evaluating the pulled-back normal alignment in image space.
+pub fn score_rectified_circle_support(
+    gradient: &GradientField,
+    rectified_circle: &Circle,
+    homography: &Homography,
+    config: &ScoringConfig,
+) -> SupportScore {
+    if rectified_circle.radius <= 1e-6 {
+        return SupportScore {
+            total: 0.0,
+            ringness: 0.0,
+            polarity_consistency: 1.0,
+            angular_coverage: 0.0,
+            is_degenerate: true,
+        };
+    }
+
+    let gx_view = gradient.gx();
+    let gy_view = gradient.gy();
+    let inner_radius = rectified_circle.radius * (1.0 - config.annulus_margin);
+    let outer_radius = rectified_circle.radius * (1.0 + config.annulus_margin);
+    let n_ang = config.sampling.num_angular_samples.max(1);
+    let n_rad = config.sampling.num_radial_samples.max(1);
+    let mut sample_count = 0usize;
+    let mut alignment_sum = 0.0;
+    let mut bins = vec![false; n_ang];
+
+    for (ai, bin) in bins.iter_mut().enumerate() {
+        let theta = 2.0 * std::f32::consts::PI * ai as Scalar / n_ang as Scalar;
+        let cos_t = theta.cos();
+        let sin_t = theta.sin();
+        let rectified_normal = Vector2::new(cos_t, sin_t);
+
+        for ri in 0..n_rad {
+            let t = if n_rad <= 1 {
+                0.5
+            } else {
+                ri as Scalar / (n_rad - 1) as Scalar
+            };
+            let radius = inner_radius + t * (outer_radius - inner_radius);
+            let rectified_point = PixelCoord::new(
+                rectified_circle.center.x + radius * cos_t,
+                rectified_circle.center.y + radius * sin_t,
+            );
+            let Some(image_point) = homography.map_rectified_to_image(rectified_point) else {
+                continue;
+            };
+            let Some(gx) = gx_view.sample(image_point.x, image_point.y) else {
+                continue;
+            };
+            let Some(gy) = gy_view.sample(image_point.x, image_point.y) else {
+                continue;
+            };
+            let gradient_mag = (gx * gx + gy * gy).sqrt();
+            if gradient_mag <= 1e-8 {
+                continue;
+            }
+            let Some(image_normal) =
+                homography.pullback_rectified_normal_to_image(rectified_point, rectified_normal)
+            else {
+                continue;
+            };
+            let normal_mag = image_normal.norm();
+            if normal_mag <= 1e-8 {
+                continue;
+            }
+
+            let alignment =
+                ((gx * image_normal[0] + gy * image_normal[1]) / (gradient_mag * normal_mag)).abs();
+            alignment_sum += alignment;
+            sample_count += 1;
+            if alignment > 0.5 {
+                *bin = true;
+            }
+        }
+    }
+
+    let is_degenerate = sample_count < config.min_samples;
+    let ringness = if sample_count > 0 {
+        alignment_sum / sample_count as Scalar
+    } else {
+        0.0
+    };
+    let coverage = bins.iter().filter(|&&filled| filled).count() as Scalar / n_ang as Scalar;
+    let total = if is_degenerate {
+        0.0
+    } else {
+        (config.weight_ringness * ringness + config.weight_coverage * coverage).clamp(0.0, 1.0)
+    };
+
+    SupportScore {
+        total,
+        ringness,
+        polarity_consistency: 1.0,
+        angular_coverage: coverage,
         is_degenerate,
     }
 }
@@ -161,6 +255,7 @@ pub fn score_at(
 mod tests {
     use super::*;
     use crate::core::gradient::sobel_gradient;
+    use crate::core::homography::{rectified_circle_to_image_ellipse, Homography};
     use crate::core::image_view::ImageView;
 
     fn make_ring_u8(size: usize, cx: f32, cy: f32, r_inner: f32, r_outer: f32) -> Vec<u8> {
@@ -271,5 +366,51 @@ mod tests {
             &ScoringConfig::default(),
         );
         assert!(score.total > 0.2);
+    }
+
+    #[test]
+    fn high_score_for_rectified_circle_under_homography() {
+        let homography = Homography::new([
+            [1.1, 0.06, 16.0],
+            [0.03, 0.98, 12.0],
+            [0.0011, -0.0007, 1.0],
+        ])
+        .unwrap();
+        let rectified_circle = Circle::new(PixelCoord::new(64.0, 60.0), 16.0);
+        let ellipse = rectified_circle_to_image_ellipse(&homography, &rectified_circle).unwrap();
+        let size = 128;
+        let cos_a = ellipse.angle.cos();
+        let sin_a = ellipse.angle.sin();
+        let mut data = vec![0u8; size * size];
+        for y in 0..size {
+            for x in 0..size {
+                let dx = x as f32 - ellipse.center.x;
+                let dy = y as f32 - ellipse.center.y;
+                let lx = dx * cos_a + dy * sin_a;
+                let ly = -dx * sin_a + dy * cos_a;
+                if (lx / ellipse.semi_major).powi(2) + (ly / ellipse.semi_minor).powi(2) <= 1.0 {
+                    data[y * size + x] = 255;
+                }
+            }
+        }
+        let image = ImageView::from_slice(&data, size, size).unwrap();
+        let gradient = sobel_gradient(&image).unwrap();
+        let score = score_rectified_circle_support(
+            &gradient,
+            &rectified_circle,
+            &homography,
+            &ScoringConfig::default(),
+        );
+        assert!(!score.is_degenerate);
+        assert!(
+            score.total > 0.2,
+            "expected positive homography-aware score, got {}",
+            score.total
+        );
+        assert!(
+            score.angular_coverage > 0.5,
+            "expected usable rectified coverage, got {}",
+            score.angular_coverage
+        );
     }
 }

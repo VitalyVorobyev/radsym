@@ -17,216 +17,27 @@ import argparse
 from collections import defaultdict
 import math
 from pathlib import Path
-from time import perf_counter
 
 import numpy as np
-from matplotlib import pyplot as plt
-from matplotlib.patches import Ellipse as MplEllipse
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
 import radsym
+from _surf_hole_common import (
+    build_radius_band,
+    choose_best_detection as choose_best_detection_base,
+    downscale_image,
+    timed_call,
+    upscale_ellipse,
+    upscale_point,
+)
 
 console = Console()
 
 ELLIPSE_FIT_MIN_ALIGNMENT = 0.3
 ELLIPSE_FIT_ANGULAR_SAMPLES = 64
 ELLIPSE_FIT_RADIAL_SAMPLES = 9
-
-
-def build_radius_band(base_radius: float, steps: int = 5) -> list[int]:
-    """Return a compact radius search band around a nominal radius."""
-    start = max(6, int(round(base_radius * 0.65)))
-    stop = max(start + 1, int(round(base_radius * 1.35)))
-    if steps <= 1 or start == stop:
-        return [start]
-
-    radii = {
-        int(round(start + (stop - start) * index / (steps - 1)))
-        for index in range(steps)
-    }
-    return sorted(r for r in radii if r > 0)
-
-
-def downscale_image(image: np.ndarray, factor: int) -> np.ndarray:
-    """Downscale a grayscale image by block averaging."""
-    if factor <= 1:
-        return image
-
-    height, width = image.shape
-    trimmed_height = height - (height % factor)
-    trimmed_width = width - (width % factor)
-    if trimmed_height == 0 or trimmed_width == 0:
-        raise ValueError(f"downscale factor {factor} is too large for image shape {image.shape}")
-
-    trimmed = image[:trimmed_height, :trimmed_width]
-    reduced = trimmed.reshape(
-        trimmed_height // factor,
-        factor,
-        trimmed_width // factor,
-        factor,
-    ).mean(axis=(1, 3))
-    return reduced.astype(np.uint8)
-
-
-def upscale_point(point: tuple[float, float], factor: int) -> tuple[float, float]:
-    if factor <= 1:
-        return point
-    offset = 0.5 * (factor - 1)
-    return (point[0] * factor + offset, point[1] * factor + offset)
-
-
-def upscale_ellipse(ellipse: radsym.Ellipse, factor: int) -> radsym.Ellipse:
-    if factor <= 1:
-        return ellipse
-    return radsym.Ellipse(
-        upscale_point(ellipse.center, factor),
-        ellipse.semi_major * factor,
-        ellipse.semi_minor * factor,
-        ellipse.angle,
-    )
-
-
-def timed_call(metrics: dict, name: str, fn, *args, **kwargs):
-    start = perf_counter()
-    result = fn(*args, **kwargs)
-    metrics[name]["count"] += 1
-    metrics[name]["total_ms"] += (perf_counter() - start) * 1000.0
-    return result
-
-
-def sweep_radius_at_center(
-    gradient: radsym.GradientField,
-    center: tuple[float, float],
-    radius_hint: float,
-    metrics: dict,
-) -> dict:
-    """Estimate radius at a fixed center via a 1D support sweep."""
-    scoring_config = radsym.ScoringConfig(
-        annulus_margin=0.10,
-        min_samples=24,
-        weight_ringness=0.75,
-        weight_coverage=0.25,
-    )
-    radius_min = max(6.0, radius_hint * 0.35)
-    radius_max = max(radius_min + 6.0, radius_hint * 1.05)
-
-    best = None
-    start = perf_counter()
-    eval_count = 0
-    for radius in np.arange(radius_min, radius_max + 0.5, 1.0):
-        circle = radsym.Circle(center, float(radius))
-        score = radsym.score_circle_support(gradient, circle, scoring_config)
-        eval_count += 1
-        if score.is_degenerate:
-            continue
-
-        candidate = {
-            "radius": float(radius),
-            "circle": circle,
-            "score": score,
-        }
-        if best is None:
-            best = candidate
-            continue
-
-        score_delta = score.total - best["score"].total
-        # Prefer smaller radii when the score plateau is effectively tied.
-        if score_delta > 1e-4 or (abs(score_delta) <= 1e-4 and radius < best["radius"]):
-            best = candidate
-
-    metrics["score_circle_support (radius sweep)"]["count"] += eval_count
-    metrics["score_circle_support (radius sweep)"]["total_ms"] += (
-        perf_counter() - start
-    ) * 1000.0
-
-    if best is None:
-        fallback_circle = radsym.Circle(center, radius_hint)
-        return {
-            "radius": radius_hint,
-            "circle": fallback_circle,
-            "score": timed_call(
-                metrics,
-                "score_circle_support (fallback)",
-                radsym.score_circle_support,
-                gradient,
-                fallback_circle,
-            ),
-        }
-
-    return best
-
-
-def sweep_ellipse_shape_at_center(
-    gradient: radsym.GradientField,
-    center: tuple[float, float],
-    base_radius: float,
-    metrics: dict,
-) -> dict:
-    """Estimate ellipse axes and orientation at a fixed center."""
-    scoring_config = radsym.ScoringConfig(
-        annulus_margin=0.10,
-        min_samples=24,
-        weight_ringness=0.75,
-        weight_coverage=0.25,
-    )
-    axis_ratios = [1.0, 1.05, 1.1, 1.15, 1.2, 1.3]
-    angle_degrees = list(range(0, 180, 15))
-
-    best = None
-    start = perf_counter()
-    eval_count = 0
-    for axis_ratio in axis_ratios:
-        angle_candidates = [0] if axis_ratio <= 1.0 else angle_degrees
-        ratio_scale = math.sqrt(axis_ratio)
-        semi_major = base_radius * ratio_scale
-        semi_minor = base_radius / ratio_scale
-
-        for angle_deg in angle_candidates:
-            ellipse = radsym.Ellipse(center, semi_major, semi_minor, math.radians(angle_deg))
-            score = radsym.score_ellipse_support(gradient, ellipse, scoring_config)
-            eval_count += 1
-            if score.is_degenerate:
-                continue
-
-            candidate = {
-                "ellipse": ellipse,
-                "axis_ratio": axis_ratio,
-                "angle_deg": angle_deg,
-                "score": score,
-            }
-            if best is None:
-                best = candidate
-                continue
-
-            score_delta = score.total - best["score"].total
-            if score_delta > 1e-4 or (
-                abs(score_delta) <= 1e-4 and axis_ratio < best["axis_ratio"]
-            ):
-                best = candidate
-
-    metrics["score_ellipse_support (shape sweep)"]["count"] += eval_count
-    metrics["score_ellipse_support (shape sweep)"]["total_ms"] += (
-        perf_counter() - start
-    ) * 1000.0
-
-    if best is None:
-        fallback = radsym.Ellipse(center, base_radius, base_radius, 0.0)
-        return {
-            "ellipse": fallback,
-            "axis_ratio": 1.0,
-            "angle_deg": 0.0,
-            "score": timed_call(
-                metrics,
-                "score_ellipse_support (fallback)",
-                radsym.score_ellipse_support,
-                gradient,
-                fallback,
-            ),
-        }
-
-    return best
 
 
 def collect_ellipse_fit_evidence(
@@ -237,7 +48,7 @@ def collect_ellipse_fit_evidence(
     num_angular_samples: int = 64,
     num_radial_samples: int = 9,
 ) -> dict:
-    """Reconstruct the annulus samples used by ellipse fitting."""
+    """Reconstruct support annulus samples around the final ellipse."""
     gx = gradient.gx_numpy()
     gy = gradient.gy_numpy()
     height, width = gx.shape
@@ -319,6 +130,9 @@ def render_overlay(
     downscale: int,
     best: dict,
 ):
+    from matplotlib import pyplot as plt
+    from matplotlib.patches import Ellipse as MplEllipse
+
     full_resolution_ellipse = best["full_resolution_ellipse"]
     fit_support = best["fit_support"]
     pre_ellipse_center = upscale_point(best["center_result"].hypothesis, downscale)
@@ -367,7 +181,7 @@ def render_overlay(
             vmax=1.0,
             linewidths=0,
             alpha=0.9,
-            label="Ellipse-fit samples",
+            label="Support-aligned samples",
         )
 
     ax.add_patch(
@@ -412,6 +226,9 @@ def render_heatmap(
     downscale: int,
     best: dict,
 ):
+    from matplotlib import pyplot as plt
+    from matplotlib.patches import Ellipse as MplEllipse
+
     ellipse = best["ellipse"]
     fit_support = best["fit_support"]
 
@@ -455,7 +272,7 @@ def render_heatmap(
             vmax=1.0,
             linewidths=0,
             alpha=0.95,
-            label="Ellipse-fit samples",
+            label="Support-aligned samples",
         )
 
     ax.add_patch(
@@ -501,100 +318,17 @@ def choose_best_detection(
     radius_hint: float,
     metrics: dict,
 ) -> tuple[dict, list[dict]]:
-    height, width = image.shape
-    center_x = width * 0.5
-    center_y = height * 0.5
-    max_center_distance = math.hypot(center_x, center_y)
-
-    scoring_config = radsym.ScoringConfig(annulus_margin=0.12, min_samples=32)
-    refinement_annulus_margin = 0.12
-    refinement_config = radsym.EllipseRefineConfig(
-        max_iterations=16,
-        convergence_tol=0.05,
-        annulus_margin=refinement_annulus_margin,
-    )
-    center_config = radsym.RadialCenterConfig(
-        patch_radius=max(10, int(round(radius_hint * 1.4))),
-        gradient_threshold=1.0,
-    )
-
-    ranked: list[dict] = []
-    for proposal in proposals[: min(len(proposals), 12)]:
-        center_result = timed_call(
-            metrics,
-            "radial_center_refine",
-            radsym.radial_center_refine,
+    best, ranked = choose_best_detection_base(image, gradient, proposals, radius_hint, metrics)
+    for candidate in ranked:
+        candidate["fit_support"] = collect_ellipse_fit_evidence(
             gradient,
-            proposal.position,
-            center_config,
+            candidate["ellipse"],
+            0.12,
+            ELLIPSE_FIT_MIN_ALIGNMENT,
+            num_angular_samples=ELLIPSE_FIT_ANGULAR_SAMPLES,
+            num_radial_samples=ELLIPSE_FIT_RADIAL_SAMPLES,
         )
-        if center_result.converged:
-            center = center_result.hypothesis
-        else:
-            center = proposal.position
-
-        radius_sweep = sweep_radius_at_center(gradient, center, radius_hint, metrics)
-        ellipse_seed = sweep_ellipse_shape_at_center(
-            gradient,
-            center,
-            radius_sweep["radius"],
-            metrics,
-        )
-        refined = timed_call(
-            metrics,
-            "refine_ellipse",
-            radsym.refine_ellipse,
-            gradient,
-            ellipse_seed["ellipse"],
-            refinement_config,
-        )
-        ellipse = refined.hypothesis
-        support = timed_call(
-            metrics,
-            "score_ellipse_support (final)",
-            radsym.score_ellipse_support,
-            gradient,
-            ellipse,
-            scoring_config,
-        )
-
-        dx = ellipse.center[0] - center_x
-        dy = ellipse.center[1] - center_y
-        center_distance = math.hypot(dx, dy)
-        center_bonus = max(0.0, 1.0 - center_distance / max_center_distance)
-        eccentricity_ratio = max(ellipse.semi_major, ellipse.semi_minor) / max(
-            1e-3, min(ellipse.semi_major, ellipse.semi_minor)
-        )
-        shape_penalty = max(0.0, (eccentricity_ratio - 1.8) * 0.15)
-        combined = 0.7 * support.total + 0.3 * center_bonus - shape_penalty
-
-        ranked.append(
-            {
-                "proposal": proposal,
-                "refined": refined,
-                "ellipse": ellipse,
-                "support": support,
-                "center_distance": center_distance,
-                "combined": combined,
-                "radius_sweep": radius_sweep,
-                "ellipse_seed": ellipse_seed,
-                "center_result": center_result,
-                "fit_support": collect_ellipse_fit_evidence(
-                    gradient,
-                    ellipse,
-                    refinement_annulus_margin,
-                    ELLIPSE_FIT_MIN_ALIGNMENT,
-                    num_angular_samples=ELLIPSE_FIT_ANGULAR_SAMPLES,
-                    num_radial_samples=ELLIPSE_FIT_RADIAL_SAMPLES,
-                ),
-            }
-        )
-
-    if not ranked:
-        raise RuntimeError("no valid candidates remained after refinement")
-
-    ranked.sort(key=lambda item: item["combined"], reverse=True)
-    return ranked[0], ranked
+    return best, ranked
 
 
 def parse_args() -> argparse.Namespace:
@@ -658,10 +392,10 @@ def render_summary(
         f"{best['radius_sweep']['radius'] * downscale:.2f} px",
     )
     summary.add_row(
-        "Seed ellipse ratio",
-        f"{ellipse_seed['axis_ratio']:.3f} @ {ellipse_seed['angle_deg']:.0f} deg",
+        "Seed ellipse",
+        f"circle @ {ellipse_seed['ellipse'].semi_major * downscale:.2f} px",
     )
-    summary.add_row("Fit samples", str(len(best["fit_support"]["fit_xy"])))
+    summary.add_row("Support samples", str(len(best["fit_support"]["fit_xy"])))
     summary.add_row("Support", f"{support.total:.3f}")
     summary.add_row("Coverage", f"{support.angular_coverage:.3f}")
     console.print(Panel(summary, title="Detection Summary", expand=False))
@@ -747,13 +481,7 @@ def main() -> int:
     if not proposals:
         raise RuntimeError("no proposals found")
 
-    best, ranked = choose_best_detection(
-        working_image,
-        gradient,
-        proposals,
-        radius_hint,
-        metrics,
-    )
+    best, ranked = choose_best_detection(working_image, gradient, proposals, radius_hint, metrics)
     ellipse = best["ellipse"]
     full_resolution_ellipse = upscale_ellipse(ellipse, args.downscale)
     best["full_resolution_ellipse"] = full_resolution_ellipse
@@ -769,8 +497,12 @@ def main() -> int:
         heatmap_figure.savefig(heatmap_path, dpi=180, bbox_inches="tight")
 
     if overlay_path is None and heatmap_path is None:
+        from matplotlib import pyplot as plt
+
         plt.show()
     else:
+        from matplotlib import pyplot as plt
+
         plt.close(overlay_figure)
         plt.close(heatmap_figure)
 

@@ -76,20 +76,28 @@ pub mod affine;
 pub use crate::core::coords::PixelCoord;
 pub use crate::core::error::{RadSymError, Result};
 pub use crate::core::geometry::{Annulus, Circle, Ellipse};
+pub use crate::core::homography::{rectified_circle_to_image_ellipse, Homography, RectifiedGrid};
 pub use crate::core::image_view::{ImageView, OwnedImage};
 pub use crate::core::polarity::Polarity;
 pub use crate::propose::extract::{extract_proposals, ResponseMap};
 pub use crate::propose::frst::{frst_response, frst_response_single, FrstConfig};
+pub use crate::propose::homography::{
+    extract_rectified_proposals, frst_response_homography, rerank_proposals_homography,
+    HomographyProposal, HomographyRerankConfig, RectifiedResponseMap, RerankedProposal,
+};
 pub use crate::propose::rsd::{rsd_response, RsdConfig};
 pub use crate::propose::seed::{Proposal, ProposalSource, SeedPoint};
 pub use crate::support::evidence::SupportEvidence;
 pub use crate::support::hypothesis::{
     AnnulusHypothesis, CircleHypothesis, ConcentricPairHypothesis, EllipseHypothesis,
 };
-pub use crate::support::score::{ScoringConfig, SupportScore};
+pub use crate::support::score::{score_rectified_circle_support, ScoringConfig, SupportScore};
 
 pub use crate::refine::circle::{refine_circle, CircleRefineConfig};
 pub use crate::refine::ellipse::{refine_ellipse, EllipseRefineConfig};
+pub use crate::refine::homography::{
+    refine_ellipse_homography, HomographyEllipseRefineConfig, HomographyRefinementResult,
+};
 pub use crate::refine::radial_center::{
     radial_center_refine, radial_center_refine_from_gradient, RadialCenterConfig,
 };

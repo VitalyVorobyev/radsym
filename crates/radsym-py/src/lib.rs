@@ -65,6 +65,22 @@ fn frst_response_py(
     })
 }
 
+/// Compute homography-aware FRST on a rectified grid.
+#[pyfunction]
+#[pyo3(name = "frst_response_homography", signature = (gradient, homography, grid, config=None))]
+fn frst_response_homography_py(
+    gradient: &PyGradientField,
+    homography: &PyHomography,
+    grid: &PyRectifiedGrid,
+    config: Option<&PyFrstConfig>,
+) -> PyResult<PyRectifiedResponseMap> {
+    let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
+    let response =
+        radsym::frst_response_homography(&gradient.inner, &homography.inner, grid.inner, &cfg)
+            .map_err(to_pyerr)?;
+    Ok(PyRectifiedResponseMap { inner: response })
+}
+
 /// Compute the RSD (Radial Symmetry Detector) response map.
 ///
 /// Args:
@@ -108,6 +124,51 @@ fn extract_proposals_py(
     Ok(proposals
         .into_iter()
         .map(|p| PyProposal { inner: p })
+        .collect())
+}
+
+/// Extract rectified proposals from a homography-aware response map.
+#[pyfunction]
+#[pyo3(name = "extract_rectified_proposals", signature = (response, homography, nms_config=None, polarity="both"))]
+fn extract_rectified_proposals_py(
+    response: &PyRectifiedResponseMap,
+    homography: &PyHomography,
+    nms_config: Option<&PyNmsConfig>,
+    polarity: &str,
+) -> PyResult<Vec<PyHomographyProposal>> {
+    let nms = nms_config.map(|c| c.inner.clone()).unwrap_or_default();
+    let pol = polarity_from_str(polarity)?;
+    let proposals =
+        radsym::extract_rectified_proposals(&response.inner, &homography.inner, &nms, pol);
+    Ok(proposals
+        .into_iter()
+        .map(|proposal| PyHomographyProposal { inner: proposal })
+        .collect())
+}
+
+/// Rerank image-space proposals under a known homography.
+#[pyfunction]
+#[pyo3(name = "rerank_proposals_homography", signature = (gradient, proposals, homography, config=None))]
+fn rerank_proposals_homography_py(
+    gradient: &PyGradientField,
+    proposals: Vec<PyRef<'_, PyProposal>>,
+    homography: &PyHomography,
+    config: Option<&PyHomographyRerankConfig>,
+) -> PyResult<Vec<PyRerankedProposal>> {
+    let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
+    let rust_proposals = proposals
+        .into_iter()
+        .map(|proposal| proposal.inner.clone())
+        .collect::<Vec<_>>();
+    let reranked = radsym::rerank_proposals_homography(
+        &gradient.inner,
+        &rust_proposals,
+        &homography.inner,
+        &cfg,
+    );
+    Ok(reranked
+        .into_iter()
+        .map(|proposal| PyRerankedProposal { inner: proposal })
         .collect())
 }
 
@@ -155,6 +216,25 @@ fn score_ellipse_support_py(
     let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
     let score =
         radsym::support::score::score_ellipse_support(&gradient.inner, &ellipse.inner, &cfg);
+    PySupportScore { inner: score }
+}
+
+/// Score support for a rectified-frame circle under a known homography.
+#[pyfunction]
+#[pyo3(name = "score_rectified_circle_support", signature = (gradient, circle, homography, config=None))]
+fn score_rectified_circle_support_py(
+    gradient: &PyGradientField,
+    circle: &PyCircle,
+    homography: &PyHomography,
+    config: Option<&PyScoringConfig>,
+) -> PySupportScore {
+    let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
+    let score = radsym::score_rectified_circle_support(
+        &gradient.inner,
+        &circle.inner,
+        &homography.inner,
+        &cfg,
+    );
     PySupportScore { inner: score }
 }
 
@@ -215,6 +295,34 @@ fn refine_ellipse_py(
         residual: result.residual,
         iterations: result.iterations,
     }
+}
+
+/// Refine an image-space ellipse by fitting a rectified-frame circle.
+#[pyfunction]
+#[pyo3(name = "refine_ellipse_homography", signature = (gradient, ellipse, homography, config=None))]
+fn refine_ellipse_homography_py(
+    gradient: &PyGradientField,
+    ellipse: &PyEllipse,
+    homography: &PyHomography,
+    config: Option<&PyHomographyEllipseRefineConfig>,
+) -> PyResult<PyHomographyRefinementResult> {
+    let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
+    let result =
+        radsym::refine_ellipse_homography(&gradient.inner, &ellipse.inner, &homography.inner, &cfg)
+            .map_err(to_pyerr)?;
+    Ok(PyHomographyRefinementResult { inner: result })
+}
+
+/// Transport a rectified-frame circle back into an image-space ellipse.
+#[pyfunction]
+#[pyo3(name = "rectified_circle_to_image_ellipse")]
+fn rectified_circle_to_image_ellipse_py(
+    homography: &PyHomography,
+    circle: &PyCircle,
+) -> PyResult<PyEllipse> {
+    let ellipse = radsym::rectified_circle_to_image_ellipse(&homography.inner, &circle.inner)
+        .map_err(to_pyerr)?;
+    Ok(PyEllipse { inner: ellipse })
 }
 
 /// Refine a seed center to subpixel accuracy using the Parthasarathy radial center method.
@@ -374,6 +482,8 @@ fn radsym_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Geometry types
     m.add_class::<PyCircle>()?;
     m.add_class::<PyEllipse>()?;
+    m.add_class::<PyHomography>()?;
+    m.add_class::<PyRectifiedGrid>()?;
 
     // Config types
     m.add_class::<PyFrstConfig>()?;
@@ -382,29 +492,41 @@ fn radsym_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyScoringConfig>()?;
     m.add_class::<PyCircleRefineConfig>()?;
     m.add_class::<PyEllipseRefineConfig>()?;
+    m.add_class::<PyHomographyRerankConfig>()?;
+    m.add_class::<PyHomographyEllipseRefineConfig>()?;
     m.add_class::<PyRadialCenterConfig>()?;
 
     // Result types
     m.add_class::<PySupportScore>()?;
     m.add_class::<PyProposal>()?;
+    m.add_class::<PyHomographyProposal>()?;
+    m.add_class::<PyRerankedProposal>()?;
     m.add_class::<PyCircleRefinementResult>()?;
     m.add_class::<PyEllipseRefinementResult>()?;
+    m.add_class::<PyHomographyRefinementResult>()?;
     m.add_class::<PyPointRefinementResult>()?;
 
     // Opaque handles
     m.add_class::<PyGradientField>()?;
     m.add_class::<PyResponseMap>()?;
+    m.add_class::<PyRectifiedResponseMap>()?;
     m.add_class::<PyDiagnosticImage>()?;
 
     // Functions — exposed without _py suffix via #[pyo3(name = "...")]
     m.add_function(wrap_pyfunction!(sobel_gradient_py, m)?)?;
     m.add_function(wrap_pyfunction!(frst_response_py, m)?)?;
+    m.add_function(wrap_pyfunction!(frst_response_homography_py, m)?)?;
     m.add_function(wrap_pyfunction!(rsd_response_py, m)?)?;
     m.add_function(wrap_pyfunction!(extract_proposals_py, m)?)?;
+    m.add_function(wrap_pyfunction!(extract_rectified_proposals_py, m)?)?;
+    m.add_function(wrap_pyfunction!(rerank_proposals_homography_py, m)?)?;
     m.add_function(wrap_pyfunction!(score_circle_support_py, m)?)?;
     m.add_function(wrap_pyfunction!(score_ellipse_support_py, m)?)?;
+    m.add_function(wrap_pyfunction!(score_rectified_circle_support_py, m)?)?;
     m.add_function(wrap_pyfunction!(refine_circle_py, m)?)?;
     m.add_function(wrap_pyfunction!(refine_ellipse_py, m)?)?;
+    m.add_function(wrap_pyfunction!(refine_ellipse_homography_py, m)?)?;
+    m.add_function(wrap_pyfunction!(rectified_circle_to_image_ellipse_py, m)?)?;
     m.add_function(wrap_pyfunction!(radial_center_refine_py, m)?)?;
     m.add_function(wrap_pyfunction!(response_heatmap_py, m)?)?;
     m.add_function(wrap_pyfunction!(overlay_circle_py, m)?)?;

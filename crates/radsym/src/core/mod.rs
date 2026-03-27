@@ -8,6 +8,7 @@ pub mod coords;
 pub mod error;
 pub mod geometry;
 pub mod gradient;
+pub mod homography;
 pub mod image_view;
 #[cfg(feature = "image-io")]
 pub mod io;
