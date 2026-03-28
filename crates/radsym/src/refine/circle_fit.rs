@@ -69,27 +69,7 @@ where
 }
 
 pub(super) fn fit_circle_from_points(points: &[PixelCoord]) -> Option<Circle> {
-    if points.len() < 3 {
-        return None;
-    }
-
-    let mut h = SMatrix::<Scalar, 3, 3>::zeros();
-    let mut g = SVector::<Scalar, 3>::zeros();
-
-    for point in points {
-        let row = SVector::<Scalar, 3>::new(point.x, point.y, 1.0);
-        let rhs = -(point.x * point.x + point.y * point.y);
-        h += row * row.transpose();
-        g += row * rhs;
-    }
-
-    let solution = h.lu().solve(&g)?;
-    let center = PixelCoord::new(-0.5 * solution[0], -0.5 * solution[1]);
-    let radius2 = center.x * center.x + center.y * center.y - solution[2];
-    if !center.x.is_finite() || !center.y.is_finite() || !radius2.is_finite() || radius2 <= 1e-6 {
-        return None;
-    }
-    Some(Circle::new(center, radius2.sqrt()))
+    crate::core::circle_fit::fit_circle(points)
 }
 
 pub(super) fn approximate_rectified_circle_from_image_ellipse(

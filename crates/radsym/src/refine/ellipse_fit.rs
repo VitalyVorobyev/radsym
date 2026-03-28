@@ -45,11 +45,6 @@ fn wrap_half_turn(mut angle: Scalar) -> Scalar {
     angle
 }
 
-#[inline]
-pub(super) fn mean_radius(ellipse: &Ellipse) -> Scalar {
-    0.5 * (ellipse.semi_major + ellipse.semi_minor)
-}
-
 pub(super) fn normalize_ellipse(
     center: PixelCoord,
     semi_major: Scalar,
@@ -331,8 +326,8 @@ pub(super) fn compare_fit_quality(
             .partial_cmp(&candidate.evaluation.objective)
             .unwrap_or(Ordering::Equal);
     }
-    let candidate_radius_error = (mean_radius(&candidate.ellipse) - seed_radius).abs();
-    let best_radius_error = (mean_radius(&best.ellipse) - seed_radius).abs();
+    let candidate_radius_error = (candidate.ellipse.mean_radius() - seed_radius).abs();
+    let best_radius_error = (best.ellipse.mean_radius() - seed_radius).abs();
     if (candidate_radius_error - best_radius_error).abs() > 0.25 {
         return best_radius_error
             .partial_cmp(&candidate_radius_error)
@@ -348,8 +343,10 @@ pub(super) fn compare_fit_quality(
             .partial_cmp(&best.evaluation.trimmed_mean_edge_score)
             .unwrap_or(Ordering::Equal);
     }
-    mean_radius(&candidate.ellipse)
-        .partial_cmp(&mean_radius(&best.ellipse))
+    candidate
+        .ellipse
+        .mean_radius()
+        .partial_cmp(&best.ellipse.mean_radius())
         .unwrap_or(Ordering::Equal)
 }
 

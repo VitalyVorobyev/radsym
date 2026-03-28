@@ -48,6 +48,12 @@ impl Ellipse {
         }
     }
 
+    /// Arithmetic mean of semi-major and semi-minor axes.
+    #[inline]
+    pub fn mean_radius(&self) -> Scalar {
+        0.5 * (self.semi_major + self.semi_minor)
+    }
+
     /// The eccentricity of the ellipse, in `[0, 1)`.
     #[inline]
     pub fn eccentricity(&self) -> Scalar {
@@ -130,6 +136,12 @@ mod tests {
         assert_eq!(e.semi_minor, 10.0);
         assert_eq!(e.angle, 0.0);
         assert!(e.eccentricity() < 1e-6);
+    }
+
+    #[test]
+    fn ellipse_mean_radius() {
+        let e = Ellipse::new(PixelCoord::new(0.0, 0.0), 10.0, 6.0, 0.0);
+        assert!((e.mean_radius() - 8.0).abs() < 1e-6);
     }
 
     #[test]

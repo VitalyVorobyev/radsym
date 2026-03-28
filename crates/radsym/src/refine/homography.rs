@@ -18,7 +18,6 @@ use super::edge_profiles::{
     best_hypotheses, clamp_center_shift, edge_candidates_along_ray, infer_expected_sign,
     select_best_consistent_candidates, DEFAULT_MAX_EDGE_CANDIDATES, DEFAULT_PEAK_MIN_SEPARATION_PX,
 };
-use super::ellipse_fit::mean_radius;
 use super::radial_center::{radial_center_refine_from_gradient, RadialCenterConfig};
 use super::result::RefinementStatus;
 
@@ -390,7 +389,7 @@ pub fn refine_ellipse_homography(
     homography: &Homography,
     config: &HomographyEllipseRefineConfig,
 ) -> Result<HomographyRefinementResult> {
-    let seed_radius = mean_radius(initial_image_ellipse);
+    let seed_radius = initial_image_ellipse.mean_radius();
     let seed_center = initial_image_ellipse.center;
     let min_count = min_inlier_count(config.ray_count.max(16));
 
@@ -646,7 +645,7 @@ mod tests {
             &gradient,
             &homography,
             initial.center,
-            mean_radius(&initial),
+            initial.mean_radius(),
             &HomographyEllipseRefineConfig::default(),
             0.0,
         );

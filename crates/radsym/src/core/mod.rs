@@ -4,6 +4,7 @@
 //! depend on. It must remain small and free of algorithm-specific logic.
 
 pub(crate) mod blur;
+pub mod circle_fit;
 pub mod coords;
 pub mod error;
 pub mod geometry;

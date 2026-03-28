@@ -48,11 +48,12 @@
 //!
 //! ## Modules
 //!
-//! - [`core`] — fundamental types, image views, geometry, gradient, NMS
-//! - [`propose`] — center-proposal generation (FRST, RSD)
+//! - [`core`] — fundamental types, image views, geometry, gradient, NMS,
+//!   homography, circle fitting
+//! - [`propose`] — center-proposal generation (FRST, RSD, homography-aware)
 //! - [`support`] — local support extraction and scoring
 //! - [`refine`] — local hypothesis refinement (Parthasarathy radial center,
-//!   iterative circle/ellipse)
+//!   iterative circle/ellipse, homography-aware ellipse)
 //! - [`diagnostics`] — visualization: heatmaps, overlays
 //!
 //! ## Feature flags
@@ -73,6 +74,7 @@ pub mod support;
 pub mod affine;
 
 // Re-export the most commonly used types at crate root.
+pub use crate::core::circle_fit::{fit_circle, fit_circle_weighted};
 pub use crate::core::coords::PixelCoord;
 pub use crate::core::error::{RadSymError, Result};
 pub use crate::core::geometry::{Annulus, Circle, Ellipse};

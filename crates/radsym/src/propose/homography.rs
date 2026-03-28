@@ -259,10 +259,6 @@ fn collect_radial_observations(
     observations
 }
 
-fn mean_radius(ellipse: &Ellipse) -> Scalar {
-    0.5 * (ellipse.semi_major + ellipse.semi_minor)
-}
-
 fn circle_support_score(
     gradient: &GradientField,
     center: PixelCoord,
@@ -307,30 +303,8 @@ fn circle_support_score(
 }
 
 fn fit_circle_from_points(points: &[(PixelCoord, Scalar)]) -> Option<Circle> {
-    if points.len() < 3 {
-        return None;
-    }
-
-    let mut h = nalgebra::SMatrix::<Scalar, 3, 3>::zeros();
-    let mut g = nalgebra::SVector::<Scalar, 3>::zeros();
-
-    for (point, weight) in points {
-        let x = point.x;
-        let y = point.y;
-        let row = nalgebra::SVector::<Scalar, 3>::new(x, y, 1.0);
-        let rhs = -(x * x + y * y);
-        let w = weight.max(1e-3);
-        h += row * row.transpose() * w;
-        g += row * (rhs * w);
-    }
-
-    let solution = h.lu().solve(&g)?;
-    let center = PixelCoord::new(-0.5 * solution[0], -0.5 * solution[1]);
-    let radius2 = center.x * center.x + center.y * center.y - solution[2];
-    if !center.x.is_finite() || !center.y.is_finite() || radius2 <= 1e-6 || !radius2.is_finite() {
-        return None;
-    }
-    Some(Circle::new(center, radius2.sqrt()))
+    let (coords, weights): (Vec<_>, Vec<_>) = points.iter().copied().unzip();
+    crate::core::circle_fit::fit_circle_weighted(&coords, &weights)
 }
 
 fn fit_rectified_circle(
@@ -628,7 +602,7 @@ pub fn rerank_proposals_homography(
             .and_then(|circle| rectified_circle_to_image_ellipse(homography, circle).ok());
 
         let size_prior = if let Some(ellipse) = image_ellipse_hint.as_ref() {
-            let ratio = mean_radius(ellipse) / swept_circle.radius.max(1e-3);
+            let ratio = ellipse.mean_radius() / swept_circle.radius.max(1e-3);
             let z = (ratio - 1.0) / config.size_prior_sigma.max(1e-3);
             (-0.5 * z * z).exp()
         } else {

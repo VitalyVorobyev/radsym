@@ -27,8 +27,8 @@ use super::edge_profiles::{
     select_best_consistent_candidates, DEFAULT_MAX_EDGE_CANDIDATES, DEFAULT_PEAK_MIN_SEPARATION_PX,
 };
 use super::ellipse_fit::{
-    compare_fit_quality, ellipse_residual_and_jacobian, guard_ellipse, mean_radius,
-    min_inlier_count, refine_from_observations, weighted_covariance_guess, EllipseFitOutcome,
+    compare_fit_quality, ellipse_residual_and_jacobian, guard_ellipse, min_inlier_count,
+    refine_from_observations, weighted_covariance_guess, EllipseFitOutcome,
 };
 use super::radial_center::{radial_center_refine_from_gradient, RadialCenterConfig};
 use super::result::{RefinementResult, RefinementStatus};
@@ -363,7 +363,7 @@ pub fn refine_ellipse(
     initial: &Ellipse,
     config: &EllipseRefineConfig,
 ) -> RefinementResult<Ellipse> {
-    let seed_radius = mean_radius(initial).max(1.0);
+    let seed_radius = initial.mean_radius().max(1.0);
     let seed_center = initial.center;
     let width = gradient.width();
     let height = gradient.height();
