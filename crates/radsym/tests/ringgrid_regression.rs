@@ -8,8 +8,8 @@ use radsym::propose::extract::ResponseMap;
 use radsym::propose::rsd::RsdConfig;
 use radsym::propose::seed::ProposalSource;
 use radsym::{
-    extract_proposals, load_grayscale, refine_ellipse, rsd_response,
-    suppress_proposals_by_distance, Ellipse, EllipseRefineConfig, PixelCoord, Polarity, Proposal,
+    extract_proposals, refine_ellipse, rsd_response, suppress_proposals_by_distance, Ellipse,
+    EllipseRefineConfig, OwnedImage, PixelCoord, Polarity, Proposal,
 };
 
 #[derive(serde::Deserialize)]
@@ -28,6 +28,7 @@ struct MarkerFixture {
 struct EllipseFixture {
     a: f32,
     b: f32,
+    angle: f32,
 }
 
 fn testdata_path(name: &str) -> PathBuf {
@@ -39,6 +40,104 @@ fn testdata_path(name: &str) -> PathBuf {
 fn fixture() -> RinggridFixture {
     let path = testdata_path("ringgrid_features.json");
     serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap()
+}
+
+fn raster_bounds(fixture: &RinggridFixture) -> (usize, usize) {
+    let mut width = 0.0f32;
+    let mut height = 0.0f32;
+
+    for marker in &fixture.detected_markers {
+        let outer_extent = marker.ellipse_outer.a.max(marker.ellipse_outer.b) + 12.0;
+        width = width.max(marker.center[0] + outer_extent);
+        height = height.max(marker.center[1] + outer_extent);
+    }
+
+    (
+        (width.ceil() as usize).max(2),
+        (height.ceil() as usize).max(2),
+    )
+}
+
+fn fill_ellipse(
+    data: &mut [f32],
+    width: usize,
+    height: usize,
+    center: PixelCoord,
+    ellipse: &EllipseFixture,
+    value: f32,
+) {
+    let cos_a = ellipse.angle.cos();
+    let sin_a = ellipse.angle.sin();
+    let extent = ellipse.a.max(ellipse.b) + 2.5;
+    let x0 = (center.x - extent).floor().max(0.0) as usize;
+    let y0 = (center.y - extent).floor().max(0.0) as usize;
+    let x1 = (center.x + extent).ceil().min((width - 1) as f32) as usize;
+    let y1 = (center.y + extent).ceil().min((height - 1) as f32) as usize;
+
+    for y in y0..=y1 {
+        for x in x0..=x1 {
+            let dx = x as f32 - center.x;
+            let dy = y as f32 - center.y;
+            let lx = dx * cos_a + dy * sin_a;
+            let ly = -dx * sin_a + dy * cos_a;
+            let level = (lx / ellipse.a).powi(2) + (ly / ellipse.b).powi(2);
+            if level <= 1.0 {
+                data[y * width + x] = value;
+            }
+        }
+    }
+}
+
+fn blur3x3_inplace(data: &mut [f32], width: usize, height: usize, passes: usize) {
+    let mut tmp = vec![0.0f32; data.len()];
+
+    for _ in 0..passes {
+        for y in 0..height {
+            for x in 0..width {
+                let left = x.saturating_sub(1);
+                let right = (x + 1).min(width - 1);
+                tmp[y * width + x] =
+                    (data[y * width + left] + data[y * width + x] + data[y * width + right]) / 3.0;
+            }
+        }
+
+        for y in 0..height {
+            let up = y.saturating_sub(1);
+            let down = (y + 1).min(height - 1);
+            for x in 0..width {
+                data[y * width + x] =
+                    (tmp[up * width + x] + tmp[y * width + x] + tmp[down * width + x]) / 3.0;
+            }
+        }
+    }
+}
+
+fn ringgrid_image(fixture: &RinggridFixture) -> OwnedImage<u8> {
+    let (width, height) = raster_bounds(fixture);
+    let mut data = vec![232.0f32; width * height];
+
+    for marker in &fixture.detected_markers {
+        let center = PixelCoord::new(marker.center[0], marker.center[1]);
+        fill_ellipse(
+            &mut data,
+            width,
+            height,
+            center,
+            &marker.ellipse_outer,
+            26.0,
+        );
+        if let Some(inner) = marker.ellipse_inner.as_ref() {
+            fill_ellipse(&mut data, width, height, center, inner, 232.0);
+        }
+    }
+
+    blur3x3_inplace(&mut data, width, height, 2);
+
+    let data = data
+        .into_iter()
+        .map(|value| value.round().clamp(0.0, 255.0) as u8)
+        .collect::<Vec<_>>();
+    OwnedImage::from_vec(data, width, height).unwrap()
 }
 
 fn build_radius_band(
@@ -167,7 +266,7 @@ fn detect_outer_rsd_candidates(
 #[test]
 fn ringgrid_outer_rsd_candidates_recall_all_ground_truth_centers() {
     let fixture = fixture();
-    let image = load_grayscale(testdata_path("ringgrid.png")).unwrap();
+    let image = ringgrid_image(&fixture);
     let gradient = sobel_gradient(&image.view()).unwrap();
     let gt_centers = gt_centers(&fixture);
 
@@ -212,7 +311,7 @@ fn ringgrid_outer_rsd_candidates_recall_all_ground_truth_centers() {
 #[test]
 fn ringgrid_local_ellipse_refinement_recovers_outer_and_inner_geometry() {
     let fixture = fixture();
-    let image = load_grayscale(testdata_path("ringgrid.png")).unwrap();
+    let image = ringgrid_image(&fixture);
     let gradient = sobel_gradient(&image.view()).unwrap();
     let gt_centers = gt_centers(&fixture);
     let outer_hint = outer_radius_hint(&fixture);
