@@ -17,5 +17,6 @@
 
 pub mod extract;
 pub mod frst;
+pub mod homography;
 pub mod rsd;
 pub mod seed;

@@ -1,7 +1,21 @@
 """End-to-end pipeline test: gradient -> FRST -> NMS -> score -> refine."""
 
+import sys
+from pathlib import Path
+
 import numpy as np
 import radsym
+
+ROOT = Path(__file__).resolve().parents[3]
+EXAMPLES_DIR = ROOT / "crates" / "radsym-py" / "examples"
+TOOLS_DIR = ROOT / "tools"
+if str(EXAMPLES_DIR) not in sys.path:
+    sys.path.insert(0, str(EXAMPLES_DIR))
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+import detect_surf_hole  # noqa: E402
+import eval_surf_holes  # noqa: E402
 
 
 def make_bright_disk(size: int = 64, cx: float = 32.0, cy: float = 32.0, r: float = 10.0) -> np.ndarray:
@@ -10,6 +24,21 @@ def make_bright_disk(size: int = 64, cx: float = 32.0, cy: float = 32.0, r: floa
     for y in range(size):
         for x in range(size):
             if ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5 <= r:
+                image[y, x] = 255
+    return image
+
+
+def make_ellipse_fill(size: int, ellipse: radsym.Ellipse) -> np.ndarray:
+    image = np.zeros((size, size), dtype=np.uint8)
+    cos_a = np.cos(ellipse.angle)
+    sin_a = np.sin(ellipse.angle)
+    for y in range(size):
+        for x in range(size):
+            dx = x - ellipse.center[0]
+            dy = y - ellipse.center[1]
+            lx = dx * cos_a + dy * sin_a
+            ly = -dx * sin_a + dy * cos_a
+            if (lx / ellipse.semi_major) ** 2 + (ly / ellipse.semi_minor) ** 2 <= 1.0:
                 image[y, x] = 255
     return image
 
@@ -107,7 +136,7 @@ def test_ellipse_refine():
     gradient = radsym.sobel_gradient(image)
 
     ellipse = radsym.Ellipse((33.0, 31.0), 10.0, 10.0, 0.0)
-    result = radsym.refine_ellipse(gradient, ellipse)
+    result = radsym.refine_ellipse(gradient, ellipse, radsym.EllipseRefineConfig())
     assert isinstance(result, radsym.EllipseRefinementResult)
     assert isinstance(result.hypothesis, radsym.Ellipse)
 
@@ -131,3 +160,78 @@ def test_polarity_dark():
     px, py = best.position
     assert abs(px - 32.0) < 8.0
     assert abs(py - 32.0) < 8.0
+
+
+def test_homography_pipeline():
+    homography = radsym.Homography(
+        [
+            [1.10, 0.06, 16.0],
+            [0.03, 0.98, 12.0],
+            [0.0011, -0.0007, 1.0],
+        ]
+    )
+    rectified_circle = radsym.Circle((64.0, 60.0), 16.0)
+    ellipse = radsym.rectified_circle_to_image_ellipse(homography, rectified_circle)
+    image = make_ellipse_fill(128, ellipse)
+    gradient = radsym.sobel_gradient(image)
+    grid = radsym.RectifiedGrid(128, 128)
+
+    response = radsym.frst_response_homography(
+        gradient,
+        homography,
+        grid,
+        radsym.FrstConfig(radii=[15, 16, 17], polarity="bright"),
+    )
+    assert isinstance(response, radsym.RectifiedResponseMap)
+    proposals = radsym.extract_rectified_proposals(response, homography)
+    assert len(proposals) > 0
+    best = proposals[0]
+    assert best.rectified_circle_hint is not None
+    score = radsym.score_rectified_circle_support(
+        gradient,
+        best.rectified_circle_hint,
+        homography,
+    )
+    assert score.total > 0.0
+
+    image_response = radsym.frst_response(gradient, radsym.FrstConfig(radii=[15, 16, 17], polarity="bright"))
+    image_proposals = radsym.extract_proposals(image_response, radsym.NmsConfig(radius=5))
+    reranked = radsym.rerank_proposals_homography(gradient, image_proposals, homography)
+    assert len(reranked) > 0
+    assert reranked[0].total_score >= reranked[-1].total_score
+
+    refine_result = radsym.refine_ellipse_homography(
+        gradient,
+        ellipse,
+        homography,
+        radsym.HomographyEllipseRefineConfig(),
+    )
+    assert isinstance(refine_result, radsym.HomographyRefinementResult)
+    assert refine_result.status in ("converged", "max_iterations", "degenerate", "out_of_bounds")
+    assert refine_result.rectified_circle.radius > 0.0
+
+
+def test_detect_surf_hole_cli_rejects_removed_edge_mode(monkeypatch):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["detect_surf_hole.py", "testdata/surf1.png", "--edge-mode", "outer"],
+    )
+    try:
+        detect_surf_hole.parse_args()
+        assert False, "should have exited on removed --edge-mode"
+    except SystemExit:
+        pass
+
+
+def test_eval_surf_holes_cli_rejects_removed_edge_mode(monkeypatch):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["eval_surf_holes.py", "--edge-mode", "best"],
+    )
+    try:
+        eval_surf_holes.parse_args()
+        assert False, "should have exited on removed --edge-mode"
+    except SystemExit:
+        pass

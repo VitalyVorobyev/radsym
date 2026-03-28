@@ -16,21 +16,13 @@ cargo bench                                                        # benchmarks
 
 ## Architecture
 
-Workspace with two crates:
+Single library crate at `crates/radsym/` with internal modules:
 
-- `crates/radsym/`    — core Rust library
-- `crates/radsym-py/` — Python bindings via PyO3
-
-### radsym modules
-
-- `core/`         — types, image view, errors, NMS, geometry, gradient,
-                     homography, circle fitting (Kåsa)
-- `propose/`      — FRST, RSD, center voting, proposal extraction,
-                     homography-aware FRST and reranking
+- `core/`         — types, image view, errors, NMS, geometry, gradient
+- `propose/`      — FRST, RSD, center voting, proposal extraction
 - `support/`      — annulus sampling, profiles, scoring, hypothesis types
-- `refine/`       — Parthasarathy radial center, circle/ellipse refinement,
-                     homography-aware ellipse refinement
-- `affine/`       — (feature-gated) affine-aware extensions (GFRS)
+- `refine/`       — Parthasarathy radial center, circle/ellipse refinement
+- `affine/`       — (feature-gated) affine-aware extensions
 - `diagnostics/`  — heatmaps, overlays, export
 
 ## Coordinate Convention
@@ -54,8 +46,7 @@ rightward, y increases downward. `PixelCoord = nalgebra::Point2<f32>`.
 ## Dependency Rules
 
 - `core/` must not depend on algorithm modules
-- `propose/`, `support/` depend only on `core/`
-- `refine/` depends on `core/` and `support/`
+- `propose/`, `support/`, `refine/` depend only on `core/`
 - `affine/` depends on `core/` and `propose/`
 - `diagnostics/` may depend on all other modules
 - No opencv or heavy vision deps. `nalgebra` only for linear algebra.
@@ -83,7 +74,3 @@ rightward, y increases downward. `PixelCoord = nalgebra::Point2<f32>`.
 | RSD | `propose::rsd` | Barnes, Zelinsky, Fletcher, IEEE T-ITS 2008 |
 | Radial center | `refine::radial_center` | Parthasarathy, Nature Methods 2012 |
 | GFRS | `affine::propose` | Ni, Singh, Bahlmann, CVPR 2012 |
-| Kåsa circle fit | `core::circle_fit` | Kåsa, IEEE T-IM 1976 |
-| Ellipse refinement | `refine::ellipse` | Fitzgibbon et al., TPAMI 1999 |
-| Homography FRST | `propose::homography` | Novel: FRST in rectified space |
-| Homography refinement | `refine::homography` | Novel: circle fit in rectified space |

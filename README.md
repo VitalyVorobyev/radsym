@@ -4,7 +4,7 @@
 [![Crates.io](https://img.shields.io/crates/v/radsym.svg)](https://crates.io/crates/radsym)
 [![docs.rs](https://docs.rs/radsym/badge.svg)](https://docs.rs/radsym)
 [![License](https://img.shields.io/crates/l/radsym.svg)](LICENSE-MIT)
-[![MSRV](https://img.shields.io/badge/MSRV-1.80-blue.svg)](https://blog.rust-lang.org/2024/07/25/Rust-1.80.0.html)
+[![MSRV](https://img.shields.io/badge/MSRV-1.88-blue.svg)](https://blog.rust-lang.org/2025/06/26/Rust-1.88.0/)
 
 Radial symmetry detection in Rust. Fast gradient-based center voting,
 local support scoring, and subpixel refinement — composable tools for

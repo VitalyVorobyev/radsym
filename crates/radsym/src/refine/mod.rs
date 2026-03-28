@@ -16,5 +16,10 @@
 
 pub mod circle;
 pub mod ellipse;
+pub mod homography;
 pub mod radial_center;
 pub mod result;
+
+mod circle_fit;
+mod edge_profiles;
+mod ellipse_fit;

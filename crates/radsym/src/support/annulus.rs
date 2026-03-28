@@ -41,8 +41,8 @@ pub fn sample_annulus(
     outer_radius: Scalar,
     config: &AnnulusSamplingConfig,
 ) -> SupportEvidence {
-    let w = gradient.width();
-    let h = gradient.height();
+    let gx_view = gradient.gx();
+    let gy_view = gradient.gy();
     let mut samples = Vec::new();
     let mut alignment_sum = 0.0f32;
 
@@ -65,34 +65,26 @@ pub fn sample_annulus(
             let sx = center.x + r * cos_t;
             let sy = center.y + r * sin_t;
 
-            let ix = sx.round() as usize;
-            let iy = sy.round() as usize;
-
-            if ix >= w || iy >= h {
+            let Some(gx) = gx_view.sample(sx, sy) else {
+                continue;
+            };
+            let Some(gy) = gy_view.sample(sx, sy) else {
+                continue;
+            };
+            let mag = (gx * gx + gy * gy).sqrt();
+            if mag < 1e-8 {
                 continue;
             }
 
-            if let Some((gx, gy)) = gradient.get(ix, iy) {
-                let mag = (gx * gx + gy * gy).sqrt();
-                if mag < 1e-8 {
-                    continue;
-                }
+            let alignment = ((gx * cos_t + gy * sin_t) / mag).abs();
+            alignment_sum += alignment;
 
-                // Radial direction: from center to sample point
-                let rx = cos_t;
-                let ry = sin_t;
-
-                // Alignment: |cos(angle between gradient and radial direction)|
-                let alignment = ((gx * rx + gy * ry) / mag).abs();
-                alignment_sum += alignment;
-
-                samples.push(GradientSample {
-                    position: PixelCoord::new(sx, sy),
-                    gx,
-                    gy,
-                    radial_alignment: alignment,
-                });
-            }
+            samples.push(GradientSample {
+                position: PixelCoord::new(sx, sy),
+                gx,
+                gy,
+                radial_alignment: alignment,
+            });
         }
     }
 
@@ -103,7 +95,7 @@ pub fn sample_annulus(
         0.0
     };
 
-    let coverage = compute_angular_coverage(&samples, config.num_angular_samples);
+    let coverage = compute_circular_angular_coverage(&samples, center, config.num_angular_samples);
     SupportEvidence {
         gradient_samples: samples,
         angular_coverage: coverage,
@@ -123,8 +115,8 @@ pub fn sample_elliptical_annulus(
     outer_scale: Scalar,
     config: &AnnulusSamplingConfig,
 ) -> SupportEvidence {
-    let w = gradient.width();
-    let h = gradient.height();
+    let gx_view = gradient.gx();
+    let gy_view = gradient.gy();
     let mut samples = Vec::new();
     let mut alignment_sum = 0.0f32;
 
@@ -159,39 +151,36 @@ pub fn sample_elliptical_annulus(
             let sx = ellipse.center.x + lx * cos_a - ly * sin_a;
             let sy = ellipse.center.y + lx * sin_a + ly * cos_a;
 
-            let ix = sx.round() as usize;
-            let iy = sy.round() as usize;
-
-            if ix >= w || iy >= h {
+            let Some(gx) = gx_view.sample(sx, sy) else {
+                continue;
+            };
+            let Some(gy) = gy_view.sample(sx, sy) else {
+                continue;
+            };
+            let mag = (gx * gx + gy * gy).sqrt();
+            if mag < 1e-8 {
                 continue;
             }
 
-            if let Some((gx, gy)) = gradient.get(ix, iy) {
-                let mag = (gx * gx + gy * gy).sqrt();
-                if mag < 1e-8 {
-                    continue;
-                }
-
-                // Normal direction: from center towards sample point
-                let dx = sx - ellipse.center.x;
-                let dy = sy - ellipse.center.y;
-                let d = (dx * dx + dy * dy).sqrt();
-                if d < 1e-8 {
-                    continue;
-                }
-                let rx = dx / d;
-                let ry = dy / d;
-
-                let alignment = ((gx * rx + gy * ry) / mag).abs();
-                alignment_sum += alignment;
-
-                samples.push(GradientSample {
-                    position: PixelCoord::new(sx, sy),
-                    gx,
-                    gy,
-                    radial_alignment: alignment,
-                });
+            // True ellipse normal in local coordinates, scaled copies preserve direction.
+            let nx_local = ellipse.semi_minor * cos_t;
+            let ny_local = ellipse.semi_major * sin_t;
+            let n_mag = (nx_local * nx_local + ny_local * ny_local).sqrt();
+            if n_mag < 1e-8 {
+                continue;
             }
+            let nx = (nx_local * cos_a - ny_local * sin_a) / n_mag;
+            let ny = (nx_local * sin_a + ny_local * cos_a) / n_mag;
+
+            let alignment = ((gx * nx + gy * ny) / mag).abs();
+            alignment_sum += alignment;
+
+            samples.push(GradientSample {
+                position: PixelCoord::new(sx, sy),
+                gx,
+                gy,
+                radial_alignment: alignment,
+            });
         }
     }
 
@@ -202,7 +191,8 @@ pub fn sample_elliptical_annulus(
         0.0
     };
 
-    let coverage = compute_angular_coverage(&samples, config.num_angular_samples);
+    let coverage =
+        compute_elliptical_angular_coverage(&samples, ellipse, config.num_angular_samples);
     SupportEvidence {
         gradient_samples: samples,
         angular_coverage: coverage,
@@ -215,20 +205,57 @@ pub fn sample_elliptical_annulus(
 ///
 /// Divides the annulus into `n_bins` angular bins and counts what fraction
 /// of bins have at least one well-aligned sample (alignment > 0.5).
-fn compute_angular_coverage(samples: &[GradientSample], n_bins: usize) -> Scalar {
+fn compute_circular_angular_coverage(
+    samples: &[GradientSample],
+    center: PixelCoord,
+    n_bins: usize,
+) -> Scalar {
     if samples.is_empty() || n_bins == 0 {
         return 0.0;
     }
     let mut bins = vec![false; n_bins];
     for s in samples {
         if s.radial_alignment > 0.5 {
-            let angle = s.position.y.atan2(s.position.x);
+            let angle = (s.position.y - center.y).atan2(s.position.x - center.x);
             let normalized = (angle + std::f32::consts::PI) / (2.0 * std::f32::consts::PI);
             let bin = (normalized * n_bins as Scalar) as usize;
             let bin = bin.min(n_bins - 1);
             bins[bin] = true;
         }
     }
+    let filled = bins.iter().filter(|&&b| b).count();
+    filled as Scalar / n_bins as Scalar
+}
+
+fn compute_elliptical_angular_coverage(
+    samples: &[GradientSample],
+    ellipse: &Ellipse,
+    n_bins: usize,
+) -> Scalar {
+    if samples.is_empty() || n_bins == 0 || ellipse.semi_major <= 1e-6 || ellipse.semi_minor <= 1e-6
+    {
+        return 0.0;
+    }
+
+    let cos_a = ellipse.angle.cos();
+    let sin_a = ellipse.angle.sin();
+    let mut bins = vec![false; n_bins];
+
+    for s in samples {
+        if s.radial_alignment <= 0.5 {
+            continue;
+        }
+
+        let dx = s.position.x - ellipse.center.x;
+        let dy = s.position.y - ellipse.center.y;
+        let lx = dx * cos_a + dy * sin_a;
+        let ly = -dx * sin_a + dy * cos_a;
+        let angle = (ly / ellipse.semi_minor).atan2(lx / ellipse.semi_major);
+        let normalized = (angle + std::f32::consts::PI) / (2.0 * std::f32::consts::PI);
+        let bin = ((normalized * n_bins as Scalar) as usize).min(n_bins - 1);
+        bins[bin] = true;
+    }
+
     let filled = bins.iter().filter(|&&b| b).count();
     filled as Scalar / n_bins as Scalar
 }

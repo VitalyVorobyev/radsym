@@ -4,10 +4,12 @@
 //! depend on. It must remain small and free of algorithm-specific logic.
 
 pub(crate) mod blur;
+pub mod circle_fit;
 pub mod coords;
 pub mod error;
 pub mod geometry;
 pub mod gradient;
+pub mod homography;
 pub mod image_view;
 #[cfg(feature = "image-io")]
 pub mod io;
