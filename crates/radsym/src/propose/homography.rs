@@ -272,6 +272,7 @@ fn circle_support_score(
     let gx_view = gradient.gx();
     let gy_view = gradient.gy();
     let mut aligned = 0usize;
+    let mut sampled = 0usize;
     let mut alignment_sum = 0.0;
 
     for sector in 0..ray_count {
@@ -288,17 +289,18 @@ fn circle_support_score(
             continue;
         }
         let alignment = ((gx * dir_x + gy * dir_y) / mag).abs();
+        sampled += 1;
         alignment_sum += alignment;
         if alignment > 0.45 {
             aligned += 1;
         }
     }
 
-    if aligned == 0 {
+    if aligned == 0 || sampled == 0 {
         return 0.0;
     }
     let coverage = aligned as Scalar / ray_count as Scalar;
-    let mean_alignment = alignment_sum / aligned as Scalar;
+    let mean_alignment = alignment_sum / sampled as Scalar;
     (0.7 * mean_alignment + 0.3 * coverage).clamp(0.0, 1.0)
 }
 
@@ -641,7 +643,21 @@ pub fn rerank_proposals_homography(
 mod tests {
     use super::*;
     use crate::core::gradient::sobel_gradient;
-    use crate::core::image_view::ImageView;
+    use crate::core::image_view::{ImageView, OwnedImage};
+
+    fn gradient_field_from_samples(
+        width: usize,
+        height: usize,
+        samples: &[(usize, usize, Scalar, Scalar)],
+    ) -> GradientField {
+        let mut gx = OwnedImage::<Scalar>::zeros(width, height).unwrap();
+        let mut gy = OwnedImage::<Scalar>::zeros(width, height).unwrap();
+        for &(x, y, dx, dy) in samples {
+            *gx.get_mut(x, y).unwrap() = dx;
+            *gy.get_mut(x, y).unwrap() = dy;
+        }
+        GradientField { gx, gy }
+    }
 
     fn make_projective_disk(size: usize, homography: &Homography, circle: Circle) -> Vec<u8> {
         let mut data = vec![25u8; size * size];
@@ -749,5 +765,36 @@ mod tests {
         let dy = best.proposal.seed.position.y - 63.0;
         assert!((dx * dx + dy * dy).sqrt() < 2.0);
         assert!(best.total_score > reranked[1].total_score);
+    }
+
+    #[test]
+    fn circle_support_score_averages_over_sampled_rays() {
+        let weak = (1.0_f32 - 0.4_f32 * 0.4_f32).sqrt();
+        let gradient = gradient_field_from_samples(
+            20,
+            20,
+            &[
+                (14, 10, 1.0, 0.0),
+                (14, 11, 1.0, 0.0),
+                (15, 10, 1.0, 0.0),
+                (15, 11, 1.0, 0.0),
+                (9, 14, weak, 0.4),
+                (10, 14, weak, 0.4),
+                (9, 15, weak, 0.4),
+                (10, 15, weak, 0.4),
+            ],
+        );
+
+        let score = circle_support_score(&gradient, PixelCoord::new(10.0, 10.0), 4.0, 4);
+        let expected = 0.7 * ((1.0 + 0.4) / 2.0) + 0.3 * 0.25;
+
+        assert!(
+            (score - expected).abs() < 1e-4,
+            "score={score} expected={expected}"
+        );
+        assert!(
+            score < 1.0,
+            "sampling average should not saturate the score"
+        );
     }
 }

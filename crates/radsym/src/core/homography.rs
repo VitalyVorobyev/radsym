@@ -181,7 +181,8 @@ impl Homography {
         rectified_normal: Vector2<Scalar>,
     ) -> Option<Vector2<Scalar>> {
         let jacobian = self.jacobian_rectified_to_image(rectified_point)?;
-        let result = jacobian.transpose() * rectified_normal;
+        let inv = jacobian.try_inverse()?;
+        let result = inv.transpose() * rectified_normal;
         if result.iter().all(|v| v.is_finite()) {
             Some(result)
         } else {
@@ -391,5 +392,26 @@ mod tests {
             delta > 0.5,
             "expected a projective center mismatch, got {delta}"
         );
+    }
+
+    #[test]
+    fn pullback_rectified_covector_matches_image_to_rectified_transpose() {
+        let homography =
+            Homography::new([[1.2, 0.1, 15.0], [0.05, 0.9, -8.0], [0.0015, -0.0008, 1.0]]).unwrap();
+        let image_point = PixelCoord::new(62.0, 47.0);
+        let rectified_point = homography.map_image_to_rectified(image_point).unwrap();
+        let rectified_normal = Vector2::new(0.35, -0.91);
+
+        let pulled = homography
+            .pullback_rectified_normal_to_image(rectified_point, rectified_normal)
+            .unwrap();
+        let expected = homography
+            .jacobian_image_to_rectified(image_point)
+            .unwrap()
+            .transpose()
+            * rectified_normal;
+
+        assert!((pulled[0] - expected[0]).abs() < 1e-4);
+        assert!((pulled[1] - expected[1]).abs() < 1e-4);
     }
 }
