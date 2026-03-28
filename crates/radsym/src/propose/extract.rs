@@ -62,6 +62,42 @@ pub fn extract_proposals(
         .collect()
 }
 
+/// Greedily suppress proposals that are closer than `min_distance`.
+///
+/// The input order is preserved for retained proposals, so callers should sort
+/// or rank proposals before calling this helper when they want the strongest
+/// candidate in each spatial neighborhood to survive.
+pub fn suppress_proposals_by_distance(
+    proposals: &[Proposal],
+    min_distance: Scalar,
+    max_detections: usize,
+) -> Vec<Proposal> {
+    if proposals.is_empty() || max_detections == 0 {
+        return Vec::new();
+    }
+
+    let min_distance_sq = min_distance.max(0.0).powi(2);
+    let mut kept: Vec<Proposal> = Vec::with_capacity(proposals.len().min(max_detections));
+
+    'proposal: for proposal in proposals {
+        let position = proposal.seed.position;
+        for other in &kept {
+            let dx = position.x - other.seed.position.x;
+            let dy = position.y - other.seed.position.y;
+            if dx * dx + dy * dy < min_distance_sq {
+                continue 'proposal;
+            }
+        }
+
+        kept.push(proposal.clone());
+        if kept.len() == max_detections {
+            break;
+        }
+    }
+
+    kept
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,5 +145,45 @@ mod tests {
         // Top 2 by score
         assert_eq!(proposals[0].seed.score, 3.0);
         assert_eq!(proposals[1].seed.score, 2.0);
+    }
+
+    #[test]
+    fn suppress_proposals_by_distance_keeps_strongest_per_cluster() {
+        let proposals = vec![
+            Proposal {
+                seed: SeedPoint {
+                    position: crate::core::coords::PixelCoord::new(10.0, 10.0),
+                    score: 5.0,
+                },
+                scale_hint: Some(12.0),
+                polarity: Polarity::Dark,
+                source: ProposalSource::Frst,
+            },
+            Proposal {
+                seed: SeedPoint {
+                    position: crate::core::coords::PixelCoord::new(14.0, 12.0),
+                    score: 4.0,
+                },
+                scale_hint: Some(12.0),
+                polarity: Polarity::Dark,
+                source: ProposalSource::Frst,
+            },
+            Proposal {
+                seed: SeedPoint {
+                    position: crate::core::coords::PixelCoord::new(40.0, 40.0),
+                    score: 3.0,
+                },
+                scale_hint: Some(12.0),
+                polarity: Polarity::Dark,
+                source: ProposalSource::Frst,
+            },
+        ];
+
+        let kept = suppress_proposals_by_distance(&proposals, 6.0, 8);
+        assert_eq!(kept.len(), 2);
+        assert_eq!(kept[0].seed.position.x, 10.0);
+        assert_eq!(kept[0].seed.position.y, 10.0);
+        assert_eq!(kept[1].seed.position.x, 40.0);
+        assert_eq!(kept[1].seed.position.y, 40.0);
     }
 }

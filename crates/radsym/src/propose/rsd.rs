@@ -24,10 +24,13 @@ use crate::core::gradient::GradientField;
 use crate::core::image_view::OwnedImage;
 use crate::core::polarity::Polarity;
 use crate::core::scalar::Scalar;
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
 
 /// Configuration for RSD response computation.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
 pub struct RsdConfig {
     /// Set of discrete radii to test (in pixels).
     pub radii: Vec<u32>,
@@ -132,8 +135,22 @@ pub fn rsd_response(gradient: &GradientField, config: &RsdConfig) -> Result<Owne
     let h = gradient.height();
     let mut sum = OwnedImage::<Scalar>::zeros(w, h)?;
 
-    for &r in &config.radii {
-        let single = rsd_response_single(gradient, r, config)?;
+    #[cfg(feature = "rayon")]
+    let per_radius = config
+        .radii
+        .par_iter()
+        .map(|&radius| rsd_response_single(gradient, radius, config))
+        .collect::<Vec<_>>();
+
+    #[cfg(not(feature = "rayon"))]
+    let per_radius = config
+        .radii
+        .iter()
+        .map(|&radius| rsd_response_single(gradient, radius, config))
+        .collect::<Vec<_>>();
+
+    for single in per_radius {
+        let single = single?;
         let sum_data = sum.data_mut();
         let single_data = single.data();
         for i in 0..w * h {
