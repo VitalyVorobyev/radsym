@@ -12,7 +12,7 @@
 
 ### Milestone 1.1: Workspace skeleton
 
-- [x] Workspace `Cargo.toml` with metadata, edition 2021, MSRV 1.80
+- [x] Workspace `Cargo.toml` with metadata, edition 2021, MSRV 1.88
 - [x] `crates/radsym/Cargo.toml` with feature flags: rayon, image-io, tracing, affine, serde
 - [x] `lib.rs` with module declarations and feature gates
 - [x] `CLAUDE.md` with project conventions
@@ -235,7 +235,7 @@ Literature: Ni, Singh, Bahlmann, CVPR 2012
 ### Milestone 8.3: CI
 
 - [x] GitHub Actions: fmt, clippy, test (all features), test (no default features)
-- [x] MSRV check (1.80)
+- [x] MSRV check (1.88)
 - [x] Documentation build with warnings-as-errors
 
 ### Milestone 8.4: crates.io preparation

@@ -96,7 +96,11 @@ fn box_radii_for_sigma(sigma: Scalar) -> [usize; 3] {
     // Ideal box width: w_ideal = sqrt(12 * sigma^2 / N + 1), N = 3 passes
     let w_ideal = (12.0 * sigma * sigma / 3.0 + 1.0).sqrt();
     let wl_raw = w_ideal.floor() as usize;
-    let wl = if wl_raw % 2 == 0 { wl_raw - 1 } else { wl_raw }; // largest odd <= w_ideal
+    let wl = if wl_raw.is_multiple_of(2) {
+        wl_raw - 1
+    } else {
+        wl_raw
+    }; // largest odd <= w_ideal
     let wu = wl + 2;
 
     // How many passes use wl vs wu:
