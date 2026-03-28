@@ -24,10 +24,13 @@ use crate::core::gradient::GradientField;
 use crate::core::image_view::OwnedImage;
 use crate::core::polarity::Polarity;
 use crate::core::scalar::Scalar;
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
 
 /// Configuration for RSD response computation.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
 pub struct RsdConfig {
     /// Set of discrete radii to test (in pixels).
     pub radii: Vec<u32>,
@@ -50,6 +53,19 @@ impl Default for RsdConfig {
     }
 }
 
+#[inline]
+fn accumulate_vote(acc_data: &mut [Scalar], w: usize, h: usize, x: i32, y: i32, mag: Scalar) {
+    if x >= 0 && (x as usize) < w && y >= 0 && (y as usize) < h {
+        acc_data[y as usize * w + x as usize] += mag;
+    }
+}
+
+fn accumulate_response(sum: &mut OwnedImage<Scalar>, single: &OwnedImage<Scalar>) {
+    for (dst, src) in sum.data_mut().iter_mut().zip(single.data().iter().copied()) {
+        *dst += src;
+    }
+}
+
 /// Compute the RSD response map for a single radius.
 ///
 /// Magnitude-only voting: each pixel with sufficient gradient magnitude
@@ -62,7 +78,7 @@ pub fn rsd_response_single(
 ) -> Result<OwnedImage<Scalar>> {
     let w = gradient.width();
     let h = gradient.height();
-    let n = radius as i32;
+    let radius_f = radius as Scalar;
 
     let mut acc = OwnedImage::<Scalar>::zeros(w, h)?;
     let acc_data = acc.data_mut();
@@ -70,49 +86,79 @@ pub fn rsd_response_single(
     let gy_data = gradient.gy.data();
 
     let thresh_sq = config.gradient_threshold * config.gradient_threshold;
+    match config.polarity {
+        Polarity::Bright => {
+            for y in 0..h {
+                for x in 0..w {
+                    let idx = y * w + x;
+                    let gx = gx_data[idx];
+                    let gy = gy_data[idx];
+                    let mag_sq = gx * gx + gy * gy;
+                    if mag_sq < thresh_sq {
+                        continue;
+                    }
 
-    for y in 0..h {
-        for x in 0..w {
-            let idx = y * w + x;
-            let gx = gx_data[idx];
-            let gy = gy_data[idx];
-            let mag_sq = gx * gx + gy * gy;
-
-            if mag_sq < thresh_sq {
-                continue;
+                    let mag = mag_sq.sqrt();
+                    let inv_mag = mag.recip();
+                    let offset_x = (gx * inv_mag * radius_f).round() as i32;
+                    let offset_y = (gy * inv_mag * radius_f).round() as i32;
+                    accumulate_vote(
+                        acc_data,
+                        w,
+                        h,
+                        x as i32 + offset_x,
+                        y as i32 + offset_y,
+                        mag,
+                    );
+                }
             }
+        }
+        Polarity::Dark => {
+            for y in 0..h {
+                for x in 0..w {
+                    let idx = y * w + x;
+                    let gx = gx_data[idx];
+                    let gy = gy_data[idx];
+                    let mag_sq = gx * gx + gy * gy;
+                    if mag_sq < thresh_sq {
+                        continue;
+                    }
 
-            let mag = mag_sq.sqrt();
-            let dx = gx / mag;
-            let dy = gy / mag;
-
-            // Positive-affected pixel (bright center)
-            let px_pos = x as i32 + (dx * n as Scalar).round() as i32;
-            let py_pos = y as i32 + (dy * n as Scalar).round() as i32;
-
-            // Negative-affected pixel (dark center)
-            let px_neg = x as i32 - (dx * n as Scalar).round() as i32;
-            let py_neg = y as i32 - (dy * n as Scalar).round() as i32;
-
-            let vote_pos = config.polarity.votes_positive();
-            let vote_neg = config.polarity.votes_negative();
-
-            if vote_pos
-                && px_pos >= 0
-                && (px_pos as usize) < w
-                && py_pos >= 0
-                && (py_pos as usize) < h
-            {
-                acc_data[py_pos as usize * w + px_pos as usize] += mag;
+                    let mag = mag_sq.sqrt();
+                    let inv_mag = mag.recip();
+                    let offset_x = (gx * inv_mag * radius_f).round() as i32;
+                    let offset_y = (gy * inv_mag * radius_f).round() as i32;
+                    accumulate_vote(
+                        acc_data,
+                        w,
+                        h,
+                        x as i32 - offset_x,
+                        y as i32 - offset_y,
+                        mag,
+                    );
+                }
             }
+        }
+        Polarity::Both => {
+            for y in 0..h {
+                for x in 0..w {
+                    let idx = y * w + x;
+                    let gx = gx_data[idx];
+                    let gy = gy_data[idx];
+                    let mag_sq = gx * gx + gy * gy;
+                    if mag_sq < thresh_sq {
+                        continue;
+                    }
 
-            if vote_neg
-                && px_neg >= 0
-                && (px_neg as usize) < w
-                && py_neg >= 0
-                && (py_neg as usize) < h
-            {
-                acc_data[py_neg as usize * w + px_neg as usize] += mag;
+                    let mag = mag_sq.sqrt();
+                    let inv_mag = mag.recip();
+                    let offset_x = (gx * inv_mag * radius_f).round() as i32;
+                    let offset_y = (gy * inv_mag * radius_f).round() as i32;
+                    let x = x as i32;
+                    let y = y as i32;
+                    accumulate_vote(acc_data, w, h, x + offset_x, y + offset_y, mag);
+                    accumulate_vote(acc_data, w, h, x - offset_x, y - offset_y, mag);
+                }
             }
         }
     }
@@ -132,13 +178,23 @@ pub fn rsd_response(gradient: &GradientField, config: &RsdConfig) -> Result<Owne
     let h = gradient.height();
     let mut sum = OwnedImage::<Scalar>::zeros(w, h)?;
 
-    for &r in &config.radii {
-        let single = rsd_response_single(gradient, r, config)?;
-        let sum_data = sum.data_mut();
-        let single_data = single.data();
-        for i in 0..w * h {
-            sum_data[i] += single_data[i];
-        }
+    #[cfg(feature = "rayon")]
+    let per_radius = config
+        .radii
+        .par_iter()
+        .map(|&radius| rsd_response_single(gradient, radius, config))
+        .collect::<Vec<_>>();
+
+    #[cfg(not(feature = "rayon"))]
+    for &radius in &config.radii {
+        let single = rsd_response_single(gradient, radius, config)?;
+        accumulate_response(&mut sum, &single);
+    }
+
+    #[cfg(feature = "rayon")]
+    for single in per_radius {
+        let single = single?;
+        accumulate_response(&mut sum, &single);
     }
 
     Ok(sum)

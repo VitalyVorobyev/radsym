@@ -34,10 +34,13 @@ use crate::core::gradient::GradientField;
 use crate::core::image_view::OwnedImage;
 use crate::core::polarity::Polarity;
 use crate::core::scalar::Scalar;
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
 
 /// Configuration for FRST response computation.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
 pub struct FrstConfig {
     /// Set of discrete radii to test (in pixels).
     pub radii: Vec<u32>,
@@ -179,8 +182,22 @@ pub fn frst_response(gradient: &GradientField, config: &FrstConfig) -> Result<Ow
     let h = gradient.height();
     let mut response = OwnedImage::<Scalar>::zeros(w, h)?;
 
-    for &radius in &config.radii {
-        let s_n = frst_response_single(gradient, radius, config)?;
+    #[cfg(feature = "rayon")]
+    let per_radius = config
+        .radii
+        .par_iter()
+        .map(|&radius| frst_response_single(gradient, radius, config))
+        .collect::<Vec<_>>();
+
+    #[cfg(not(feature = "rayon"))]
+    let per_radius = config
+        .radii
+        .iter()
+        .map(|&radius| frst_response_single(gradient, radius, config))
+        .collect::<Vec<_>>();
+
+    for s_n in per_radius {
+        let s_n = s_n?;
         let resp_data = response.data_mut();
         let s_data = s_n.data();
         for i in 0..w * h {

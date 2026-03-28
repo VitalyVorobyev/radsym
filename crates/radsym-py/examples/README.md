@@ -101,13 +101,24 @@ python crates/radsym-py/examples/detect_ringgrid.py \
 What it does:
 
 - loads the image with `radsym.load_grayscale`
-- computes FRST proposals
-- refines candidates as circles
-- filters by support score
-- suppresses near-duplicate detections
+- computes outer-radius proposal responses with `RSD` by default, or `FRST` with `--detector frst`
+- extracts and deduplicates center proposals
+- runs in proposals-only mode by default
+- optionally fits outer and inner ellipses with `--fit-ellipses`
 - renders:
   - a matplotlib overlay on the source image
-  - a matplotlib FRST heatmap overlay
+  - a matplotlib response heatmap overlay
+- prints a `rich` summary and per-call `radsym` timing table
+
+Ellipse fitting example:
+
+```bash
+python crates/radsym-py/examples/detect_ringgrid.py \
+  testdata/ringgrid.png \
+  --fit-ellipses \
+  --output output/ringgrid_overlay.png \
+  --heatmap-output output/ringgrid_heatmap.png
+```
 
 ## Notes
 

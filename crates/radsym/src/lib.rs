@@ -81,7 +81,7 @@ pub use crate::core::geometry::{Annulus, Circle, Ellipse};
 pub use crate::core::homography::{rectified_circle_to_image_ellipse, Homography, RectifiedGrid};
 pub use crate::core::image_view::{ImageView, OwnedImage};
 pub use crate::core::polarity::Polarity;
-pub use crate::propose::extract::{extract_proposals, ResponseMap};
+pub use crate::propose::extract::{extract_proposals, suppress_proposals_by_distance, ResponseMap};
 pub use crate::propose::frst::{frst_response, frst_response_single, FrstConfig};
 pub use crate::propose::homography::{
     extract_rectified_proposals, frst_response_homography, rerank_proposals_homography,

@@ -215,7 +215,7 @@ def test_detect_surf_hole_cli_rejects_removed_edge_mode(monkeypatch):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["detect_surf_hole.py", "testdata/surf1.png", "--edge-mode", "outer"],
+        ["detect_surf_hole.py", "placeholder.png", "--edge-mode", "outer"],
     )
     try:
         detect_surf_hole.parse_args()
