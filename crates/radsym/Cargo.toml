@@ -48,6 +48,10 @@ name = "rsd_bench"
 harness = false
 
 [[bench]]
+name = "ringgrid_proposal_bench"
+harness = false
+
+[[bench]]
 name = "refinement_bench"
 harness = false
 
