@@ -253,7 +253,7 @@ pub fn non_maximum_suppression(response: &ImageView<'_, Scalar>, config: &NmsCon
 mod tests {
     use super::*;
     use crate::core::image_view::OwnedImage;
-    use rand::{rngs::StdRng, Rng, SeedableRng};
+    use rand::{rngs::StdRng, RngExt, SeedableRng};
 
     fn make_response_with_peaks(
         width: usize,

@@ -87,7 +87,7 @@ fn parse_homography_input(matrix: &Bound<'_, PyAny>) -> PyResult<radsym::Homogra
 ///
 ///     c = radsym.Circle((100.0, 200.0), 15.0)
 ///     print(c.center, c.radius)
-#[pyclass(name = "Circle")]
+#[pyclass(name = "Circle", skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyCircle {
     pub inner: radsym::Circle,
@@ -138,7 +138,7 @@ impl PyCircle {
 /// Example::
 ///
 ///     e = radsym.Ellipse((100.0, 200.0), 20.0, 10.0, angle=0.5)
-#[pyclass(name = "Ellipse")]
+#[pyclass(name = "Ellipse", skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyEllipse {
     pub inner: radsym::Ellipse,
@@ -196,7 +196,7 @@ impl PyEllipse {
 }
 
 /// Validated image-to-rectified homography.
-#[pyclass(name = "Homography")]
+#[pyclass(name = "Homography", skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyHomography {
     pub inner: radsym::Homography,
@@ -238,7 +238,7 @@ impl PyHomography {
 }
 
 /// Caller-defined rectified raster domain.
-#[pyclass(name = "RectifiedGrid")]
+#[pyclass(name = "RectifiedGrid", skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyRectifiedGrid {
     pub inner: radsym::RectifiedGrid,

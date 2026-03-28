@@ -1,4 +1,4 @@
-#[pyclass(name = "FrstConfig")]
+#[pyclass(name = "FrstConfig", skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyFrstConfig {
     pub inner: radsym::FrstConfig,
@@ -73,7 +73,7 @@ impl PyFrstConfig {
 ///     gradient_threshold: Minimum gradient magnitude. Default: 0.0.
 ///     polarity: ``"bright"``, ``"dark"``, or ``"both"``. Default: ``"both"``.
 ///     smoothing_factor: Gaussian smoothing factor. Default: 0.5.
-#[pyclass(name = "RsdConfig")]
+#[pyclass(name = "RsdConfig", skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyRsdConfig {
     pub inner: radsym::RsdConfig,
@@ -118,7 +118,7 @@ impl PyRsdConfig {
 /// Example::
 ///
 ///     nms = radsym.NmsConfig(radius=10, threshold=0.01, max_detections=50)
-#[pyclass(name = "NmsConfig")]
+#[pyclass(name = "NmsConfig", skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyNmsConfig {
     pub inner: radsym::core::nms::NmsConfig,
@@ -172,7 +172,7 @@ impl PyNmsConfig {
 ///     min_samples: Minimum gradient samples to avoid degeneracy. Default: 8.
 ///     weight_ringness: Weight of gradient alignment in total score. Default: 0.6.
 ///     weight_coverage: Weight of angular coverage in total score. Default: 0.4.
-#[pyclass(name = "ScoringConfig")]
+#[pyclass(name = "ScoringConfig", skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyScoringConfig {
     pub inner: radsym::ScoringConfig,
@@ -213,7 +213,7 @@ impl PyScoringConfig {
 ///     max_iterations: Maximum refinement iterations. Default: 10.
 ///     convergence_tol: Stop when center shift is below this (pixels). Default: 0.1.
 ///     annulus_margin: Fractional annulus margin around the radius. Default: 0.3.
-#[pyclass(name = "CircleRefineConfig")]
+#[pyclass(name = "CircleRefineConfig", skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyCircleRefineConfig {
     pub inner: radsym::CircleRefineConfig,
@@ -255,7 +255,7 @@ impl PyCircleRefineConfig {
 ///     min_inlier_coverage: Minimum inlier sector coverage. Default: 0.6.
 ///     max_center_shift_fraction: Maximum center shift from the seed as a radius fraction. Default: 0.4.
 ///     max_axis_ratio: Maximum allowed ellipse axis ratio. Default: 1.8.
-#[pyclass(name = "EllipseRefineConfig")]
+#[pyclass(name = "EllipseRefineConfig", skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyEllipseRefineConfig {
     pub inner: radsym::EllipseRefineConfig,
@@ -315,7 +315,7 @@ impl PyEllipseRefineConfig {
 }
 
 /// Configuration for homography-aware proposal reranking.
-#[pyclass(name = "HomographyRerankConfig")]
+#[pyclass(name = "HomographyRerankConfig", skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyHomographyRerankConfig {
     pub inner: radsym::HomographyRerankConfig,
@@ -368,7 +368,7 @@ impl PyHomographyRerankConfig {
 }
 
 /// Configuration for homography-aware refinement.
-#[pyclass(name = "HomographyEllipseRefineConfig")]
+#[pyclass(name = "HomographyEllipseRefineConfig", skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyHomographyEllipseRefineConfig {
     pub inner: radsym::HomographyEllipseRefineConfig,
@@ -431,7 +431,7 @@ impl PyHomographyEllipseRefineConfig {
 ///     gradient_threshold: Minimum gradient magnitude in the patch. Default: library default.
 ///
 /// Literature: Parthasarathy, Nature Methods 2012.
-#[pyclass(name = "RadialCenterConfig")]
+#[pyclass(name = "RadialCenterConfig", skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyRadialCenterConfig {
     pub inner: radsym::RadialCenterConfig,

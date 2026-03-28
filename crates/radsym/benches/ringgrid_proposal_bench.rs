@@ -1,8 +1,10 @@
 #[cfg(feature = "image-io")]
+use std::hint::black_box;
+#[cfg(feature = "image-io")]
 use std::path::PathBuf;
 
 #[cfg(feature = "image-io")]
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 #[cfg(feature = "image-io")]
 use radsym::core::gradient::sobel_gradient;
