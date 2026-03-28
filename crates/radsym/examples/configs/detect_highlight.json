@@ -1,5 +1,5 @@
 {
-  "image_path": "testdata/surf1.png",
+  "image_path": "path/to/image.png",
   "polarity": "Bright",
   "radius_hint": 30.0,
   "frst": {

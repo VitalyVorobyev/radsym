@@ -116,6 +116,45 @@ def test_default_configs():
     assert result.status in ("converged", "max_iterations", "degenerate", "out_of_bounds")
 
 
+def test_pyramid_level_image_matches_box_pyramid_semantics():
+    image = np.arange(15, dtype=np.uint8).reshape(3, 5)
+    level_image = radsym.pyramid_level_image(image, 1)
+
+    assert level_image.level == 1
+    assert level_image.factor == 2
+    assert level_image.width == 2
+    assert level_image.height == 1
+    np.testing.assert_array_equal(level_image.to_numpy(), np.array([[3, 5]], dtype=np.uint8))
+
+
+def test_pyramid_level_image_maps_geometry_and_proposal():
+    level_image = radsym.pyramid_level_image(np.zeros((32, 32), dtype=np.uint8), 3)
+
+    assert level_image.map_point((10.0, 5.0)) == (83.5, 43.5)
+
+    mapped_circle = level_image.map_circle(radsym.Circle((2.0, 3.0), 4.0))
+    assert mapped_circle.center == (19.5, 27.5)
+    assert mapped_circle.radius == 32.0
+
+    mapped_ellipse = level_image.map_ellipse(radsym.Ellipse((1.0, 2.0), 6.0, 4.0, 0.25))
+    assert mapped_ellipse.center == (11.5, 19.5)
+    assert mapped_ellipse.semi_major == 48.0
+    assert mapped_ellipse.semi_minor == 32.0
+    assert mapped_ellipse.angle == 0.25
+
+    full_image = make_bright_disk(size=128, cx=64.0, cy=64.0, r=20.0)
+    working_level = radsym.pyramid_level_image(full_image, 1)
+    gradient = radsym.sobel_gradient(working_level.to_numpy())
+    response = radsym.frst_response(gradient, radsym.FrstConfig(radii=[9, 10, 11]))
+    proposals = radsym.extract_proposals(response, radsym.NmsConfig(radius=5, max_detections=5))
+    assert len(proposals) > 0
+
+    mapped_proposal = working_level.map_proposal(proposals[0])
+    px, py = proposals[0].position
+    assert mapped_proposal.position == (px * 2.0 + 0.5, py * 2.0 + 0.5)
+    assert mapped_proposal.score == proposals[0].score
+
+
 def test_radial_center_refine():
     """Test subpixel center refinement."""
     image = make_bright_disk()

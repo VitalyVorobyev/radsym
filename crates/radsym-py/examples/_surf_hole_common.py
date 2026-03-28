@@ -22,42 +22,10 @@ def build_radius_band(base_radius: float, steps: int = 5) -> list[int]:
     return sorted(radius for radius in radii if radius > 0)
 
 
-def downscale_image(image: np.ndarray, factor: int) -> np.ndarray:
-    if factor <= 1:
-        return image
-
-    height, width = image.shape
-    trimmed_height = height - (height % factor)
-    trimmed_width = width - (width % factor)
-    if trimmed_height == 0 or trimmed_width == 0:
-        raise ValueError(f"downscale factor {factor} is too large for image shape {image.shape}")
-
-    trimmed = image[:trimmed_height, :trimmed_width]
-    reduced = trimmed.reshape(
-        trimmed_height // factor,
-        factor,
-        trimmed_width // factor,
-        factor,
-    ).mean(axis=(1, 3))
-    return reduced.astype(np.uint8)
-
-
-def upscale_point(point: tuple[float, float], factor: int) -> tuple[float, float]:
-    if factor <= 1:
-        return point
-    offset = 0.5 * (factor - 1)
-    return (point[0] * factor + offset, point[1] * factor + offset)
-
-
-def upscale_ellipse(ellipse: radsym.Ellipse, factor: int) -> radsym.Ellipse:
-    if factor <= 1:
-        return ellipse
-    return radsym.Ellipse(
-        upscale_point(ellipse.center, factor),
-        ellipse.semi_major * factor,
-        ellipse.semi_minor * factor,
-        ellipse.angle,
-    )
+def downscale_to_level(downscale: int) -> int:
+    if downscale < 1 or downscale & (downscale - 1):
+        raise ValueError("--downscale must be a positive power of two")
+    return downscale.bit_length() - 1
 
 
 def timed_call(metrics: dict, name: str, fn, *args, **kwargs):
@@ -227,3 +195,47 @@ def choose_best_detection(
 
     ranked.sort(key=lambda item: item["combined"], reverse=True)
     return ranked[0], ranked
+
+
+def detect_working_image(
+    image: np.ndarray,
+    polarity: str,
+    metrics: dict,
+    working_radius_hint: float | None = None,
+) -> dict:
+    height, width = image.shape
+    radius_hint = working_radius_hint
+    if radius_hint is None:
+        radius_hint = max(14.0, min(height, width) * 0.16)
+
+    gradient = timed_call(metrics, "sobel_gradient", radsym.sobel_gradient, image)
+    frst_config = radsym.FrstConfig(
+        radii=build_radius_band(radius_hint),
+        alpha=2.0,
+        gradient_threshold=1.5,
+        polarity=polarity,
+        smoothing_factor=0.5,
+    )
+    response = timed_call(metrics, "frst_response", radsym.frst_response, gradient, frst_config)
+    proposals = timed_call(
+        metrics,
+        "extract_proposals",
+        radsym.extract_proposals,
+        response,
+        radsym.NmsConfig(
+            radius=max(10, int(round(radius_hint * 0.8))),
+            threshold=0.01,
+            max_detections=12,
+        ),
+        polarity=polarity,
+    )
+    best, ranked = choose_best_detection(image, gradient, proposals, radius_hint, metrics)
+    return {
+        "gradient": gradient,
+        "response": response,
+        "proposals": proposals,
+        "frst_config": frst_config,
+        "radius_hint": radius_hint,
+        "best": best,
+        "ranked": ranked,
+    }

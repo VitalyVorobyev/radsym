@@ -36,6 +36,23 @@ fn sobel_gradient_py(image: PyReadonlyArray2<u8>) -> PyResult<PyGradientField> {
     Ok(PyGradientField { inner: grad })
 }
 
+/// Extract a one-shot pyramid level from a grayscale image.
+///
+/// Args:
+///     image: 2D numpy array (uint8, H x W).
+///     level: Pyramid level, where ``0`` is the base image and each increment
+///         applies one additional 2x box-filter downsample.
+///
+/// Returns:
+///     PyramidLevelImage: working image plus remap helpers back to image space.
+#[pyfunction]
+#[pyo3(name = "pyramid_level_image")]
+fn pyramid_level_image_py(image: PyReadonlyArray2<u8>, level: u8) -> PyResult<PyPyramidLevelImage> {
+    let owned = numpy_to_owned_u8(&image)?;
+    let level_image = radsym::pyramid_level_owned(&owned.view(), level).map_err(to_pyerr)?;
+    Ok(PyPyramidLevelImage { inner: level_image })
+}
+
 // ---------------------------------------------------------------------------
 // Proposal generation
 // ---------------------------------------------------------------------------
@@ -510,10 +527,12 @@ fn radsym_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyGradientField>()?;
     m.add_class::<PyResponseMap>()?;
     m.add_class::<PyRectifiedResponseMap>()?;
+    m.add_class::<PyPyramidLevelImage>()?;
     m.add_class::<PyDiagnosticImage>()?;
 
     // Functions — exposed without _py suffix via #[pyo3(name = "...")]
     m.add_function(wrap_pyfunction!(sobel_gradient_py, m)?)?;
+    m.add_function(wrap_pyfunction!(pyramid_level_image_py, m)?)?;
     m.add_function(wrap_pyfunction!(frst_response_py, m)?)?;
     m.add_function(wrap_pyfunction!(frst_response_homography_py, m)?)?;
     m.add_function(wrap_pyfunction!(rsd_response_py, m)?)?;

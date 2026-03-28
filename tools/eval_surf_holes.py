@@ -259,41 +259,12 @@ def run_detector(
     downscale: int,
     polarity: str,
 ) -> tuple[radsym.Ellipse, dict, np.ndarray]:
+    image = radsym.load_grayscale(str(image_path))
+    level = surf_hole.downscale_to_level(downscale)
     metrics = defaultdict(lambda: {"count": 0, "total_ms": 0.0})
-    image = surf_hole.timed_call(metrics, "load_grayscale", radsym.load_grayscale, str(image_path))
-    working_image = surf_hole.downscale_image(image, downscale)
-    working_h, working_w = working_image.shape
-    radius_hint = max(14.0, min(working_h, working_w) * 0.16)
-    radii = surf_hole.build_radius_band(radius_hint)
-
-    gradient = surf_hole.timed_call(metrics, "sobel_gradient", radsym.sobel_gradient, working_image)
-    response = surf_hole.timed_call(
-        metrics,
-        "frst_response",
-        radsym.frst_response,
-        gradient,
-        radsym.FrstConfig(
-            radii=radii,
-            alpha=2.0,
-            gradient_threshold=1.5,
-            polarity=polarity,
-            smoothing_factor=0.5,
-        ),
-    )
-    proposals = surf_hole.timed_call(
-        metrics,
-        "extract_proposals",
-        radsym.extract_proposals,
-        response,
-        radsym.NmsConfig(
-            radius=max(10, int(round(radius_hint * 0.8))),
-            threshold=0.01,
-            max_detections=12,
-        ),
-        polarity=polarity,
-    )
-    best, _ = surf_hole.choose_best_detection(working_image, gradient, proposals, radius_hint, metrics)
-    return surf_hole.upscale_ellipse(best["ellipse"], downscale), best, image
+    pyramid = radsym.pyramid_level_image(image, level)
+    working = surf_hole.detect_working_image(pyramid.to_numpy(), polarity, metrics)
+    return pyramid.map_ellipse(working["best"]["ellipse"]), working, image
 
 
 def run_detector_homography(
@@ -420,11 +391,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    surf_hole.downscale_to_level(args.downscale)
     results: list[tuple[str, EvalMetrics]] = []
 
     for index in range(1, 9):
-        image_path = ROOT / "testdata" / f"surf{index}.png"
-        svg_path = ROOT / "testdata" / f"surf{index}.svg"
+        image_path = ROOT / "data" / f"surf{index}.png"
+        svg_path = ROOT / "data" / f"surf{index}.svg"
         if args.mode == "image":
             predicted, best, image = run_detector(image_path, args.downscale, args.polarity)
         else:
