@@ -9,11 +9,15 @@ repository.workspace = true
 homepage.workspace = true
 description = "Radial symmetry detection: center proposals, local support analysis, scoring, and refinement"
 documentation = "https://docs.rs/radsym"
-readme = "../../README.md"
+readme = "README.md"
 categories = ["algorithms", "multimedia::images", "science"]
 keywords = ["radial-symmetry", "image-processing", "circle-detection", "center-voting", "computer-vision"]
 include = [
+    "README.md",
     "src/**",
+    "examples/**",
+    "tests/**",
+    "benches/**",
     "Cargo.toml",
 ]
 

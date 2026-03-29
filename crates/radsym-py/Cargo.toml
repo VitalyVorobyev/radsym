@@ -6,6 +6,9 @@ license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 description = "Python bindings for the radsym radial symmetry detection library"
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
 publish = false
 
 [lib]
@@ -18,4 +21,4 @@ pyo3-build-config = "0.28"
 [dependencies]
 pyo3 = { version = "0.28", features = ["extension-module"] }
 numpy = "0.28"
-radsym = { path = "../radsym", features = ["image-io", "serde", "rayon"] }
+radsym = { path = "../radsym", version = "0.1.0", features = ["image-io", "serde", "rayon"] }
