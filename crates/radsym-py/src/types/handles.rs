@@ -138,6 +138,81 @@ impl PyRectifiedResponseMap {
     }
 }
 
+/// One-shot owned image at a selected pyramid level.
+#[pyclass(name = "PyramidLevelImage")]
+pub struct PyPyramidLevelImage {
+    pub inner: radsym::OwnedPyramidLevel,
+}
+
+#[pymethods]
+impl PyPyramidLevelImage {
+    /// Return the working image as a 2D uint8 numpy array (H x W).
+    fn to_numpy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<u8>>> {
+        let image = self.inner.image();
+        let width = image.width();
+        let height = image.height();
+        let data = image.as_slice()[..width * height].to_vec();
+        let arr = Array2::from_shape_vec((height, width), data)
+            .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+        Ok(PyArray2::from_owned_array(py, arr))
+    }
+
+    #[getter]
+    fn level(&self) -> u8 {
+        self.inner.level()
+    }
+
+    #[getter]
+    fn factor(&self) -> usize {
+        self.inner.factor()
+    }
+
+    #[getter]
+    fn width(&self) -> usize {
+        self.inner.image().width()
+    }
+
+    #[getter]
+    fn height(&self) -> usize {
+        self.inner.image().height()
+    }
+
+    fn map_point(&self, point: (f32, f32)) -> (f32, f32) {
+        let mapped = self
+            .inner
+            .map_point_to_image(radsym::PixelCoord::new(point.0, point.1));
+        (mapped.x, mapped.y)
+    }
+
+    fn map_circle(&self, circle: &PyCircle) -> PyCircle {
+        PyCircle {
+            inner: self.inner.map_circle_to_image(circle.inner),
+        }
+    }
+
+    fn map_ellipse(&self, ellipse: &PyEllipse) -> PyEllipse {
+        PyEllipse {
+            inner: self.inner.map_ellipse_to_image(ellipse.inner),
+        }
+    }
+
+    fn map_proposal(&self, proposal: &PyProposal) -> PyProposal {
+        PyProposal {
+            inner: radsym::remap_proposal_to_image(&proposal.inner, self.inner.level()),
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "PyramidLevelImage(level={}, factor={}, size={}x{})",
+            self.inner.level(),
+            self.inner.factor(),
+            self.inner.image().width(),
+            self.inner.image().height(),
+        )
+    }
+}
+
 /// RGBA diagnostic image for visualization.
 ///
 /// Created by :func:`response_heatmap`. Can be drawn on with
@@ -204,4 +279,6 @@ use numpy::ndarray::Array2;
 use numpy::{PyArray2, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::prelude::*;
 
+use super::geometry::{PyCircle, PyEllipse};
+use super::results::PyProposal;
 use crate::error::to_pyerr;

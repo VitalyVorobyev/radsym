@@ -39,7 +39,7 @@ build.
 
 ### `detect_surf_hole.py`
 
-Detects a single central hole-like structure in a `surf*.png` image.
+Detects a single central hole-like structure in a user-supplied image.
 
 The detection runs on an 8x downscaled working image by default, then maps the
 refined ellipse back to full resolution for display.
@@ -47,7 +47,7 @@ refined ellipse back to full resolution for display.
 Example:
 
 ```bash
-python crates/radsym-py/examples/detect_surf_hole.py testdata/surf1.png
+python crates/radsym-py/examples/detect_surf_hole.py path/to/image.png
 ```
 
 With no output flags, the script opens matplotlib windows instead of writing files.
@@ -56,10 +56,11 @@ Optional outputs:
 
 ```bash
 python crates/radsym-py/examples/detect_surf_hole.py \
-  testdata/surf4.png \
+  path/to/image.png \
   --downscale 8 \
-  --output output/surf4_overlay.png \
-  --heatmap-output output/surf4_heatmap.png
+  --working-radius-hint 18 \
+  --output output/surf_overlay.png \
+  --heatmap-output output/surf_heatmap.png
 ```
 
 What it does:
@@ -75,6 +76,7 @@ What it does:
   - a matplotlib overlay on the source image
   - a matplotlib FRST heatmap overlay
 - accepts `--downscale` to control the working resolution, default `8`
+- accepts `--working-radius-hint` to override the automatic working-image radius prior
 - prints a `rich` summary and performance table for the main `radsym` calls
 
 ### `detect_ringgrid.py`
@@ -126,6 +128,6 @@ python crates/radsym-py/examples/detect_ringgrid.py \
 - By default the demos display interactive matplotlib figures.
 - Files are only written when you pass `--output` and/or `--heatmap-output`.
 - For realistic timings, install the Python extension with `maturin develop --release`.
-- The demos assume the image polarity defaults that match the bundled test data:
+- The demos keep default polarities that match the common example scenarios:
   - `detect_surf_hole.py`: `--polarity bright`
   - `detect_ringgrid.py`: `--polarity dark`

@@ -17,6 +17,7 @@ import argparse
 from collections import defaultdict
 import math
 from pathlib import Path
+from time import perf_counter
 
 from matplotlib import pyplot as plt
 from matplotlib.patches import Ellipse as MplEllipse
@@ -171,6 +172,7 @@ def render_summary(
     deduplicated_count: int,
     final_count: int,
     detections: list[dict],
+    processing_ms: float,
 ) -> None:
     summary = Table(show_header=False, box=None, pad_edge=False)
     summary.add_column("Metric", style="bold cyan")
@@ -185,6 +187,7 @@ def render_summary(
     summary.add_row("Raw proposals", str(raw_proposal_count))
     summary.add_row("Deduplicated proposals", str(deduplicated_count))
     summary.add_row("Final detections", str(final_count))
+    summary.add_row("Processing time", f"{processing_ms:.2f} ms (excl. load)")
     if fit_ellipses and detections:
         best_support = detections[0]["combined_support"]
         worst_support = detections[-1]["combined_support"]
@@ -289,6 +292,7 @@ def main() -> int:
     metrics = defaultdict(lambda: {"count": 0, "total_ms": 0.0})
 
     image = timed_call(metrics, "load_grayscale", radsym.load_grayscale, str(image_path))
+    processing_start = perf_counter()
     height, width = image.shape
     min_dim = min(height, width)
     outer_radius = args.outer_radius or max(10.0, min_dim * 0.042)
@@ -462,6 +466,7 @@ def main() -> int:
             }
             for proposal in proposals
         ]
+    processing_ms = (perf_counter() - processing_start) * 1000.0
 
     overlay_figure = render_overlay(image, detections, args.detector, args.fit_ellipses)
     heatmap_figure = render_heatmap(response, detections, args.detector, args.fit_ellipses)
@@ -492,6 +497,7 @@ def main() -> int:
         deduplicated_count=len(proposals),
         final_count=len(detections),
         detections=detections,
+        processing_ms=processing_ms,
     )
     render_performance(metrics)
     if overlay_path is not None:

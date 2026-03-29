@@ -81,12 +81,16 @@ pub use crate::core::geometry::{Annulus, Circle, Ellipse};
 pub use crate::core::homography::{rectified_circle_to_image_ellipse, Homography, RectifiedGrid};
 pub use crate::core::image_view::{ImageView, OwnedImage};
 pub use crate::core::polarity::Polarity;
+pub use crate::core::pyramid::{
+    pyramid_level_owned, OwnedPyramidLevel, PyramidLevelView, PyramidWorkspace,
+};
 pub use crate::propose::extract::{extract_proposals, suppress_proposals_by_distance, ResponseMap};
 pub use crate::propose::frst::{frst_response, frst_response_single, FrstConfig};
 pub use crate::propose::homography::{
     extract_rectified_proposals, frst_response_homography, rerank_proposals_homography,
     HomographyProposal, HomographyRerankConfig, RectifiedResponseMap, RerankedProposal,
 };
+pub use crate::propose::remap::{remap_proposal_to_image, remap_proposals_to_image};
 pub use crate::propose::rsd::{rsd_response, RsdConfig};
 pub use crate::propose::seed::{Proposal, ProposalSource, SeedPoint};
 pub use crate::support::evidence::SupportEvidence;

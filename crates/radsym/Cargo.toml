@@ -9,11 +9,15 @@ repository.workspace = true
 homepage.workspace = true
 description = "Radial symmetry detection: center proposals, local support analysis, scoring, and refinement"
 documentation = "https://docs.rs/radsym"
-readme = "../../README.md"
+readme = "README.md"
 categories = ["algorithms", "multimedia::images", "science"]
 keywords = ["radial-symmetry", "image-processing", "circle-detection", "center-voting", "computer-vision"]
 include = [
+    "README.md",
     "src/**",
+    "examples/**",
+    "tests/**",
+    "benches/**",
     "Cargo.toml",
 ]
 
@@ -24,6 +28,7 @@ rayon = { version = "1", optional = true }
 image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg"] }
 tracing = { version = "0.1", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
+box-image-pyramid = { version = "0.4.2", default-features = false }
 
 [dev-dependencies]
 rand = "0.10"
@@ -33,9 +38,9 @@ serde_json = "1"
 
 [features]
 default = []
-rayon = ["dep:rayon"]
+rayon = ["dep:rayon", "box-image-pyramid/rayon", "box-image-pyramid/par_pyramid"]
 image-io = ["dep:image"]
-tracing = ["dep:tracing"]
+tracing = ["dep:tracing", "box-image-pyramid/tracing"]
 affine = []
 serde = ["dep:serde", "nalgebra/serde-serialize"]
 
@@ -49,6 +54,10 @@ harness = false
 
 [[bench]]
 name = "ringgrid_proposal_bench"
+harness = false
+
+[[bench]]
+name = "surf_hole_bench"
 harness = false
 
 [[bench]]

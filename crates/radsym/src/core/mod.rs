@@ -15,4 +15,5 @@ pub mod image_view;
 pub mod io;
 pub mod nms;
 pub mod polarity;
+pub mod pyramid;
 pub mod scalar;
