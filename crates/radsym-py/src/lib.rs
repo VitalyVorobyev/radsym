@@ -4,7 +4,6 @@ use numpy::PyReadonlyArray2;
 use pyo3::prelude::*;
 use radsym::core::gradient::sobel_gradient;
 use radsym::propose::extract::extract_proposals;
-use radsym::propose::seed::ProposalSource;
 
 mod convert;
 mod error;
@@ -77,9 +76,7 @@ fn frst_response_py(
 ) -> PyResult<PyResponseMap> {
     let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
     let response = radsym::frst_response(&gradient.inner, &cfg).map_err(to_pyerr)?;
-    Ok(PyResponseMap {
-        inner: radsym::ResponseMap::new(response, ProposalSource::Frst),
-    })
+    Ok(PyResponseMap { inner: response })
 }
 
 /// Compute homography-aware FRST on a rectified grid.
@@ -114,9 +111,7 @@ fn rsd_response_py(
 ) -> PyResult<PyResponseMap> {
     let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
     let response = radsym::rsd_response(&gradient.inner, &cfg).map_err(to_pyerr)?;
-    Ok(PyResponseMap {
-        inner: radsym::ResponseMap::new(response, ProposalSource::Rsd),
-    })
+    Ok(PyResponseMap { inner: response })
 }
 
 /// Extract center proposals from a response map using non-maximum suppression.
@@ -277,15 +272,15 @@ fn refine_circle_py(
     gradient: &PyGradientField,
     circle: &PyCircle,
     config: Option<&PyCircleRefineConfig>,
-) -> PyCircleRefinementResult {
+) -> PyResult<PyCircleRefinementResult> {
     let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
-    let result = radsym::refine_circle(&gradient.inner, &circle.inner, &cfg);
-    PyCircleRefinementResult {
+    let result = radsym::refine_circle(&gradient.inner, &circle.inner, &cfg).map_err(to_pyerr)?;
+    Ok(PyCircleRefinementResult {
         circle: result.hypothesis,
         status: result.status,
         residual: result.residual,
         iterations: result.iterations,
-    }
+    })
 }
 
 /// Iteratively refine an ellipse hypothesis using gradient evidence.
@@ -303,15 +298,15 @@ fn refine_ellipse_py(
     gradient: &PyGradientField,
     ellipse: &PyEllipse,
     config: Option<&PyEllipseRefineConfig>,
-) -> PyEllipseRefinementResult {
+) -> PyResult<PyEllipseRefinementResult> {
     let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
-    let result = radsym::refine_ellipse(&gradient.inner, &ellipse.inner, &cfg);
-    PyEllipseRefinementResult {
+    let result = radsym::refine_ellipse(&gradient.inner, &ellipse.inner, &cfg).map_err(to_pyerr)?;
+    Ok(PyEllipseRefinementResult {
         ellipse: result.hypothesis,
         status: result.status,
         residual: result.residual,
         iterations: result.iterations,
-    }
+    })
 }
 
 /// Refine an image-space ellipse by fitting a rectified-frame circle.
@@ -362,16 +357,80 @@ fn radial_center_refine_py(
     gradient: &PyGradientField,
     seed: (f32, f32),
     config: Option<&PyRadialCenterConfig>,
-) -> PyPointRefinementResult {
+) -> PyResult<PyPointRefinementResult> {
     let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
     let coord = radsym::PixelCoord::new(seed.0, seed.1);
-    let result = radsym::radial_center_refine_from_gradient(&gradient.inner, coord, &cfg);
-    PyPointRefinementResult {
+    let result = radsym::radial_center_refine_from_gradient(&gradient.inner, coord, &cfg)
+        .map_err(to_pyerr)?;
+    Ok(PyPointRefinementResult {
         point: (result.hypothesis.x, result.hypothesis.y),
         status: result.status,
         residual: result.residual,
         iterations: result.iterations,
-    }
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline
+// ---------------------------------------------------------------------------
+
+/// Detect circles in a grayscale image using the full propose-score-refine pipeline.
+///
+/// This is a one-call convenience wrapper that runs:
+/// 1. Sobel gradient computation
+/// 2. FRST voting and NMS proposal extraction
+/// 3. Support scoring and filtering
+/// 4. Iterative circle refinement
+///
+/// Args:
+///     image: 2D numpy array (uint8, H x W) representing a grayscale image.
+///     config: Optional DetectCirclesConfig. Uses defaults if None.
+///
+/// Returns:
+///     list[Detection]: Detections sorted by descending support score.
+///
+/// Raises:
+///     ValueError: if the image is empty or has invalid dimensions.
+#[pyfunction]
+#[pyo3(name = "detect_circles", signature = (image, config=None))]
+fn detect_circles_py(
+    image: PyReadonlyArray2<u8>,
+    config: Option<&PyDetectCirclesConfig>,
+) -> PyResult<Vec<PyDetection>> {
+    let owned = numpy_to_owned_u8(&image)?;
+    let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
+    let detections = radsym::detect_circles(&owned.view(), &cfg).map_err(to_pyerr)?;
+    Ok(detections
+        .into_iter()
+        .map(|d| PyDetection { inner: d })
+        .collect())
+}
+
+/// Greedily suppress proposals that are closer than `min_distance`.
+///
+/// Input proposals should be sorted by descending score so that the strongest
+/// candidate in each spatial neighborhood survives.
+///
+/// Args:
+///     proposals: list[Proposal] — candidates to filter.
+///     min_distance: Minimum allowed distance between retained proposals (pixels).
+///     max_detections: Maximum number of proposals to return.
+///
+/// Returns:
+///     list[Proposal]: Filtered proposals preserving relative input order.
+#[pyfunction]
+#[pyo3(name = "suppress_proposals_by_distance")]
+fn suppress_proposals_by_distance_py(
+    proposals: Vec<PyRef<'_, PyProposal>>,
+    min_distance: f32,
+    max_detections: usize,
+) -> Vec<PyProposal> {
+    let rust_proposals: Vec<radsym::Proposal> =
+        proposals.into_iter().map(|p| p.inner.clone()).collect();
+    radsym::suppress_proposals_by_distance(&rust_proposals, min_distance, max_detections)
+        .into_iter()
+        .map(|p| PyProposal { inner: p })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -512,6 +571,7 @@ fn radsym_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyHomographyRerankConfig>()?;
     m.add_class::<PyHomographyEllipseRefineConfig>()?;
     m.add_class::<PyRadialCenterConfig>()?;
+    m.add_class::<PyDetectCirclesConfig>()?;
 
     // Result types
     m.add_class::<PySupportScore>()?;
@@ -522,6 +582,7 @@ fn radsym_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyEllipseRefinementResult>()?;
     m.add_class::<PyHomographyRefinementResult>()?;
     m.add_class::<PyPointRefinementResult>()?;
+    m.add_class::<PyDetection>()?;
 
     // Opaque handles
     m.add_class::<PyGradientField>()?;
@@ -539,6 +600,8 @@ fn radsym_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(extract_proposals_py, m)?)?;
     m.add_function(wrap_pyfunction!(extract_rectified_proposals_py, m)?)?;
     m.add_function(wrap_pyfunction!(rerank_proposals_homography_py, m)?)?;
+    m.add_function(wrap_pyfunction!(detect_circles_py, m)?)?;
+    m.add_function(wrap_pyfunction!(suppress_proposals_by_distance_py, m)?)?;
     m.add_function(wrap_pyfunction!(score_circle_support_py, m)?)?;
     m.add_function(wrap_pyfunction!(score_ellipse_support_py, m)?)?;
     m.add_function(wrap_pyfunction!(score_rectified_circle_support_py, m)?)?;

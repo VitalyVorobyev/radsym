@@ -57,6 +57,34 @@ pub struct FrstConfig {
     pub smoothing_factor: Scalar,
 }
 
+impl FrstConfig {
+    /// Validate configuration parameters.
+    pub fn validate(&self) -> crate::core::error::Result<()> {
+        use crate::core::error::RadSymError;
+        if self.radii.is_empty() {
+            return Err(RadSymError::InvalidConfig {
+                reason: "radii must be non-empty",
+            });
+        }
+        if self.radii.contains(&0) {
+            return Err(RadSymError::InvalidConfig {
+                reason: "all radii must be > 0",
+            });
+        }
+        if self.alpha < 0.0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "alpha must be >= 0",
+            });
+        }
+        if self.smoothing_factor <= 0.0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "smoothing_factor must be > 0",
+            });
+        }
+        Ok(())
+    }
+}
+
 impl Default for FrstConfig {
     fn default() -> Self {
         Self {
@@ -77,6 +105,7 @@ pub fn frst_response_single(
     radius: u32,
     config: &FrstConfig,
 ) -> Result<OwnedImage<Scalar>> {
+    config.validate()?;
     let w = gradient.width();
     let h = gradient.height();
     let n = radius as i32;
@@ -176,8 +205,36 @@ pub fn frst_response_single(
 
 /// Compute the full multi-radius FRST response map.
 ///
-/// Returns the summed response across all configured radii: `S = sum(S_n)`.
-pub fn frst_response(gradient: &GradientField, config: &FrstConfig) -> Result<OwnedImage<Scalar>> {
+/// Returns the summed response across all configured radii: `S = sum(S_n)`,
+/// wrapped in a [`ResponseMap`](super::extract::ResponseMap) tagged with
+/// [`ProposalSource::Frst`](super::seed::ProposalSource::Frst).
+///
+/// # Example
+///
+/// ```rust
+/// use radsym::{ImageView, FrstConfig, sobel_gradient, frst_response};
+///
+/// let size = 64usize;
+/// let mut data = vec![0u8; size * size];
+/// for y in 0..size {
+///     for x in 0..size {
+///         let dx = x as f32 - 32.0;
+///         let dy = y as f32 - 32.0;
+///         if (dx * dx + dy * dy).sqrt() <= 10.0 { data[y * size + x] = 255; }
+///     }
+/// }
+/// let image = ImageView::from_slice(&data, size, size).unwrap();
+/// let grad = sobel_gradient(&image).unwrap();
+/// let config = FrstConfig { radii: vec![9, 10, 11], ..FrstConfig::default() };
+/// let response = frst_response(&grad, &config).unwrap();
+/// assert_eq!(response.response().width(), size);
+/// assert!(response.response().data().iter().any(|&v| v > 0.0));
+/// ```
+pub fn frst_response(
+    gradient: &GradientField,
+    config: &FrstConfig,
+) -> Result<super::extract::ResponseMap> {
+    config.validate()?;
     let w = gradient.width();
     let h = gradient.height();
     let mut response = OwnedImage::<Scalar>::zeros(w, h)?;
@@ -205,7 +262,10 @@ pub fn frst_response(gradient: &GradientField, config: &FrstConfig) -> Result<Ow
         }
     }
 
-    Ok(response)
+    Ok(super::extract::ResponseMap::new(
+        response,
+        super::seed::ProposalSource::Frst,
+    ))
 }
 
 #[cfg(test)]
@@ -269,7 +329,7 @@ mod tests {
         };
 
         let response = frst_response(&grad, &config).unwrap();
-        let resp_data = response.data();
+        let resp_data = response.response().data();
 
         // Find the peak
         let (max_idx, &max_val) = resp_data
@@ -316,7 +376,7 @@ mod tests {
         };
 
         let response = frst_response(&grad, &config).unwrap();
-        let resp_data = response.data();
+        let resp_data = response.response().data();
 
         let (max_idx, &max_val) = resp_data
             .iter()
@@ -350,7 +410,7 @@ mod tests {
         };
 
         let response = frst_response(&grad, &config).unwrap();
-        let resp_data = response.data();
+        let resp_data = response.response().data();
 
         let (max_idx, &max_val) = resp_data
             .iter()
@@ -420,8 +480,61 @@ mod tests {
         let grad = sobel_gradient(&image).unwrap();
         let config = FrstConfig::default();
         let response = frst_response(&grad, &config).unwrap();
-        assert_eq!(response.width(), 40);
-        assert_eq!(response.height(), 30);
+        assert_eq!(response.response().width(), 40);
+        assert_eq!(response.response().height(), 30);
+    }
+
+    #[test]
+    fn default_config_passes_validation() {
+        FrstConfig::default().validate().unwrap();
+    }
+
+    #[test]
+    fn empty_radii_fails_validation() {
+        let config = FrstConfig {
+            radii: vec![],
+            ..FrstConfig::default()
+        };
+        assert!(matches!(
+            config.validate(),
+            Err(crate::core::error::RadSymError::InvalidConfig { .. })
+        ));
+    }
+
+    #[test]
+    fn zero_radius_fails_validation() {
+        let config = FrstConfig {
+            radii: vec![5, 0, 3],
+            ..FrstConfig::default()
+        };
+        assert!(matches!(
+            config.validate(),
+            Err(crate::core::error::RadSymError::InvalidConfig { .. })
+        ));
+    }
+
+    #[test]
+    fn negative_alpha_fails_validation() {
+        let config = FrstConfig {
+            alpha: -1.0,
+            ..FrstConfig::default()
+        };
+        assert!(matches!(
+            config.validate(),
+            Err(crate::core::error::RadSymError::InvalidConfig { .. })
+        ));
+    }
+
+    #[test]
+    fn zero_smoothing_factor_fails_validation() {
+        let config = FrstConfig {
+            smoothing_factor: 0.0,
+            ..FrstConfig::default()
+        };
+        assert!(matches!(
+            config.validate(),
+            Err(crate::core::error::RadSymError::InvalidConfig { .. })
+        ));
     }
 
     #[test]
@@ -439,7 +552,7 @@ mod tests {
 
         let response = frst_response(&grad, &config).unwrap();
         assert!(
-            response.data().iter().all(|&v| v == 0.0),
+            response.response().data().iter().all(|&v| v == 0.0),
             "high threshold on uniform image should produce zero response"
         );
     }

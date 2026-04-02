@@ -38,40 +38,36 @@ radsym = "0.1"
 Detect circles in an image:
 
 ```rust
-use radsym::{ImageView, FrstConfig, Circle, Polarity, ScoringConfig};
-use radsym::core::gradient::sobel_gradient;
-use radsym::core::nms::NmsConfig;
-use radsym::propose::extract::{extract_proposals, ResponseMap};
-use radsym::propose::seed::ProposalSource;
-use radsym::support::score::score_circle_support;
+use radsym::{
+    ImageView, FrstConfig, Circle, Polarity, ScoringConfig, NmsConfig,
+    sobel_gradient, frst_response, extract_proposals, score_circle_support,
+};
 
-// Load image as &[u8] with known width/height
-let image = ImageView::from_slice(&pixels, width, height).unwrap();
-
-// Propose centers via FRST
-let gradient = sobel_gradient(&image).unwrap();
-let config = FrstConfig { radii: vec![8, 10, 12], ..Default::default() };
-let response = radsym::frst_response(&gradient, &config).unwrap();
-
-// Extract top proposals
-let map = ResponseMap { data: response, source: ProposalSource::Frst };
-let nms = NmsConfig { radius: 5, threshold: 0.0, max_detections: 20 };
-let proposals = extract_proposals(&map, &nms, Polarity::Bright);
-
-// Score and refine
-for p in &proposals {
-    let circle = Circle::new(p.seed.position, 10.0);
-    let score = score_circle_support(&gradient, &circle, &ScoringConfig::default());
-    if !score.is_degenerate && score.total > 0.3 {
-        let refined = radsym::refine_circle(&gradient, &circle, &Default::default());
-        if refined.converged() {
-            println!("circle at ({:.1}, {:.1}) r={:.1} score={:.2}",
-                refined.hypothesis.center.x,
-                refined.hypothesis.center.y,
-                refined.hypothesis.radius,
-                score.total);
+let size = 64;
+let mut data = vec![0u8; size * size];
+for y in 0..size {
+    for x in 0..size {
+        let dx = x as f32 - 32.0;
+        let dy = y as f32 - 32.0;
+        if (dx * dx + dy * dy).sqrt() <= 10.0 {
+            data[y * size + x] = 255;
         }
     }
+}
+
+let image = ImageView::from_slice(&data, size, size).unwrap();
+let gradient = sobel_gradient(&image).unwrap();
+
+let config = FrstConfig { radii: vec![9, 10, 11], ..FrstConfig::default() };
+let response = frst_response(&gradient, &config).unwrap();
+
+let nms = NmsConfig { radius: 5, threshold: 0.0, max_detections: 5 };
+let proposals = extract_proposals(&response, &nms, Polarity::Bright);
+
+if let Some(best) = proposals.first() {
+    let circle = Circle::new(best.seed.position, 10.0);
+    let score = score_circle_support(&gradient, &circle, &ScoringConfig::default());
+    assert!(score.total > 0.0);
 }
 ```
 

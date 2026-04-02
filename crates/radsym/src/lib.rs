@@ -7,12 +7,10 @@
 //! ## Quick start
 //!
 //! ```rust
-//! use radsym::{ImageView, FrstConfig, Circle, PixelCoord, Polarity, ScoringConfig};
-//! use radsym::core::gradient::sobel_gradient;
-//! use radsym::propose::extract::{extract_proposals, ResponseMap};
-//! use radsym::propose::seed::ProposalSource;
-//! use radsym::core::nms::NmsConfig;
-//! use radsym::support::score::score_circle_support;
+//! use radsym::{
+//!     ImageView, FrstConfig, Circle, Polarity, ScoringConfig, NmsConfig,
+//!     sobel_gradient, frst_response, extract_proposals, score_circle_support,
+//! };
 //!
 //! // 1. Load or create an image (here: synthetic bright disk)
 //! let size = 64;
@@ -31,12 +29,11 @@
 //! // 2. Compute gradient and FRST response
 //! let gradient = sobel_gradient(&image).unwrap();
 //! let config = FrstConfig { radii: vec![9, 10, 11], ..FrstConfig::default() };
-//! let response = radsym::frst_response(&gradient, &config).unwrap();
+//! let response = frst_response(&gradient, &config).unwrap();
 //!
 //! // 3. Extract proposals via NMS
-//! let response_map = ResponseMap::new(response, ProposalSource::Frst);
 //! let nms = NmsConfig { radius: 5, threshold: 0.0, max_detections: 5 };
-//! let proposals = extract_proposals(&response_map, &nms, Polarity::Bright);
+//! let proposals = extract_proposals(&response, &nms, Polarity::Bright);
 //!
 //! // 4. Score the best proposal
 //! if let Some(best) = proposals.first() {
@@ -66,6 +63,8 @@
 
 pub mod core;
 pub mod diagnostics;
+pub mod pipeline;
+pub mod prelude;
 pub mod propose;
 pub mod refine;
 pub mod support;
@@ -74,16 +73,22 @@ pub mod support;
 pub mod affine;
 
 // Re-export the most commonly used types at crate root.
+
+// Core types
 pub use crate::core::circle_fit::{fit_circle, fit_circle_weighted};
 pub use crate::core::coords::PixelCoord;
 pub use crate::core::error::{RadSymError, Result};
 pub use crate::core::geometry::{Annulus, Circle, Ellipse};
+pub use crate::core::gradient::{sobel_gradient, sobel_gradient_f32, GradientField};
 pub use crate::core::homography::{rectified_circle_to_image_ellipse, Homography, RectifiedGrid};
 pub use crate::core::image_view::{ImageView, OwnedImage};
+pub use crate::core::nms::NmsConfig;
 pub use crate::core::polarity::Polarity;
 pub use crate::core::pyramid::{
     pyramid_level_owned, OwnedPyramidLevel, PyramidLevelView, PyramidWorkspace,
 };
+
+// Proposal generation
 pub use crate::propose::extract::{extract_proposals, suppress_proposals_by_distance, ResponseMap};
 pub use crate::propose::frst::{frst_response, frst_response_single, FrstConfig};
 pub use crate::propose::homography::{
@@ -93,12 +98,19 @@ pub use crate::propose::homography::{
 pub use crate::propose::remap::{remap_proposal_to_image, remap_proposals_to_image};
 pub use crate::propose::rsd::{rsd_response, RsdConfig};
 pub use crate::propose::seed::{Proposal, ProposalSource, SeedPoint};
+
+// Support scoring
+pub use crate::support::annulus::AnnulusSamplingConfig;
 pub use crate::support::evidence::SupportEvidence;
 pub use crate::support::hypothesis::{
     AnnulusHypothesis, CircleHypothesis, ConcentricPairHypothesis, EllipseHypothesis,
 };
-pub use crate::support::score::{score_rectified_circle_support, ScoringConfig, SupportScore};
+pub use crate::support::score::{
+    score_circle_support, score_ellipse_support, score_rectified_circle_support, ScoringConfig,
+    SupportScore,
+};
 
+// Refinement
 pub use crate::refine::circle::{refine_circle, CircleRefineConfig};
 pub use crate::refine::ellipse::{refine_ellipse, EllipseRefineConfig};
 pub use crate::refine::homography::{
@@ -109,6 +121,14 @@ pub use crate::refine::radial_center::{
 };
 pub use crate::refine::result::{RefinementResult, RefinementStatus};
 
+// Pipeline
+pub use crate::pipeline::{detect_circles, DetectCirclesConfig, Detection};
+
+// Diagnostics
+pub use crate::diagnostics::heatmap::{response_heatmap, Colormap, DiagnosticImage};
+pub use crate::diagnostics::overlay::{overlay_circle, overlay_ellipse};
+
+// I/O (feature-gated)
 #[cfg(feature = "image-io")]
 pub use crate::core::io::load_grayscale;
 #[cfg(feature = "image-io")]

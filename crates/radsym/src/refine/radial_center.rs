@@ -16,6 +16,7 @@
 //! calculation of radial symmetry centers." Nature Methods 9, 724–726 (2012).
 
 use crate::core::coords::PixelCoord;
+use crate::core::error::Result;
 use crate::core::gradient::GradientField;
 use crate::core::image_view::ImageView;
 use crate::core::scalar::Scalar;
@@ -31,6 +32,19 @@ pub struct RadialCenterConfig {
     pub patch_radius: usize,
     /// Minimum gradient magnitude to include a pixel in the fit.
     pub gradient_threshold: Scalar,
+}
+
+impl RadialCenterConfig {
+    /// Validate configuration parameters.
+    pub fn validate(&self) -> crate::core::error::Result<()> {
+        use crate::core::error::RadSymError;
+        if self.patch_radius == 0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "patch_radius must be > 0",
+            });
+        }
+        Ok(())
+    }
 }
 
 impl Default for RadialCenterConfig {
@@ -52,7 +66,8 @@ pub fn radial_center_refine(
     image: &ImageView<'_, u8>,
     seed: PixelCoord,
     config: &RadialCenterConfig,
-) -> RefinementResult<PixelCoord> {
+) -> Result<RefinementResult<PixelCoord>> {
+    config.validate()?;
     let pr = config.patch_radius as i32;
     let cx = seed.x.round() as i32;
     let cy = seed.y.round() as i32;
@@ -61,21 +76,24 @@ pub fn radial_center_refine(
 
     // Check bounds
     if cx - pr < 0 || cx + pr >= w || cy - pr < 0 || cy + pr >= h {
-        return RefinementResult {
+        return Ok(RefinementResult {
             hypothesis: seed,
             status: RefinementStatus::OutOfBounds,
             residual: 0.0,
             iterations: 0,
-        };
+        });
     }
 
     // Roberts-cross gradient on half-pixel grid:
     //   dI/dx(i+0.5, j+0.5) = [I(i+1,j) - I(i,j) + I(i+1,j+1) - I(i,j+1)] / 2
-    //   dI/dy(i+0.5, j+0.5) = [I(i,j+1) - I(i,j) + I(i+1,j+1) - I(i+1,j)] / 2
+    //   dI/dy(i+0.5, j+0.5) = [I(i,j+1) - I(i,j) + I(i+1,j+1) - I(i,j+1)] / 2
     //
     // We accumulate the weighted LS system: minimize sum_k w_k * (d_k - n_k . c)^2
     // where n_k is the unit gradient direction, c is the center, and d_k = n_k . p_k.
 
+    // f64 accumulation for numerical stability in weighted least-squares:
+    // summing many squared gradient magnitudes in f32 can lose precision,
+    // causing the 2x2 system determinant to underflow and produce wrong centers.
     let mut swx2 = 0.0f64;
     let mut swy2 = 0.0f64;
     let mut swxy = 0.0f64;
@@ -130,12 +148,12 @@ pub fn radial_center_refine(
     // Solve 2x2 system: [swx2, swxy; swxy, swy2] * [cx, cy] = [swxd, swyd]
     let det = swx2 * swy2 - swxy * swxy;
     if det.abs() < 1e-12 {
-        return RefinementResult {
+        return Ok(RefinementResult {
             hypothesis: seed,
             status: RefinementStatus::Degenerate,
             residual: 0.0,
             iterations: 0,
-        };
+        });
     }
 
     let dcx = (swy2 * swxd - swxy * swyd) / det;
@@ -151,12 +169,12 @@ pub fn radial_center_refine(
         RefinementStatus::Converged
     };
 
-    RefinementResult {
+    Ok(RefinementResult {
         hypothesis: refined,
         status,
         residual: shift,
         iterations: 1,
-    }
+    })
 }
 
 /// Refine a seed center using a precomputed Sobel gradient field.
@@ -168,7 +186,8 @@ pub fn radial_center_refine_from_gradient(
     gradient: &GradientField,
     seed: PixelCoord,
     config: &RadialCenterConfig,
-) -> RefinementResult<PixelCoord> {
+) -> Result<RefinementResult<PixelCoord>> {
+    config.validate()?;
     let pr = config.patch_radius as i32;
     let cx = seed.x.round() as i32;
     let cy = seed.y.round() as i32;
@@ -176,14 +195,17 @@ pub fn radial_center_refine_from_gradient(
     let h = gradient.height() as i32;
 
     if cx - pr < 0 || cx + pr >= w || cy - pr < 0 || cy + pr >= h {
-        return RefinementResult {
+        return Ok(RefinementResult {
             hypothesis: seed,
             status: RefinementStatus::OutOfBounds,
             residual: 0.0,
             iterations: 0,
-        };
+        });
     }
 
+    // f64 accumulation for numerical stability in weighted least-squares:
+    // summing many squared gradient magnitudes in f32 can lose precision,
+    // causing the 2x2 system determinant to underflow and produce wrong centers.
     let mut swx2 = 0.0f64;
     let mut swy2 = 0.0f64;
     let mut swxy = 0.0f64;
@@ -226,12 +248,12 @@ pub fn radial_center_refine_from_gradient(
 
     let det = swx2 * swy2 - swxy * swxy;
     if det.abs() < 1e-12 {
-        return RefinementResult {
+        return Ok(RefinementResult {
             hypothesis: seed,
             status: RefinementStatus::Degenerate,
             residual: 0.0,
             iterations: 0,
-        };
+        });
     }
 
     let dcx = (swy2 * swxd - swxy * swyd) / det;
@@ -246,12 +268,12 @@ pub fn radial_center_refine_from_gradient(
         RefinementStatus::Converged
     };
 
-    RefinementResult {
+    Ok(RefinementResult {
         hypothesis: refined,
         status,
         residual: shift,
         iterations: 1,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -299,7 +321,7 @@ mod tests {
         let image = ImageView::from_slice(&data, size, size).unwrap();
 
         let seed = PixelCoord::new(40.0, 40.0);
-        let result = radial_center_refine(&image, seed, &RadialCenterConfig::default());
+        let result = radial_center_refine(&image, seed, &RadialCenterConfig::default()).unwrap();
 
         assert!(
             result.converged(),
@@ -336,7 +358,7 @@ mod tests {
             ..RadialCenterConfig::default()
         };
         let seed = PixelCoord::new(41.0, 39.0);
-        let result = radial_center_refine(&image, seed, &config);
+        let result = radial_center_refine(&image, seed, &config).unwrap();
 
         assert!(result.converged());
         let err = ((result.hypothesis.x - true_cx).powi(2)
@@ -361,7 +383,8 @@ mod tests {
 
         let seed = PixelCoord::new(40.0, 40.0);
         let result =
-            radial_center_refine_from_gradient(&grad, seed, &RadialCenterConfig::default());
+            radial_center_refine_from_gradient(&grad, seed, &RadialCenterConfig::default())
+                .unwrap();
 
         assert!(result.converged());
         let err = ((result.hypothesis.x - true_cx).powi(2)
@@ -385,7 +408,8 @@ mod tests {
             &image,
             PixelCoord::new(32.0, 32.0),
             &RadialCenterConfig::default(),
-        );
+        )
+        .unwrap();
         assert_eq!(result.status, RefinementStatus::Degenerate);
     }
 
@@ -399,8 +423,26 @@ mod tests {
             &image,
             PixelCoord::new(5.0, 5.0),
             &RadialCenterConfig::default(),
-        );
+        )
+        .unwrap();
         assert_eq!(result.status, RefinementStatus::OutOfBounds);
+    }
+
+    #[test]
+    fn default_config_passes_validation() {
+        RadialCenterConfig::default().validate().unwrap();
+    }
+
+    #[test]
+    fn zero_patch_radius_fails_validation() {
+        let config = RadialCenterConfig {
+            patch_radius: 0,
+            ..RadialCenterConfig::default()
+        };
+        assert!(matches!(
+            config.validate(),
+            Err(crate::core::error::RadSymError::InvalidConfig { .. })
+        ));
     }
 
     #[test]
@@ -413,9 +455,11 @@ mod tests {
         let grad = sobel_gradient(&image).unwrap();
 
         let seed = PixelCoord::new(42.0, 38.0);
-        let ref_result = radial_center_refine(&image, seed, &RadialCenterConfig::default());
+        let ref_result =
+            radial_center_refine(&image, seed, &RadialCenterConfig::default()).unwrap();
         let prod_result =
-            radial_center_refine_from_gradient(&grad, seed, &RadialCenterConfig::default());
+            radial_center_refine_from_gradient(&grad, seed, &RadialCenterConfig::default())
+                .unwrap();
 
         assert!(ref_result.converged());
         assert!(prod_result.converged());

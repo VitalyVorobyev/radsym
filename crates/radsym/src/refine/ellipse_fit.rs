@@ -9,6 +9,9 @@ use crate::core::scalar::Scalar;
 
 use super::ellipse::EllipseRefineConfig;
 
+// f64 for numerical stability in weighted least-squares ellipse fitting:
+// the 5x5 normal matrix can become ill-conditioned with f32 accumulation,
+// causing inaccurate coefficient estimates and degenerate ellipses.
 type Matrix5 = SMatrix<f64, 5, 5>;
 type Vector5 = SVector<f64, 5>;
 

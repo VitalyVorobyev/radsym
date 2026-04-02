@@ -423,6 +423,60 @@ impl PyPointRefinementResult {
         )
     }
 }
+/// A detected circle from the one-call :func:`detect_circles` pipeline.
+///
+/// Attributes:
+///     hypothesis (Circle): Refined circle hypothesis.
+///     score (SupportScore): Gradient evidence score.
+///     status (str): Refinement convergence status.
+///     converged (bool): True if refinement converged.
+#[pyclass(name = "Detection")]
+pub struct PyDetection {
+    pub inner: radsym::Detection<radsym::Circle>,
+}
+
+#[pymethods]
+impl PyDetection {
+    /// Refined circle hypothesis.
+    #[getter]
+    fn hypothesis(&self) -> PyCircle {
+        PyCircle {
+            inner: self.inner.hypothesis,
+        }
+    }
+
+    /// Support score from gradient evidence.
+    #[getter]
+    fn score(&self) -> PySupportScore {
+        PySupportScore {
+            inner: self.inner.score,
+        }
+    }
+
+    /// Convergence status string.
+    #[getter]
+    fn status(&self) -> &'static str {
+        status_to_str(&self.inner.status)
+    }
+
+    /// True if refinement converged.
+    #[getter]
+    fn converged(&self) -> bool {
+        matches!(self.inner.status, radsym::RefinementStatus::Converged)
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "Detection(center=({:.1}, {:.1}), radius={:.1}, score={:.3}, status='{}')",
+            self.inner.hypothesis.center.x,
+            self.inner.hypothesis.center.y,
+            self.inner.hypothesis.radius,
+            self.inner.score.total,
+            status_to_str(&self.inner.status),
+        )
+    }
+}
+
 use pyo3::prelude::*;
 
 use crate::convert::status_to_str;

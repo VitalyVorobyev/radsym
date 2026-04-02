@@ -7,15 +7,11 @@
 
 use std::fs;
 
-use radsym::core::gradient::sobel_gradient;
-use radsym::core::nms::NmsConfig;
-use radsym::diagnostics::heatmap::{response_heatmap, Colormap, DiagnosticImage};
-use radsym::diagnostics::overlay::{overlay_circle, overlay_proposals};
-use radsym::propose::extract::{extract_proposals, ResponseMap};
-use radsym::propose::seed::ProposalSource;
+use radsym::diagnostics::overlay::overlay_proposals;
 use radsym::{
-    frst_response, load_grayscale, refine_circle, save_diagnostic, Circle, CircleRefineConfig,
-    FrstConfig, Polarity,
+    extract_proposals, frst_response, load_grayscale, overlay_circle, refine_circle,
+    response_heatmap, save_diagnostic, sobel_gradient, Circle, CircleRefineConfig, Colormap,
+    DiagnosticImage, FrstConfig, NmsConfig, Polarity,
 };
 
 #[derive(serde::Deserialize)]
@@ -60,9 +56,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut frst_config = config.frst.clone();
     frst_config.polarity = config.polarity;
-    let response = frst_response(&gradient, &frst_config)?;
-
-    let response_map = ResponseMap::new(response, ProposalSource::Frst);
+    let response_map = frst_response(&gradient, &frst_config)?;
     let proposals = extract_proposals(&response_map, &config.nms, config.polarity);
     println!("Found {} proposals", proposals.len());
 
@@ -91,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Refine and draw circles (red)
     for proposal in &proposals {
         let circle = Circle::new(proposal.seed.position, config.radius_hint);
-        let refined = refine_circle(&gradient, &circle, &config.refinement);
+        let refined = refine_circle(&gradient, &circle, &config.refinement)?;
         overlay_circle(&mut overlay, &refined.hypothesis, [255, 0, 0, 255]);
     }
 

@@ -4,9 +4,7 @@ use std::path::PathBuf;
 
 use radsym::core::gradient::sobel_gradient;
 use radsym::core::nms::NmsConfig;
-use radsym::propose::extract::ResponseMap;
 use radsym::propose::rsd::RsdConfig;
-use radsym::propose::seed::ProposalSource;
 use radsym::{
     extract_proposals, refine_ellipse, rsd_response, suppress_proposals_by_distance, Ellipse,
     EllipseRefineConfig, OwnedImage, PixelCoord, Polarity, Proposal,
@@ -245,9 +243,8 @@ fn detect_outer_rsd_candidates(
         },
     )
     .unwrap();
-    let response_map = ResponseMap::new(response, ProposalSource::Rsd);
     let proposals = extract_proposals(
-        &response_map,
+        &response,
         &NmsConfig {
             radius: (0.55 * outer_hint).round().max(6.0) as usize,
             threshold: 0.01,
@@ -353,6 +350,7 @@ fn ringgrid_local_ellipse_refinement_recovers_outer_and_inner_geometry() {
                 &Ellipse::new(proposal.seed.position, outer_hint, outer_hint, 0.0),
                 &outer_config,
             )
+            .unwrap()
         })
         .collect::<Vec<_>>();
     let refined_outer_centers = refined_outer
@@ -394,7 +392,7 @@ fn ringgrid_local_ellipse_refinement_recovers_outer_and_inner_geometry() {
                 outer.semi_minor * inner_ratio,
                 outer.angle,
             );
-            let refined = refine_ellipse(&gradient, &inner_seed, &inner_config);
+            let refined = refine_ellipse(&gradient, &inner_seed, &inner_config).ok()?;
             Some((gt_center, gt_inner, refined.hypothesis))
         })
         .collect::<Vec<_>>();

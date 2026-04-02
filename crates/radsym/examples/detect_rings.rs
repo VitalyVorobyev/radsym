@@ -7,15 +7,10 @@
 
 use std::fs;
 
-use radsym::core::gradient::sobel_gradient;
-use radsym::core::nms::NmsConfig;
-use radsym::diagnostics::heatmap::Colormap;
-use radsym::propose::extract::{extract_proposals, ResponseMap};
-use radsym::propose::seed::ProposalSource;
-use radsym::support::score::score_circle_support;
 use radsym::{
-    frst_response, load_grayscale, refine_circle, save_diagnostic, Circle, CircleRefineConfig,
-    FrstConfig, Polarity, ScoringConfig,
+    extract_proposals, frst_response, load_grayscale, refine_circle, response_heatmap,
+    save_diagnostic, score_circle_support, sobel_gradient, Circle, CircleRefineConfig, Colormap,
+    FrstConfig, NmsConfig, Polarity, ScoringConfig,
 };
 
 #[derive(serde::Deserialize)]
@@ -55,9 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut frst_config = config.frst.clone();
     frst_config.polarity = config.polarity;
-    let response = frst_response(&gradient, &frst_config)?;
-
-    let response_map = ResponseMap::new(response, ProposalSource::Frst);
+    let response_map = frst_response(&gradient, &frst_config)?;
     let proposals = extract_proposals(&response_map, &config.nms, config.polarity);
     println!("Found {} proposals", proposals.len());
 
@@ -74,7 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let score = score_circle_support(&gradient, &circle, &config.scoring);
 
-        let refined = refine_circle(&gradient, &circle, &config.refinement);
+        let refined = refine_circle(&gradient, &circle, &config.refinement)?;
 
         println!(
             "{:>4} {:>8.1} {:>8.1} {:>8.2} {:>8.3} {:>8}",
@@ -90,8 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Optionally save heatmap overlay
     if let Some(ref dir) = config.output_dir {
         fs::create_dir_all(dir)?;
-        let heatmap =
-            radsym::diagnostics::heatmap::response_heatmap(response_map.response(), Colormap::Hot);
+        let heatmap = response_heatmap(response_map.response(), Colormap::Hot);
         let path = format!("{dir}/detect_rings_heatmap.png");
         save_diagnostic(&heatmap, &path)?;
         println!("Saved heatmap to {path}");

@@ -20,6 +20,24 @@ pub struct AnnulusSamplingConfig {
     pub num_radial_samples: usize,
 }
 
+impl AnnulusSamplingConfig {
+    /// Validate configuration parameters.
+    pub fn validate(&self) -> crate::core::error::Result<()> {
+        use crate::core::error::RadSymError;
+        if self.num_angular_samples < 4 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "num_angular_samples must be >= 4",
+            });
+        }
+        if self.num_radial_samples < 1 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "num_radial_samples must be >= 1",
+            });
+        }
+        Ok(())
+    }
+}
+
 impl Default for AnnulusSamplingConfig {
     fn default() -> Self {
         Self {

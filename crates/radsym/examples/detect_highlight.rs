@@ -7,14 +7,10 @@
 
 use std::fs;
 
-use radsym::core::gradient::sobel_gradient;
-use radsym::core::nms::NmsConfig;
-use radsym::propose::extract::{extract_proposals, ResponseMap};
-use radsym::propose::seed::ProposalSource;
-use radsym::support::score::{score_circle_support, ScoringConfig};
+use radsym::support::score::ScoringConfig;
 use radsym::{
-    frst_response, load_grayscale, refine_ellipse, Circle, Ellipse, EllipseRefineConfig,
-    FrstConfig, Polarity,
+    extract_proposals, frst_response, load_grayscale, refine_ellipse, score_circle_support,
+    sobel_gradient, Circle, Ellipse, EllipseRefineConfig, FrstConfig, NmsConfig, Polarity,
 };
 
 #[derive(serde::Deserialize)]
@@ -53,9 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut frst_config = config.frst.clone();
     frst_config.polarity = config.polarity;
-    let response = frst_response(&gradient, &frst_config)?;
-
-    let response_map = ResponseMap::new(response, ProposalSource::Frst);
+    let response_map = frst_response(&gradient, &frst_config)?;
     let proposals = extract_proposals(&response_map, &config.nms, config.polarity);
     println!("Found {} proposals", proposals.len());
 
@@ -73,7 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Start ellipse refinement from a circular initial guess
         let initial = Ellipse::new(center, r, r, 0.0);
-        let refined = refine_ellipse(&gradient, &initial, &config.ellipse_refinement);
+        let refined = refine_ellipse(&gradient, &initial, &config.ellipse_refinement).unwrap();
 
         let e = &refined.hypothesis;
         println!(

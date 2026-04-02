@@ -15,8 +15,6 @@ use radsym::propose::extract::{extract_proposals, ResponseMap};
 #[cfg(feature = "image-io")]
 use radsym::propose::rsd::{rsd_response, rsd_response_single, RsdConfig};
 #[cfg(feature = "image-io")]
-use radsym::propose::seed::ProposalSource;
-#[cfg(feature = "image-io")]
 use radsym::{load_grayscale, Polarity};
 
 #[cfg(feature = "image-io")]
@@ -69,7 +67,6 @@ fn build_fixture() -> BenchFixture {
     };
 
     let response = rsd_response(&gradient, &multi_radius).unwrap();
-    let response = ResponseMap::new(response, ProposalSource::Rsd);
     let nms = NmsConfig {
         radius: 13,
         threshold: 0.01,

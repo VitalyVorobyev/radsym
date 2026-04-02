@@ -18,12 +18,10 @@ radsym = "0.1"
 ## Quick start
 
 ```rust
-use radsym::{Circle, FrstConfig, ImageView, Polarity, ScoringConfig};
-use radsym::core::gradient::sobel_gradient;
-use radsym::core::nms::NmsConfig;
-use radsym::propose::extract::{extract_proposals, ResponseMap};
-use radsym::propose::seed::ProposalSource;
-use radsym::support::score::score_circle_support;
+use radsym::{
+    ImageView, FrstConfig, Circle, Polarity, ScoringConfig, NmsConfig,
+    sobel_gradient, frst_response, extract_proposals, score_circle_support,
+};
 
 let size = 64;
 let mut data = vec![0u8; size * size];
@@ -40,19 +38,11 @@ for y in 0..size {
 let image = ImageView::from_slice(&data, size, size).unwrap();
 let gradient = sobel_gradient(&image).unwrap();
 
-let config = FrstConfig {
-    radii: vec![9, 10, 11],
-    ..FrstConfig::default()
-};
-let response = radsym::frst_response(&gradient, &config).unwrap();
+let config = FrstConfig { radii: vec![9, 10, 11], ..FrstConfig::default() };
+let response = frst_response(&gradient, &config).unwrap();
 
-let response_map = ResponseMap::new(response, ProposalSource::Frst);
-let nms = NmsConfig {
-    radius: 5,
-    threshold: 0.0,
-    max_detections: 5,
-};
-let proposals = extract_proposals(&response_map, &nms, Polarity::Bright);
+let nms = NmsConfig { radius: 5, threshold: 0.0, max_detections: 5 };
+let proposals = extract_proposals(&response, &nms, Polarity::Bright);
 
 if let Some(best) = proposals.first() {
     let circle = Circle::new(best.seed.position, 10.0);

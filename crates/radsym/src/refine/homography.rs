@@ -394,7 +394,7 @@ pub fn refine_ellipse_homography(
     let min_count = min_inlier_count(config.ray_count.max(16));
 
     let radial_center =
-        radial_center_refine_from_gradient(gradient, seed_center, &config.radial_center);
+        radial_center_refine_from_gradient(gradient, seed_center, &config.radial_center)?;
     let stabilized_center = match radial_center.status {
         RefinementStatus::Converged => clamp_center_shift(
             seed_center,
