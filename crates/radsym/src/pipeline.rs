@@ -104,6 +104,8 @@ pub fn detect_circles(
     image: &ImageView<'_, u8>,
     config: &DetectCirclesConfig,
 ) -> Result<Vec<Detection<Circle>>> {
+    config.refinement.validate()?;
+
     let gradient = sobel_gradient(image)?;
 
     let mut frst_config = config.frst.clone();
@@ -183,6 +185,27 @@ mod tests {
             "center should be near ({cx}, {cy}), got ({}, {})",
             best.hypothesis.center.x,
             best.hypothesis.center.y,
+        );
+    }
+
+    #[test]
+    fn invalid_refinement_config_returns_error() {
+        let size = 64;
+        let data = vec![128u8; size * size];
+        let image = ImageView::from_slice(&data, size, size).unwrap();
+
+        let config = DetectCirclesConfig {
+            refinement: CircleRefineConfig {
+                max_iterations: 0,
+                ..CircleRefineConfig::default()
+            },
+            ..DetectCirclesConfig::default()
+        };
+
+        let result = detect_circles(&image, &config);
+        assert!(
+            matches!(result, Err(crate::core::error::RadSymError::InvalidConfig { .. })),
+            "expected InvalidConfig error, got {result:?}"
         );
     }
 }
