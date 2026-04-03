@@ -245,6 +245,12 @@ impl<T> OwnedImage<T> {
     pub fn data_mut(&mut self) -> &mut [T] {
         &mut self.data
     }
+
+    /// Consume the image and return the backing buffer.
+    #[inline]
+    pub fn into_data(self) -> Vec<T> {
+        self.data
+    }
 }
 
 impl<T: Clone + Default> OwnedImage<T> {
