@@ -204,7 +204,10 @@ mod tests {
 
         let result = detect_circles(&image, &config);
         assert!(
-            matches!(result, Err(crate::core::error::RadSymError::InvalidConfig { .. })),
+            matches!(
+                result,
+                Err(crate::core::error::RadSymError::InvalidConfig { .. })
+            ),
             "expected InvalidConfig error, got {result:?}"
         );
     }
