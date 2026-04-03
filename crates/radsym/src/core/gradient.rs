@@ -54,6 +54,17 @@ impl GradientField {
         let (gx, gy) = self.get(x, y)?;
         Some((gx * gx + gy * gy).sqrt())
     }
+
+    /// Maximum gradient magnitude across the entire field.
+    pub fn max_magnitude(&self) -> Scalar {
+        let gx = self.gx.data();
+        let gy = self.gy.data();
+        gx.iter()
+            .zip(gy.iter())
+            .map(|(&x, &y)| x * x + y * y)
+            .fold(0.0f32, Scalar::max)
+            .sqrt()
+    }
 }
 
 /// Compute the gradient field of a grayscale `u8` image using a 3x3 Sobel operator.

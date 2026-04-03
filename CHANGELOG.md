@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-04-03
+
+### Added
+
+- `OwnedImage::into_data()` — consume an image and return the backing `Vec<T>`.
+- `ResponseMap::into_response()` — consume a response map and return the
+  underlying `OwnedImage<Scalar>`.
+- `GradientField::max_magnitude()` — maximum gradient magnitude across the
+  entire field (useful for relative-to-absolute threshold conversion).
+
+### Fixed
+
+- `detect_circles` now validates `CircleRefineConfig` eagerly, so invalid
+  refinement settings (e.g. `max_iterations = 0`) return `Err(InvalidConfig)`
+  instead of being silently swallowed and returning `Ok([])`.
+
+### Changed
+
+- Adapted release CI workflows (`release.yml`, `release-pypi.yml`) for the
+  `radsym` package name and workspace version layout.
+
 ## [0.1.0] - 2026-04-02
 
 ### Added
@@ -38,4 +59,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Zero unsafe code; zero clippy warnings; 138 unit and integration tests.
 - mdBook documentation with full mathematical derivations.
 
+[0.1.1]: https://github.com/VitalyVorobyev/radsym/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/VitalyVorobyev/radsym/releases/tag/v0.1.0

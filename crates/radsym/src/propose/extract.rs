@@ -36,6 +36,11 @@ impl ResponseMap {
     pub fn source(&self) -> ProposalSource {
         self.source
     }
+
+    /// Consume the response map and return the underlying image.
+    pub fn into_response(self) -> OwnedImage<Scalar> {
+        self.data
+    }
 }
 
 /// Extract proposals from a response map using non-maximum suppression.
