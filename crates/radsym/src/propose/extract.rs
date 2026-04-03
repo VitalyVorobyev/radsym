@@ -41,6 +41,34 @@ impl ResponseMap {
 /// Extract proposals from a response map using non-maximum suppression.
 ///
 /// Returns proposals sorted by descending score, up to the NMS budget.
+///
+/// # Example
+///
+/// ```rust
+/// use radsym::{ImageView, FrstConfig, NmsConfig, Polarity,
+///              sobel_gradient, frst_response, extract_proposals};
+///
+/// let size = 64usize;
+/// let mut data = vec![0u8; size * size];
+/// for y in 0..size {
+///     for x in 0..size {
+///         let dx = x as f32 - 32.0;
+///         let dy = y as f32 - 32.0;
+///         if (dx * dx + dy * dy).sqrt() <= 10.0 { data[y * size + x] = 255; }
+///     }
+/// }
+/// let image = ImageView::from_slice(&data, size, size).unwrap();
+/// let grad = sobel_gradient(&image).unwrap();
+/// let config = FrstConfig { radii: vec![9, 10, 11], ..FrstConfig::default() };
+/// let response = frst_response(&grad, &config).unwrap();
+/// let nms = NmsConfig { radius: 5, threshold: 0.0, max_detections: 10 };
+/// let proposals = extract_proposals(&response, &nms, Polarity::Bright);
+/// assert!(!proposals.is_empty());
+/// // Proposals are sorted by descending score
+/// if proposals.len() > 1 {
+///     assert!(proposals[0].seed.score >= proposals[1].seed.score);
+/// }
+/// ```
 pub fn extract_proposals(
     response: &ResponseMap,
     nms_config: &NmsConfig,

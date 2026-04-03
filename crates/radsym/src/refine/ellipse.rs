@@ -16,6 +16,7 @@
 use std::f32::consts::PI;
 
 use crate::core::coords::PixelCoord;
+use crate::core::error::Result;
 use crate::core::geometry::Ellipse;
 use crate::core::gradient::GradientField;
 use crate::core::image_view::ImageView;
@@ -81,6 +82,29 @@ pub struct EllipseRefineConfig {
     pub max_center_shift_fraction: Scalar,
     /// Maximum allowed ellipse axis ratio.
     pub max_axis_ratio: Scalar,
+}
+
+impl EllipseRefineConfig {
+    /// Validate configuration parameters.
+    pub fn validate(&self) -> crate::core::error::Result<()> {
+        use crate::core::error::RadSymError;
+        if self.max_iterations == 0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "max_iterations must be > 0",
+            });
+        }
+        if self.convergence_tol <= 0.0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "convergence_tol must be > 0.0",
+            });
+        }
+        if self.ray_count < 8 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "ray_count must be >= 8",
+            });
+        }
+        Ok(())
+    }
 }
 
 impl Default for EllipseRefineConfig {
@@ -362,7 +386,8 @@ pub fn refine_ellipse(
     gradient: &GradientField,
     initial: &Ellipse,
     config: &EllipseRefineConfig,
-) -> RefinementResult<Ellipse> {
+) -> Result<RefinementResult<Ellipse>> {
+    config.validate()?;
     let seed_radius = initial.mean_radius().max(1.0);
     let seed_center = initial.center;
     let width = gradient.width();
@@ -372,7 +397,7 @@ pub fn refine_ellipse(
     let min_count = min_inlier_count(config.ray_count.max(16));
 
     let radial_center =
-        radial_center_refine_from_gradient(gradient, seed_center, &config.radial_center);
+        radial_center_refine_from_gradient(gradient, seed_center, &config.radial_center)?;
     let stabilized_center = match radial_center.status {
         RefinementStatus::Converged => {
             clamp_center_shift(seed_center, radial_center.hypothesis, 0.25 * seed_radius)
@@ -385,12 +410,12 @@ pub fn refine_ellipse(
         collect_radial_candidates(gx_view, gy_view, stabilized_center, seed_radius, config);
     let radial_count: usize = radial_candidates.iter().map(Vec::len).sum();
     if radial_count < min_count {
-        return RefinementResult {
+        return Ok(RefinementResult {
             hypothesis: initial_circle,
             status: RefinementStatus::Degenerate,
             residual: 0.0,
             iterations: 0,
-        };
+        });
     }
 
     let Some(mut fit) = initial_fit_from_candidates(
@@ -402,12 +427,12 @@ pub fn refine_ellipse(
         width,
         height,
     ) else {
-        return RefinementResult {
+        return Ok(RefinementResult {
             hypothesis: initial_circle,
             status: RefinementStatus::Degenerate,
             residual: 0.0,
             iterations: 0,
-        };
+        });
     };
     let expected_sign = infer_expected_sign(
         &fit.observations,
@@ -423,12 +448,12 @@ pub fn refine_ellipse(
         width,
         height,
     ) {
-        return RefinementResult {
+        return Ok(RefinementResult {
             hypothesis: initial_circle,
             status: RefinementStatus::Degenerate,
             residual: fit.fit.evaluation.objective,
             iterations: fit.fit.inner_iterations,
-        };
+        });
     }
 
     let mut iterations = 1usize;
@@ -524,12 +549,12 @@ pub fn refine_ellipse(
         status = RefinementStatus::Degenerate;
     }
 
-    RefinementResult {
+    Ok(RefinementResult {
         hypothesis: fit.fit.ellipse,
         status,
         residual: fit.fit.evaluation.objective,
         iterations,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -683,7 +708,7 @@ mod tests {
         let grad = sobel_gradient(&image).unwrap();
 
         let initial = Ellipse::new(PixelCoord::new(67.0, 60.0), 21.0, 21.0, 0.0);
-        let result = refine_ellipse(&grad, &initial, &EllipseRefineConfig::default());
+        let result = refine_ellipse(&grad, &initial, &EllipseRefineConfig::default()).unwrap();
         assert_ne!(result.status, RefinementStatus::Degenerate);
         let ellipse = result.hypothesis;
         let center_err = ((ellipse.center.x - true_center.x).powi(2)
@@ -709,7 +734,7 @@ mod tests {
         let image = ImageView::from_slice(&data, size, size).unwrap();
         let grad = sobel_gradient(&image).unwrap();
         let initial = Ellipse::new(PixelCoord::new(66.0, 61.0), 22.0, 22.0, 0.0);
-        let result = refine_ellipse(&grad, &initial, &EllipseRefineConfig::default());
+        let result = refine_ellipse(&grad, &initial, &EllipseRefineConfig::default()).unwrap();
         assert_ne!(result.status, RefinementStatus::Degenerate);
         let ellipse = result.hypothesis;
         assert!(
@@ -740,7 +765,7 @@ mod tests {
             ..EllipseRefineConfig::default()
         };
 
-        let result = refine_ellipse(&gradient, &initial, &config);
+        let result = refine_ellipse(&gradient, &initial, &config).unwrap();
         assert_ne!(result.status, RefinementStatus::Degenerate);
         assert!((result.hypothesis.semi_major - outer_a).abs() < 3.0);
         assert!((result.hypothesis.semi_minor - outer_b).abs() < 3.0);
@@ -755,7 +780,7 @@ mod tests {
         let grad = sobel_gradient(&image).unwrap();
 
         let initial = Ellipse::new(PixelCoord::new(50.0, 50.0), 15.0, 15.0, 0.0);
-        let result = refine_ellipse(&grad, &initial, &EllipseRefineConfig::default());
+        let result = refine_ellipse(&grad, &initial, &EllipseRefineConfig::default()).unwrap();
         assert_eq!(result.status, RefinementStatus::Degenerate);
     }
 

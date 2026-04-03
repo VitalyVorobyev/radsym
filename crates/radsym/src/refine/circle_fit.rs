@@ -10,6 +10,9 @@ use crate::core::scalar::Scalar;
 
 use super::homography::HomographyEllipseRefineConfig;
 
+// f64 for numerical stability in weighted least-squares circle fitting:
+// the 3x3 normal matrix can lose precision in f32 when point coordinates
+// are large (e.g., far from origin), leading to inaccurate radius estimates.
 type Matrix3x3 = SMatrix<f64, 3, 3>;
 type Vector3f = SVector<f64, 3>;
 

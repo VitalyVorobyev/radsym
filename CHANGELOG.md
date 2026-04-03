@@ -1,0 +1,41 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.0] - 2026-04-02
+
+### Added
+
+- **Center proposal generation** via FRST (Loy & Zelinsky, TPAMI 2003) and RSD
+  (Barnes, Zelinsky, Fletcher, IEEE T-ITS 2008), with optional rayon parallelism.
+- **Homography-aware FRST** (`frst_response_homography`): votes in a rectified
+  coordinate frame to handle oblique viewpoints.
+- **Non-maximum suppression** (`extract_proposals`) with configurable radius,
+  threshold, and detection budget.
+- **Spatial deduplication** (`suppress_proposals_by_distance`) for downstream
+  post-processing.
+- **Annular support scoring** (`score_circle_support`, `score_ellipse_support`)
+  measuring gradient alignment and angular coverage.
+- **Iterative circle refinement** (`refine_circle`) combining the Parthasarathy
+  radial center method (Nature Methods 2012) with annulus-based radius estimation.
+- **Iterative ellipse refinement** (`refine_ellipse`) using Fitzgibbon et al.
+  direct least-squares fitting (TPAMI 1999) with robust trimming.
+- **Homography-aware ellipse refinement** (`refine_ellipse_homography`): fits a
+  circle in rectified space and back-projects to an image-space ellipse.
+- **One-call pipeline** (`detect_circles`) for the common propose-score-refine
+  workflow.
+- **Pyramid support** (`pyramid_level_owned`) for coarse-to-fine processing.
+- **Kåsa circle fit** (`fit_circle`, `fit_circle_weighted`) for algebraic circle
+  fitting (IEEE T-IM 1976).
+- **Diagnostics**: response heatmaps (`response_heatmap`) and shape overlays
+  (`overlay_circle`, `overlay_ellipse`).
+- **Python bindings** (`radsym-py`) via PyO3/maturin exposing the full pipeline
+  with numpy I/O.
+- Feature flags: `rayon`, `image-io`, `tracing`, `affine`, `serde`.
+- Zero unsafe code; zero clippy warnings; 138 unit and integration tests.
+- mdBook documentation with full mathematical derivations.
+
+[0.1.0]: https://github.com/VitalyVorobyev/radsym/releases/tag/v0.1.0

@@ -5,6 +5,7 @@
 //! updates the center via the radial-center method, and re-estimates the
 //! radius from the gradient peak distribution.
 
+use crate::core::error::Result;
 use crate::core::geometry::Circle;
 use crate::core::gradient::GradientField;
 use crate::core::scalar::Scalar;
@@ -30,6 +31,29 @@ pub struct CircleRefineConfig {
     pub sampling: AnnulusSamplingConfig,
 }
 
+impl CircleRefineConfig {
+    /// Validate configuration parameters.
+    pub fn validate(&self) -> crate::core::error::Result<()> {
+        use crate::core::error::RadSymError;
+        if self.max_iterations == 0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "max_iterations must be > 0",
+            });
+        }
+        if self.convergence_tol <= 0.0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "convergence_tol must be > 0.0",
+            });
+        }
+        if self.annulus_margin <= 0.0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "annulus_margin must be > 0.0",
+            });
+        }
+        Ok(())
+    }
+}
+
 impl Default for CircleRefineConfig {
     fn default() -> Self {
         Self {
@@ -48,36 +72,61 @@ impl Default for CircleRefineConfig {
 /// 1. Refines the center using the radial center method on the gradient field.
 /// 2. Samples the annulus around the current estimate.
 /// 3. Re-estimates the radius from the peak of the radial gradient distribution.
+///
+/// # Example
+///
+/// ```rust
+/// use radsym::{ImageView, Circle, PixelCoord, sobel_gradient, refine_circle};
+/// use radsym::refine::circle::CircleRefineConfig;
+///
+/// let size = 64usize;
+/// let mut data = vec![0u8; size * size];
+/// for y in 0..size {
+///     for x in 0..size {
+///         let dx = x as f32 - 32.0;
+///         let dy = y as f32 - 32.0;
+///         if (dx * dx + dy * dy).sqrt() <= 10.0 { data[y * size + x] = 255; }
+///     }
+/// }
+/// let image = ImageView::from_slice(&data, size, size).unwrap();
+/// let grad = sobel_gradient(&image).unwrap();
+/// let circle = Circle::new(PixelCoord::new(33.0, 33.0), 10.0);
+/// let result = refine_circle(&grad, &circle, &CircleRefineConfig::default()).unwrap();
+/// let dx = result.hypothesis.center.x - 32.0;
+/// let dy = result.hypothesis.center.y - 32.0;
+/// assert!((dx * dx + dy * dy).sqrt() < 3.0, "refined center should be near (32, 32)");
+/// ```
 pub fn refine_circle(
     gradient: &GradientField,
     initial: &Circle,
     config: &CircleRefineConfig,
-) -> RefinementResult<Circle> {
+) -> Result<RefinementResult<Circle>> {
+    config.validate()?;
     let mut center = initial.center;
     let mut radius = initial.radius;
 
     for iter in 0..config.max_iterations {
         // Step 1: Refine center
         let center_result =
-            radial_center_refine_from_gradient(gradient, center, &config.radial_center);
+            radial_center_refine_from_gradient(gradient, center, &config.radial_center)?;
 
         match center_result.status {
             RefinementStatus::Converged => {}
             RefinementStatus::Degenerate => {
-                return RefinementResult {
+                return Ok(RefinementResult {
                     hypothesis: Circle::new(center, radius),
                     status: RefinementStatus::Degenerate,
                     residual: center_result.residual,
                     iterations: iter,
-                };
+                });
             }
             RefinementStatus::OutOfBounds => {
-                return RefinementResult {
+                return Ok(RefinementResult {
                     hypothesis: Circle::new(center, radius),
                     status: RefinementStatus::OutOfBounds,
                     residual: center_result.residual,
                     iterations: iter,
-                };
+                });
             }
             RefinementStatus::MaxIterations => {}
         }
@@ -111,21 +160,21 @@ pub fn refine_circle(
         center = new_center;
 
         if shift < config.convergence_tol {
-            return RefinementResult {
+            return Ok(RefinementResult {
                 hypothesis: Circle::new(center, radius),
                 status: RefinementStatus::Converged,
                 residual: shift,
                 iterations: iter + 1,
-            };
+            });
         }
     }
 
-    RefinementResult {
+    Ok(RefinementResult {
         hypothesis: Circle::new(center, radius),
         status: RefinementStatus::MaxIterations,
         residual: 0.0,
         iterations: config.max_iterations,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -169,7 +218,7 @@ mod tests {
             },
             ..CircleRefineConfig::default()
         };
-        let result = refine_circle(&grad, &initial, &config);
+        let result = refine_circle(&grad, &initial, &config).unwrap();
 
         assert!(
             result.converged() || result.status == RefinementStatus::MaxIterations,
@@ -194,13 +243,42 @@ mod tests {
     }
 
     #[test]
+    fn default_config_passes_validation() {
+        CircleRefineConfig::default().validate().unwrap();
+    }
+
+    #[test]
+    fn zero_max_iterations_fails_validation() {
+        let config = CircleRefineConfig {
+            max_iterations: 0,
+            ..CircleRefineConfig::default()
+        };
+        assert!(matches!(
+            config.validate(),
+            Err(crate::core::error::RadSymError::InvalidConfig { .. })
+        ));
+    }
+
+    #[test]
+    fn zero_convergence_tol_fails_validation() {
+        let config = CircleRefineConfig {
+            convergence_tol: 0.0,
+            ..CircleRefineConfig::default()
+        };
+        assert!(matches!(
+            config.validate(),
+            Err(crate::core::error::RadSymError::InvalidConfig { .. })
+        ));
+    }
+
+    #[test]
     fn degenerate_on_empty() {
         let data = vec![0u8; 100 * 100];
         let image = ImageView::from_slice(&data, 100, 100).unwrap();
         let grad = sobel_gradient(&image).unwrap();
 
         let initial = Circle::new(PixelCoord::new(50.0, 50.0), 15.0);
-        let result = refine_circle(&grad, &initial, &CircleRefineConfig::default());
+        let result = refine_circle(&grad, &initial, &CircleRefineConfig::default()).unwrap();
         assert_eq!(result.status, RefinementStatus::Degenerate);
     }
 }

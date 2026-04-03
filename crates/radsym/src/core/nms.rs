@@ -16,6 +16,24 @@ pub struct NmsConfig {
     pub max_detections: usize,
 }
 
+impl NmsConfig {
+    /// Validate configuration parameters.
+    pub fn validate(&self) -> crate::core::error::Result<()> {
+        use crate::core::error::RadSymError;
+        if self.radius == 0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "radius must be > 0",
+            });
+        }
+        if self.max_detections == 0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "max_detections must be > 0",
+            });
+        }
+        Ok(())
+    }
+}
+
 impl Default for NmsConfig {
     fn default() -> Self {
         Self {
@@ -407,6 +425,35 @@ mod tests {
 
         let peaks = non_maximum_suppression(&img.view(), &config);
         assert!(peaks.is_empty());
+    }
+
+    #[test]
+    fn default_config_passes_validation() {
+        NmsConfig::default().validate().unwrap();
+    }
+
+    #[test]
+    fn zero_radius_fails_validation() {
+        let config = NmsConfig {
+            radius: 0,
+            ..NmsConfig::default()
+        };
+        assert!(matches!(
+            config.validate(),
+            Err(crate::core::error::RadSymError::InvalidConfig { .. })
+        ));
+    }
+
+    #[test]
+    fn zero_max_detections_fails_validation() {
+        let config = NmsConfig {
+            max_detections: 0,
+            ..NmsConfig::default()
+        };
+        assert!(matches!(
+            config.validate(),
+            Err(crate::core::error::RadSymError::InvalidConfig { .. })
+        ));
     }
 
     #[test]

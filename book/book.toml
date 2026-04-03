@@ -1,0 +1,11 @@
+[book]
+authors = ["Vitaly Vorobyev"]
+language = "en"
+multilingual = false
+src = "src"
+title = "radsym: Radial Symmetry Detection"
+description = "Algorithms and API guide for the radsym Rust library"
+
+[output.html]
+git-repository-url = "https://github.com/VitalyVorobyev/radsym"
+edit-url-template = "https://github.com/VitalyVorobyev/radsym/edit/main/book/{path}"

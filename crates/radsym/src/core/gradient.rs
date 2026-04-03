@@ -59,6 +59,28 @@ impl GradientField {
 /// Compute the gradient field of a grayscale `u8` image using a 3x3 Sobel operator.
 ///
 /// The output has the same dimensions as the input. Border pixels are set to zero.
+///
+/// # Example
+///
+/// ```rust
+/// use radsym::{ImageView, sobel_gradient};
+///
+/// let size = 16usize;
+/// let mut data = vec![0u8; size * size];
+/// // Create a vertical step edge at x = 8
+/// for y in 0..size {
+///     for x in 8..size {
+///         data[y * size + x] = 255;
+///     }
+/// }
+/// let image = ImageView::from_slice(&data, size, size).unwrap();
+/// let grad = sobel_gradient(&image).unwrap();
+/// assert_eq!(grad.width(), size);
+/// assert_eq!(grad.height(), size);
+/// // Strong horizontal gradient at the step edge
+/// let (gx, _) = grad.get(8, size / 2).unwrap();
+/// assert!(gx > 20.0, "expected strong gx at step edge, got {gx}");
+/// ```
 pub fn sobel_gradient(image: &ImageView<'_, u8>) -> Result<GradientField> {
     let w = image.width();
     let h = image.height();

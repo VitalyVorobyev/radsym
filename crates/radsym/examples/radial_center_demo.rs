@@ -10,13 +10,9 @@
 
 use std::fs;
 
-use radsym::core::gradient::sobel_gradient;
-use radsym::core::nms::NmsConfig;
-use radsym::propose::extract::{extract_proposals, ResponseMap};
-use radsym::propose::seed::ProposalSource;
 use radsym::{
-    frst_response, load_grayscale, radial_center_refine_from_gradient, FrstConfig, Polarity,
-    RadialCenterConfig,
+    extract_proposals, frst_response, load_grayscale, radial_center_refine_from_gradient,
+    sobel_gradient, FrstConfig, NmsConfig, Polarity, RadialCenterConfig,
 };
 
 #[derive(serde::Deserialize)]
@@ -47,9 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut frst_config = config.frst.clone();
     frst_config.polarity = config.polarity;
-    let response = frst_response(&gradient, &frst_config)?;
-
-    let response_map = ResponseMap::new(response, ProposalSource::Frst);
+    let response_map = frst_response(&gradient, &frst_config)?;
     let proposals = extract_proposals(&response_map, &config.nms, config.polarity);
     println!("Found {} proposals\n", proposals.len());
 
@@ -62,7 +56,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (i, proposal) in proposals.iter().enumerate() {
         let seed = proposal.seed.position;
 
-        let result = radial_center_refine_from_gradient(&gradient, seed, &config.radial_center);
+        let result = radial_center_refine_from_gradient(&gradient, seed, &config.radial_center)?;
 
         let refined = result.hypothesis;
         let shift = ((refined.x - seed.x).powi(2) + (refined.y - seed.y).powi(2)).sqrt();

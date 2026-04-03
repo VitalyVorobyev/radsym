@@ -3,8 +3,8 @@
 use radsym::core::gradient::sobel_gradient;
 use radsym::core::nms::NmsConfig;
 use radsym::core::polarity::Polarity;
-use radsym::propose::extract::{extract_proposals, ResponseMap};
-use radsym::propose::seed::{Proposal, ProposalSource};
+use radsym::propose::extract::extract_proposals;
+use radsym::propose::seed::Proposal;
 use radsym::support::score::{score_circle_support, score_ellipse_support};
 use radsym::{
     pyramid_level_owned, refine_ellipse, Circle, Ellipse, EllipseRefineConfig, FrstConfig,
@@ -188,7 +188,6 @@ pub fn detect_case_image(image: &OwnedImage<u8>, level: u8) -> Result<SyntheticS
             smoothing_factor: 0.5,
         },
     )?;
-    let response = ResponseMap::new(response, ProposalSource::Frst);
     let proposals = extract_proposals(
         &response,
         &NmsConfig {
@@ -319,7 +318,7 @@ fn rank_candidates(
         let (radius_sweep_radius, _) = sweep_radius_at_center(gradient, center, radius_hint);
         let seed_radius = radius_sweep_radius.max(0.8 * radius_hint);
         let ellipse_seed = Ellipse::new(center, seed_radius, seed_radius, 0.0);
-        let refined = refine_ellipse(gradient, &ellipse_seed, &refine_config);
+        let refined = refine_ellipse(gradient, &ellipse_seed, &refine_config).unwrap();
         let working_ellipse = refined.hypothesis;
         let final_support = score_ellipse_support(gradient, &working_ellipse, &scoring_config);
 

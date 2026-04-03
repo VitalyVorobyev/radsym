@@ -42,6 +42,29 @@ pub struct RsdConfig {
     pub smoothing_factor: Scalar,
 }
 
+impl RsdConfig {
+    /// Validate configuration parameters.
+    pub fn validate(&self) -> crate::core::error::Result<()> {
+        use crate::core::error::RadSymError;
+        if self.radii.is_empty() {
+            return Err(RadSymError::InvalidConfig {
+                reason: "radii must be non-empty",
+            });
+        }
+        if self.radii.contains(&0) {
+            return Err(RadSymError::InvalidConfig {
+                reason: "all radii must be > 0",
+            });
+        }
+        if self.smoothing_factor <= 0.0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "smoothing_factor must be > 0",
+            });
+        }
+        Ok(())
+    }
+}
+
 impl Default for RsdConfig {
     fn default() -> Self {
         Self {
@@ -76,6 +99,7 @@ pub fn rsd_response_single(
     radius: u32,
     config: &RsdConfig,
 ) -> Result<OwnedImage<Scalar>> {
+    config.validate()?;
     let w = gradient.width();
     let h = gradient.height();
     let radius_f = radius as Scalar;
@@ -173,7 +197,14 @@ pub fn rsd_response_single(
 }
 
 /// Compute the multi-radius RSD response by summing single-radius responses.
-pub fn rsd_response(gradient: &GradientField, config: &RsdConfig) -> Result<OwnedImage<Scalar>> {
+///
+/// Returns the summed response wrapped in a [`ResponseMap`](super::extract::ResponseMap)
+/// tagged with [`ProposalSource::Rsd`](super::seed::ProposalSource::Rsd).
+pub fn rsd_response(
+    gradient: &GradientField,
+    config: &RsdConfig,
+) -> Result<super::extract::ResponseMap> {
+    config.validate()?;
     let w = gradient.width();
     let h = gradient.height();
     let mut sum = OwnedImage::<Scalar>::zeros(w, h)?;
@@ -197,7 +228,10 @@ pub fn rsd_response(gradient: &GradientField, config: &RsdConfig) -> Result<Owne
         accumulate_response(&mut sum, &single);
     }
 
-    Ok(sum)
+    Ok(super::extract::ResponseMap::new(
+        sum,
+        super::seed::ProposalSource::Rsd,
+    ))
 }
 
 #[cfg(test)]
@@ -265,8 +299,8 @@ mod tests {
         let grad = sobel_gradient(&image).unwrap();
 
         let response = rsd_response(&grad, &RsdConfig::default()).unwrap();
-        assert_eq!(response.width(), size);
-        assert_eq!(response.height(), size);
+        assert_eq!(response.response().width(), size);
+        assert_eq!(response.response().height(), size);
     }
 
     #[test]
@@ -321,6 +355,35 @@ mod tests {
             });
             assert!(found, "did not find center near ({cx}, {cy})");
         }
+    }
+
+    #[test]
+    fn default_config_passes_validation() {
+        RsdConfig::default().validate().unwrap();
+    }
+
+    #[test]
+    fn empty_radii_fails_validation() {
+        let config = RsdConfig {
+            radii: vec![],
+            ..RsdConfig::default()
+        };
+        assert!(matches!(
+            config.validate(),
+            Err(crate::core::error::RadSymError::InvalidConfig { .. })
+        ));
+    }
+
+    #[test]
+    fn zero_smoothing_factor_fails_validation() {
+        let config = RsdConfig {
+            smoothing_factor: 0.0,
+            ..RsdConfig::default()
+        };
+        assert!(matches!(
+            config.validate(),
+            Err(crate::core::error::RadSymError::InvalidConfig { .. })
+        ));
     }
 
     #[test]

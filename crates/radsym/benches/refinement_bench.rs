@@ -133,7 +133,7 @@ fn bench_refine_circle(c: &mut Criterion) {
     let config = CircleRefineConfig::default();
 
     c.bench_function("refine_circle_256", |b| {
-        b.iter(|| refine_circle(&gradient, &circle, &config));
+        b.iter(|| refine_circle(&gradient, &circle, &config).unwrap());
     });
 }
 
@@ -150,7 +150,7 @@ fn bench_refine_ellipse(c: &mut Criterion) {
     let config = EllipseRefineConfig::default();
 
     c.bench_function("refine_ellipse_256", |b| {
-        b.iter(|| refine_ellipse(&gradient, &ellipse, &config));
+        b.iter(|| refine_ellipse(&gradient, &ellipse, &config).unwrap());
     });
 }
 
@@ -167,7 +167,7 @@ fn bench_refine_ellipse_concentric_distractor(c: &mut Criterion) {
     let config = EllipseRefineConfig::default();
 
     c.bench_function("refine_ellipse_256_concentric_distractor", |b| {
-        b.iter(|| refine_ellipse(&gradient, &ellipse, &config));
+        b.iter(|| refine_ellipse(&gradient, &ellipse, &config).unwrap());
     });
 }
 

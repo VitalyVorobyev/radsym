@@ -1,0 +1,152 @@
+name: Release Python Package to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify-version:
+    name: Verify tag/version sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Verify versions match tag (vX.Y.Z)
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import tomllib
+
+          root = pathlib.Path('.')
+          tag = os.environ['GITHUB_REF_NAME']
+          tag_version = tag[1:] if tag.startswith('v') else tag
+
+          workspace_version = tomllib.loads((root / 'Cargo.toml').read_text())['workspace']['package']['version']
+          pyproject_version = tomllib.loads((root / 'crates/radsym-py/pyproject.toml').read_text())['project']['version']
+
+          print(f'tag version:       {tag_version}')
+          print(f'workspace version: {workspace_version}')
+          print(f'pyproject version: {pyproject_version}')
+
+          versions = {tag_version, workspace_version, pyproject_version}
+          if len(versions) != 1:
+              raise SystemExit('version mismatch between tag and project files')
+          PY
+
+  build-wheels:
+    name: Build wheels (${{ matrix.os }}, py${{ matrix.python-version }})
+    needs: verify-version
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Resolve manylinux Python interpreter
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.python-version }}" in
+            "3.10") echo "MANYLINUX_PY=/opt/python/cp310-cp310/bin/python" >> "$GITHUB_ENV" ;;
+            "3.11") echo "MANYLINUX_PY=/opt/python/cp311-cp311/bin/python" >> "$GITHUB_ENV" ;;
+            "3.12") echo "MANYLINUX_PY=/opt/python/cp312-cp312/bin/python" >> "$GITHUB_ENV" ;;
+            "3.13") echo "MANYLINUX_PY=/opt/python/cp313-cp313/bin/python" >> "$GITHUB_ENV" ;;
+            "3.14") echo "MANYLINUX_PY=/opt/python/cp314-cp314/bin/python" >> "$GITHUB_ENV" ;;
+            *)
+              echo "Unsupported python-version: ${{ matrix.python-version }}" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Build wheels (Linux manylinux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: >-
+            --release
+            -m crates/radsym-py/Cargo.toml
+            --out dist
+            --compatibility pypi
+            -i ${{ env.MANYLINUX_PY }}
+          manylinux: auto
+
+      - name: Build wheels (macOS/Windows)
+        if: matrix.os != 'ubuntu-latest'
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: >-
+            --release
+            -m crates/radsym-py/Cargo.toml
+            --out dist
+            --compatibility pypi
+            -i python
+          manylinux: auto
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v7
+        with:
+          compression-level: 0
+          name: dist-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: dist/*
+
+  publish:
+    name: Publish to PyPI
+    needs: [build-wheels]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pypi
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist

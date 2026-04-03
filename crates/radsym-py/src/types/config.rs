@@ -460,6 +460,83 @@ impl PyRadialCenterConfig {
     }
 }
 
+/// Aggregated configuration for the one-call :func:`detect_circles` pipeline.
+///
+/// Args:
+///     frst: Optional FrstConfig. Uses defaults if None.
+///     nms: Optional NmsConfig. Uses defaults if None.
+///     scoring: Optional ScoringConfig. Uses defaults if None.
+///     refinement: Optional CircleRefineConfig. Uses defaults if None.
+///     polarity: Which polarity to detect — ``"bright"``, ``"dark"``, or ``"both"``.
+///         Default: ``"both"``.
+///     radius_hint: Approximate expected radius in pixels used as the initial
+///         circle hypothesis. Default: 10.0.
+///     min_score: Minimum support score to keep a detection (in ``[0, 1]``).
+///         Default: 0.0.
+#[pyclass(name = "DetectCirclesConfig", skip_from_py_object)]
+#[derive(Clone)]
+pub struct PyDetectCirclesConfig {
+    pub inner: radsym::DetectCirclesConfig,
+}
+
+#[pymethods]
+impl PyDetectCirclesConfig {
+    #[new]
+    #[pyo3(signature = (
+        frst=None,
+        nms=None,
+        scoring=None,
+        refinement=None,
+        polarity="both",
+        radius_hint=10.0,
+        min_score=0.0
+    ))]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        frst: Option<&PyFrstConfig>,
+        nms: Option<&PyNmsConfig>,
+        scoring: Option<&PyScoringConfig>,
+        refinement: Option<&PyCircleRefineConfig>,
+        polarity: &str,
+        radius_hint: f32,
+        min_score: f32,
+    ) -> PyResult<Self> {
+        let defaults = radsym::DetectCirclesConfig::default();
+        Ok(Self {
+            inner: radsym::DetectCirclesConfig {
+                frst: frst.map(|c| c.inner.clone()).unwrap_or(defaults.frst),
+                nms: nms.map(|c| c.inner.clone()).unwrap_or(defaults.nms),
+                scoring: scoring.map(|c| c.inner.clone()).unwrap_or(defaults.scoring),
+                refinement: refinement
+                    .map(|c| c.inner.clone())
+                    .unwrap_or(defaults.refinement),
+                polarity: polarity_from_str(polarity)?,
+                radius_hint,
+                min_score,
+            },
+        })
+    }
+
+    /// Approximate expected radius hint in pixels.
+    #[getter]
+    fn radius_hint(&self) -> f32 {
+        self.inner.radius_hint
+    }
+
+    /// Minimum support score to keep a detection.
+    #[getter]
+    fn min_score(&self) -> f32 {
+        self.inner.min_score
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "DetectCirclesConfig(radius_hint={}, min_score={})",
+            self.inner.radius_hint, self.inner.min_score,
+        )
+    }
+}
+
 use pyo3::prelude::*;
 
 use crate::convert::{polarity_from_str, polarity_to_str};

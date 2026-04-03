@@ -21,8 +21,6 @@ pub struct SupportScore {
     pub total: Scalar,
     /// Ring-like support strength (gradient alignment).
     pub ringness: Scalar,
-    /// Polarity consistency (not yet fully implemented; reserved).
-    pub polarity_consistency: Scalar,
     /// Angular coverage fraction in `[0, 1]`.
     pub angular_coverage: Scalar,
     /// True if the evidence is degenerate (insufficient samples).
@@ -46,6 +44,34 @@ pub struct ScoringConfig {
     pub weight_coverage: Scalar,
 }
 
+impl ScoringConfig {
+    /// Validate configuration parameters.
+    pub fn validate(&self) -> crate::core::error::Result<()> {
+        use crate::core::error::RadSymError;
+        if self.annulus_margin <= 0.0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "annulus_margin must be > 0.0",
+            });
+        }
+        if self.min_samples == 0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "min_samples must be > 0",
+            });
+        }
+        if self.weight_ringness < 0.0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "weight_ringness must be >= 0.0",
+            });
+        }
+        if self.weight_coverage < 0.0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "weight_coverage must be >= 0.0",
+            });
+        }
+        Ok(())
+    }
+}
+
 impl Default for ScoringConfig {
     fn default() -> Self {
         Self {
@@ -59,6 +85,29 @@ impl Default for ScoringConfig {
 }
 
 /// Score how strongly the local image evidence supports a circle hypothesis.
+///
+/// # Example
+///
+/// ```rust
+/// use radsym::{ImageView, Circle, ScoringConfig, sobel_gradient};
+/// use radsym::support::score::score_circle_support;
+///
+/// let size = 64usize;
+/// let mut data = vec![0u8; size * size];
+/// for y in 0..size {
+///     for x in 0..size {
+///         let dx = x as f32 - 32.0;
+///         let dy = y as f32 - 32.0;
+///         if (dx * dx + dy * dy).sqrt() <= 10.0 { data[y * size + x] = 255; }
+///     }
+/// }
+/// let image = ImageView::from_slice(&data, size, size).unwrap();
+/// let grad = sobel_gradient(&image).unwrap();
+/// let circle = Circle::new(radsym::PixelCoord::new(32.0, 32.0), 10.0);
+/// let score = score_circle_support(&grad, &circle, &ScoringConfig::default());
+/// assert!(!score.is_degenerate);
+/// assert!(score.total > 0.0);
+/// ```
 pub fn score_circle_support(
     gradient: &GradientField,
     circle: &Circle,
@@ -95,7 +144,7 @@ pub fn score_circle_support(
     SupportScore {
         total,
         ringness,
-        polarity_consistency: 1.0, // TODO: implement polarity analysis
+
         angular_coverage: cov,
         is_degenerate,
     }
@@ -132,7 +181,7 @@ pub fn score_ellipse_support(
     SupportScore {
         total,
         ringness,
-        polarity_consistency: 1.0,
+
         angular_coverage: cov,
         is_degenerate,
     }
@@ -150,7 +199,7 @@ pub fn score_rectified_circle_support(
         return SupportScore {
             total: 0.0,
             ringness: 0.0,
-            polarity_consistency: 1.0,
+
             angular_coverage: 0.0,
             is_degenerate: true,
         };
@@ -232,7 +281,7 @@ pub fn score_rectified_circle_support(
     SupportScore {
         total,
         ringness,
-        polarity_consistency: 1.0,
+
         angular_coverage: coverage,
         is_degenerate,
     }
