@@ -21,4 +21,4 @@ pyo3-build-config = "0.28"
 [dependencies]
 pyo3 = { version = "0.28", features = ["extension-module"] }
 numpy = "0.28"
-radsym = { path = "../radsym", version = "0.1.1", features = ["image-io", "serde", "rayon"] }
+radsym = { path = "../radsym", version = "0.1.2", features = ["image-io", "serde", "rayon"] }

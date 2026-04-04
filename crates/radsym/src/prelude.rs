@@ -58,7 +58,7 @@ pub use crate::core::polarity::Polarity;
 
 // Proposal generation
 pub use crate::propose::extract::{extract_proposals, ResponseMap};
-pub use crate::propose::frst::{frst_response, FrstConfig};
+pub use crate::propose::frst::{frst_response, multiradius_response, FrstConfig};
 pub use crate::propose::rsd::{rsd_response, RsdConfig};
 pub use crate::propose::seed::Proposal;
 

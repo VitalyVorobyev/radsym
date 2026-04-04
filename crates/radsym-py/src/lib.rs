@@ -79,6 +79,21 @@ fn frst_response_py(
     Ok(PyResponseMap { inner: response })
 }
 
+/// Compute a fused multi-radius magnitude-only response map.
+///
+/// Faster than ``frst_response`` when testing many radii. Uses a single
+/// image pass and a single blur. The ``alpha`` config field is ignored.
+#[pyfunction]
+#[pyo3(name = "multiradius_response", signature = (gradient, config=None))]
+fn multiradius_response_py(
+    gradient: &PyGradientField,
+    config: Option<&PyFrstConfig>,
+) -> PyResult<PyResponseMap> {
+    let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
+    let response = radsym::multiradius_response(&gradient.inner, &cfg).map_err(to_pyerr)?;
+    Ok(PyResponseMap { inner: response })
+}
+
 /// Compute homography-aware FRST on a rectified grid.
 #[pyfunction]
 #[pyo3(name = "frst_response_homography", signature = (gradient, homography, grid, config=None))]
@@ -595,6 +610,7 @@ fn radsym_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sobel_gradient_py, m)?)?;
     m.add_function(wrap_pyfunction!(pyramid_level_image_py, m)?)?;
     m.add_function(wrap_pyfunction!(frst_response_py, m)?)?;
+    m.add_function(wrap_pyfunction!(multiradius_response_py, m)?)?;
     m.add_function(wrap_pyfunction!(frst_response_homography_py, m)?)?;
     m.add_function(wrap_pyfunction!(rsd_response_py, m)?)?;
     m.add_function(wrap_pyfunction!(extract_proposals_py, m)?)?;

@@ -90,7 +90,9 @@ pub use crate::core::pyramid::{
 
 // Proposal generation
 pub use crate::propose::extract::{extract_proposals, suppress_proposals_by_distance, ResponseMap};
-pub use crate::propose::frst::{frst_response, frst_response_single, FrstConfig};
+pub use crate::propose::frst::{
+    frst_response, frst_response_single, multiradius_response, FrstConfig,
+};
 pub use crate::propose::homography::{
     extract_rectified_proposals, frst_response_homography, rerank_proposals_homography,
     HomographyProposal, HomographyRerankConfig, RectifiedResponseMap, RerankedProposal,

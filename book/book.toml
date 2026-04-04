@@ -1,7 +1,6 @@
 [book]
 authors = ["Vitaly Vorobyev"]
 language = "en"
-multilingual = false
 src = "src"
 title = "radsym: Radial Symmetry Detection"
 description = "Algorithms and API guide for the radsym Rust library"
