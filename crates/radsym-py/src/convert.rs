@@ -22,6 +22,16 @@ pub fn polarity_to_str(p: Polarity) -> &'static str {
     }
 }
 
+pub fn gradient_operator_from_str(s: &str) -> PyResult<radsym::GradientOperator> {
+    match s.to_lowercase().as_str() {
+        "sobel" => Ok(radsym::GradientOperator::Sobel),
+        "scharr" => Ok(radsym::GradientOperator::Scharr),
+        _ => Err(PyValueError::new_err(format!(
+            "unknown gradient operator '{s}', expected 'sobel' or 'scharr'"
+        ))),
+    }
+}
+
 pub fn colormap_from_str(s: &str) -> PyResult<radsym::diagnostics::heatmap::Colormap> {
     use radsym::diagnostics::heatmap::Colormap;
     match s.to_lowercase().as_str() {

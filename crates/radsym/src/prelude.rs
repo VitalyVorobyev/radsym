@@ -51,7 +51,9 @@
 pub use crate::core::coords::PixelCoord;
 pub use crate::core::error::{RadSymError, Result};
 pub use crate::core::geometry::{Annulus, Circle, Ellipse};
-pub use crate::core::gradient::{sobel_gradient, GradientField};
+pub use crate::core::gradient::{
+    compute_gradient, scharr_gradient, sobel_gradient, GradientField, GradientOperator,
+};
 pub use crate::core::image_view::{ImageView, OwnedImage};
 pub use crate::core::nms::NmsConfig;
 pub use crate::core::polarity::Polarity;

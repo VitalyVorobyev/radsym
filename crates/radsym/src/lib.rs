@@ -79,7 +79,10 @@ pub use crate::core::circle_fit::{fit_circle, fit_circle_weighted};
 pub use crate::core::coords::PixelCoord;
 pub use crate::core::error::{RadSymError, Result};
 pub use crate::core::geometry::{Annulus, Circle, Ellipse};
-pub use crate::core::gradient::{sobel_gradient, sobel_gradient_f32, GradientField};
+pub use crate::core::gradient::{
+    compute_gradient, compute_gradient_f32, scharr_gradient, scharr_gradient_f32, sobel_gradient,
+    sobel_gradient_f32, GradientField, GradientOperator,
+};
 pub use crate::core::homography::{rectified_circle_to_image_ellipse, Homography, RectifiedGrid};
 pub use crate::core::image_view::{ImageView, OwnedImage};
 pub use crate::core::nms::NmsConfig;

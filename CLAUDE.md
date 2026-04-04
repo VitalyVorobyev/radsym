@@ -23,7 +23,7 @@ Workspace with two crates:
 
 ### radsym modules
 
-- `core/`         — types, image view, errors, NMS, geometry, gradient,
+- `core/`         — types, image view, errors, NMS, geometry, gradient (Sobel/Scharr),
                      homography, circle fitting (Kåsa)
 - `propose/`      — FRST, RSD, center voting, proposal extraction,
                      homography-aware FRST and reranking

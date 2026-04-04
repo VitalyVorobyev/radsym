@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `scharr_gradient` — Scharr 3×3 gradient operator for `u8` images, providing
+  better rotational isotropy than Sobel for circular structure detection.
+- `scharr_gradient_f32` — Scharr operator variant accepting `f32` images.
+- `GradientOperator` — enum (`Sobel` | `Scharr`) for runtime operator selection;
+  derives `serde` under the `serde` feature flag.
+- `compute_gradient` — dispatcher that routes a `u8` image to `sobel_gradient`
+  or `scharr_gradient` based on `GradientOperator`.
+- `compute_gradient_f32` — same dispatcher for `f32` images.
+- `gradient_operator` field on `DetectCirclesConfig` (default: `GradientOperator::Sobel`)
+  so users can switch the pipeline gradient operator without touching internal code.
+
 ## [0.1.2] - 2026-04-04
 
 ### Added

@@ -5,7 +5,7 @@
 
 use crate::core::error::Result;
 use crate::core::geometry::Circle;
-use crate::core::gradient::sobel_gradient;
+use crate::core::gradient::{compute_gradient, GradientOperator};
 use crate::core::image_view::ImageView;
 use crate::core::nms::NmsConfig;
 use crate::core::polarity::Polarity;
@@ -34,6 +34,8 @@ pub struct DetectCirclesConfig {
     pub radius_hint: Scalar,
     /// Minimum support score to keep a detection (in `[0, 1]`).
     pub min_score: Scalar,
+    /// Gradient operator to use (default: Sobel).
+    pub gradient_operator: GradientOperator,
 }
 
 impl Default for DetectCirclesConfig {
@@ -46,12 +48,21 @@ impl Default for DetectCirclesConfig {
             polarity: Polarity::Both,
             radius_hint: 10.0,
             min_score: 0.0,
+            gradient_operator: GradientOperator::default(),
         }
     }
 }
 
 /// A detected circle with its support score and refinement status.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "T: serde::Serialize",
+        deserialize = "T: serde::de::DeserializeOwned"
+    ))
+)]
 pub struct Detection<T> {
     /// Refined geometric hypothesis.
     pub hypothesis: T,
@@ -106,7 +117,7 @@ pub fn detect_circles(
 ) -> Result<Vec<Detection<Circle>>> {
     config.refinement.validate()?;
 
-    let gradient = sobel_gradient(image)?;
+    let gradient = compute_gradient(image, config.gradient_operator)?;
 
     let mut frst_config = config.frst.clone();
     frst_config.polarity = config.polarity;

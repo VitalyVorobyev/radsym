@@ -35,6 +35,24 @@ fn sobel_gradient_py(image: PyReadonlyArray2<u8>) -> PyResult<PyGradientField> {
     Ok(PyGradientField { inner: grad })
 }
 
+/// Compute Scharr gradient from a grayscale image.
+///
+/// The Scharr operator provides better rotational isotropy than Sobel,
+/// which can improve detection quality for circular structures.
+///
+/// Args:
+///     image: 2D numpy array (uint8, H x W) representing a grayscale image.
+///
+/// Returns:
+///     GradientField: opaque gradient object used by all downstream functions.
+#[pyfunction]
+#[pyo3(name = "scharr_gradient")]
+fn scharr_gradient_py(image: PyReadonlyArray2<u8>) -> PyResult<PyGradientField> {
+    let owned = numpy_to_owned_u8(&image)?;
+    let grad = radsym::scharr_gradient(&owned.view()).map_err(to_pyerr)?;
+    Ok(PyGradientField { inner: grad })
+}
+
 /// Extract a one-shot pyramid level from a grayscale image.
 ///
 /// Args:
@@ -623,6 +641,7 @@ fn radsym_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Functions — exposed without _py suffix via #[pyo3(name = "...")]
     m.add_function(wrap_pyfunction!(sobel_gradient_py, m)?)?;
+    m.add_function(wrap_pyfunction!(scharr_gradient_py, m)?)?;
     m.add_function(wrap_pyfunction!(pyramid_level_image_py, m)?)?;
     m.add_function(wrap_pyfunction!(frst_response_py, m)?)?;
     m.add_function(wrap_pyfunction!(multiradius_response_py, m)?)?;
