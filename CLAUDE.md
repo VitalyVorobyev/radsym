@@ -69,6 +69,16 @@ rightward, y increases downward. `PixelCoord = nalgebra::Point2<f32>`.
 - Every public item must have rustdoc
 - Literature traceability: algorithm implementations must cite source paper
 
+## Versioning
+
+- **Single source of truth**: `[workspace.package] version` in root `Cargo.toml`
+- `crates/radsym/Cargo.toml` and `crates/radsym-py/Cargo.toml` use
+  `version.workspace = true`
+- `crates/radsym-py/pyproject.toml` uses `dynamic = ["version"]` so maturin
+  reads the version from `Cargo.toml` automatically — **never hardcode a
+  version in pyproject.toml**
+- When bumping the version: update **only** root `Cargo.toml` and `CHANGELOG.md`
+
 ## Testing
 
 - Synthetic test generators for circles, rings, ellipses

@@ -10,7 +10,7 @@ use crate::core::homography::Homography;
 use crate::core::scalar::Scalar;
 use nalgebra::Vector2;
 
-use super::annulus::{sample_annulus, sample_elliptical_annulus, AnnulusSamplingConfig};
+use super::annulus::{AnnulusSamplingConfig, sample_annulus, sample_elliptical_annulus};
 use super::coverage::{angular_coverage, ellipse_angular_coverage};
 
 /// Structured support score with component breakdown.
@@ -304,7 +304,7 @@ pub fn score_at(
 mod tests {
     use super::*;
     use crate::core::gradient::sobel_gradient;
-    use crate::core::homography::{rectified_circle_to_image_ellipse, Homography};
+    use crate::core::homography::{Homography, rectified_circle_to_image_ellipse};
     use crate::core::image_view::ImageView;
 
     fn make_ring_u8(size: usize, cx: f32, cy: f32, r_inner: f32, r_outer: f32) -> Vec<u8> {

@@ -10,9 +10,9 @@ use crate::core::coords::PixelCoord;
 use crate::core::error::Result;
 use crate::core::geometry::{Circle, Ellipse};
 use crate::core::gradient::GradientField;
-use crate::core::homography::{rectified_circle_to_image_ellipse, Homography, RectifiedGrid};
+use crate::core::homography::{Homography, RectifiedGrid, rectified_circle_to_image_ellipse};
 use crate::core::image_view::{ImageView, OwnedImage};
-use crate::core::nms::{non_maximum_suppression, NmsConfig};
+use crate::core::nms::{NmsConfig, non_maximum_suppression};
 use crate::core::polarity::Polarity;
 use crate::core::scalar::Scalar;
 use crate::propose::frst::FrstConfig;
@@ -538,11 +538,7 @@ pub fn extract_rectified_proposals(
             let y = peak.position.y.round() as usize;
             let scale_hint = if x < width && y < response.response().height() {
                 let radius = scale_data[y * width + x];
-                if radius > 0.0 {
-                    Some(radius)
-                } else {
-                    None
-                }
+                if radius > 0.0 { Some(radius) } else { None }
             } else {
                 None
             };

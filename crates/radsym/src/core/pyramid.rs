@@ -1,8 +1,8 @@
 //! Generic access to box-filter pyramid levels and image-frame remapping.
 
 use box_image_pyramid::{
-    build_pyramid, ImageView as PyramidImageView, PyramidBuffers as PyramidBuffersImpl,
-    PyramidParams,
+    ImageView as PyramidImageView, PyramidBuffers as PyramidBuffersImpl, PyramidParams,
+    build_pyramid,
 };
 
 use crate::core::coords::PixelCoord;

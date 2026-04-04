@@ -61,7 +61,7 @@ pub fn sample_annulus(
 ) -> SupportEvidence {
     let gx_view = gradient.gx();
     let gy_view = gradient.gy();
-    let mut samples = Vec::new();
+    let mut samples = Vec::with_capacity(config.num_angular_samples * config.num_radial_samples);
     let mut alignment_sum = 0.0f32;
 
     let n_ang = config.num_angular_samples;

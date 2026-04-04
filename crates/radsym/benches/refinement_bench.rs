@@ -1,12 +1,12 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 use radsym::core::gradient::sobel_gradient;
 use radsym::core::image_view::OwnedImage;
 use radsym::{
+    Circle, CircleRefineConfig, Ellipse, EllipseRefineConfig, FrstConfig, Homography,
+    HomographyEllipseRefineConfig, PixelCoord, RadialCenterConfig, RectifiedGrid,
     frst_response_homography, radial_center_refine_from_gradient, refine_circle, refine_ellipse,
-    refine_ellipse_homography, Circle, CircleRefineConfig, Ellipse, EllipseRefineConfig,
-    FrstConfig, Homography, HomographyEllipseRefineConfig, PixelCoord, RadialCenterConfig,
-    RectifiedGrid,
+    refine_ellipse_homography,
 };
 
 fn make_disk_image(size: usize) -> OwnedImage<u8> {

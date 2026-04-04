@@ -24,14 +24,15 @@ use crate::core::scalar::Scalar;
 use crate::support::annulus::AnnulusSamplingConfig;
 
 use super::edge_profiles::{
-    best_hypotheses, clamp_center_shift, edge_candidates_along_ray, infer_expected_sign,
-    select_best_consistent_candidates, DEFAULT_MAX_EDGE_CANDIDATES, DEFAULT_PEAK_MIN_SEPARATION_PX,
+    DEFAULT_MAX_EDGE_CANDIDATES, DEFAULT_PEAK_MIN_SEPARATION_PX, best_hypotheses,
+    clamp_center_shift, edge_candidates_along_ray, infer_expected_sign,
+    select_best_consistent_candidates,
 };
 use super::ellipse_fit::{
-    compare_fit_quality, ellipse_residual_and_jacobian, guard_ellipse, min_inlier_count,
-    refine_from_observations, weighted_covariance_guess, EllipseFitOutcome,
+    EllipseFitOutcome, compare_fit_quality, ellipse_residual_and_jacobian, guard_ellipse,
+    min_inlier_count, refine_from_observations, weighted_covariance_guess,
 };
-use super::radial_center::{radial_center_refine_from_gradient, RadialCenterConfig};
+use super::radial_center::{RadialCenterConfig, radial_center_refine_from_gradient};
 use super::result::{RefinementResult, RefinementStatus};
 
 const RADIAL_SAMPLE_STEP: Scalar = 1.0;
@@ -322,8 +323,8 @@ fn refine_hypothesis(
     let mut selected = observations;
 
     let reassigned = select_observations_by_ellipse(sector_candidates, &fit.ellipse);
-    if reassigned.len() >= min_count {
-        if let Some(refined) = refine_from_observations(
+    if reassigned.len() >= min_count
+        && let Some(refined) = refine_from_observations(
             &reassigned,
             fit.ellipse,
             seed_center,
@@ -334,10 +335,10 @@ fn refine_hypothesis(
             observation_point,
             observation_score,
             observation_sector,
-        ) {
-            selected = reassigned;
-            fit = refined;
-        }
+        )
+    {
+        selected = reassigned;
+        fit = refined;
     }
 
     Some(HypothesisFit {

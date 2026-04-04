@@ -1,7 +1,7 @@
 //! Proposal extraction from response maps.
 
 use crate::core::image_view::OwnedImage;
-use crate::core::nms::{non_maximum_suppression, NmsConfig, Peak};
+use crate::core::nms::{NmsConfig, Peak, non_maximum_suppression};
 use crate::core::polarity::Polarity;
 use crate::core::scalar::Scalar;
 

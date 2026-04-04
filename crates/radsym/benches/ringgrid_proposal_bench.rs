@@ -4,18 +4,18 @@ use std::hint::black_box;
 use std::path::PathBuf;
 
 #[cfg(feature = "image-io")]
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 #[cfg(feature = "image-io")]
 use radsym::core::gradient::sobel_gradient;
 #[cfg(feature = "image-io")]
-use radsym::core::nms::{non_maximum_suppression, NmsConfig};
+use radsym::core::nms::{NmsConfig, non_maximum_suppression};
 #[cfg(feature = "image-io")]
-use radsym::propose::extract::{extract_proposals, ResponseMap};
+use radsym::propose::extract::{ResponseMap, extract_proposals};
 #[cfg(feature = "image-io")]
-use radsym::propose::rsd::{rsd_response, rsd_response_single, RsdConfig};
+use radsym::propose::rsd::{RsdConfig, rsd_response, rsd_response_single};
 #[cfg(feature = "image-io")]
-use radsym::{load_grayscale, Polarity};
+use radsym::{Polarity, load_grayscale};
 
 #[cfg(feature = "image-io")]
 struct BenchFixture {

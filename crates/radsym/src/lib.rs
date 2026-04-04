@@ -80,28 +80,28 @@ pub use crate::core::coords::PixelCoord;
 pub use crate::core::error::{RadSymError, Result};
 pub use crate::core::geometry::{Annulus, Circle, Ellipse};
 pub use crate::core::gradient::{
-    compute_gradient, compute_gradient_f32, scharr_gradient, scharr_gradient_f32, sobel_gradient,
-    sobel_gradient_f32, GradientField, GradientOperator,
+    GradientField, GradientOperator, compute_gradient, compute_gradient_f32, scharr_gradient,
+    scharr_gradient_f32, sobel_gradient, sobel_gradient_f32,
 };
-pub use crate::core::homography::{rectified_circle_to_image_ellipse, Homography, RectifiedGrid};
+pub use crate::core::homography::{Homography, RectifiedGrid, rectified_circle_to_image_ellipse};
 pub use crate::core::image_view::{ImageView, OwnedImage};
 pub use crate::core::nms::NmsConfig;
 pub use crate::core::polarity::Polarity;
 pub use crate::core::pyramid::{
-    pyramid_level_owned, OwnedPyramidLevel, PyramidLevelView, PyramidWorkspace,
+    OwnedPyramidLevel, PyramidLevelView, PyramidWorkspace, pyramid_level_owned,
 };
 
 // Proposal generation
-pub use crate::propose::extract::{extract_proposals, suppress_proposals_by_distance, ResponseMap};
+pub use crate::propose::extract::{ResponseMap, extract_proposals, suppress_proposals_by_distance};
 pub use crate::propose::frst::{
-    frst_response, frst_response_single, multiradius_response, FrstConfig,
+    FrstConfig, frst_response, frst_response_single, multiradius_response,
 };
 pub use crate::propose::homography::{
-    extract_rectified_proposals, frst_response_homography, rerank_proposals_homography,
     HomographyProposal, HomographyRerankConfig, RectifiedResponseMap, RerankedProposal,
+    extract_rectified_proposals, frst_response_homography, rerank_proposals_homography,
 };
 pub use crate::propose::remap::{remap_proposal_to_image, remap_proposals_to_image};
-pub use crate::propose::rsd::{rsd_response, rsd_response_fused, RsdConfig};
+pub use crate::propose::rsd::{RsdConfig, rsd_response, rsd_response_fused};
 pub use crate::propose::seed::{Proposal, ProposalSource, SeedPoint};
 
 // Support scoring
@@ -111,26 +111,26 @@ pub use crate::support::hypothesis::{
     AnnulusHypothesis, CircleHypothesis, ConcentricPairHypothesis, EllipseHypothesis,
 };
 pub use crate::support::score::{
-    score_circle_support, score_ellipse_support, score_rectified_circle_support, ScoringConfig,
-    SupportScore,
+    ScoringConfig, SupportScore, score_circle_support, score_ellipse_support,
+    score_rectified_circle_support,
 };
 
 // Refinement
-pub use crate::refine::circle::{refine_circle, CircleRefineConfig};
-pub use crate::refine::ellipse::{refine_ellipse, EllipseRefineConfig};
+pub use crate::refine::circle::{CircleRefineConfig, refine_circle};
+pub use crate::refine::ellipse::{EllipseRefineConfig, refine_ellipse};
 pub use crate::refine::homography::{
-    refine_ellipse_homography, HomographyEllipseRefineConfig, HomographyRefinementResult,
+    HomographyEllipseRefineConfig, HomographyRefinementResult, refine_ellipse_homography,
 };
 pub use crate::refine::radial_center::{
-    radial_center_refine, radial_center_refine_from_gradient, RadialCenterConfig,
+    RadialCenterConfig, radial_center_refine, radial_center_refine_from_gradient,
 };
 pub use crate::refine::result::{RefinementResult, RefinementStatus};
 
 // Pipeline
-pub use crate::pipeline::{detect_circles, DetectCirclesConfig, Detection};
+pub use crate::pipeline::{DetectCirclesConfig, Detection, detect_circles};
 
 // Diagnostics
-pub use crate::diagnostics::heatmap::{response_heatmap, Colormap, DiagnosticImage};
+pub use crate::diagnostics::heatmap::{Colormap, DiagnosticImage, response_heatmap};
 pub use crate::diagnostics::overlay::{overlay_circle, overlay_ellipse};
 
 // I/O (feature-gated)

@@ -11,8 +11,8 @@
 use std::fs;
 
 use radsym::{
-    extract_proposals, frst_response, load_grayscale, radial_center_refine_from_gradient,
-    sobel_gradient, FrstConfig, NmsConfig, Polarity, RadialCenterConfig,
+    FrstConfig, NmsConfig, Polarity, RadialCenterConfig, extract_proposals, frst_response,
+    load_grayscale, radial_center_refine_from_gradient, sobel_gradient,
 };
 
 #[derive(serde::Deserialize)]

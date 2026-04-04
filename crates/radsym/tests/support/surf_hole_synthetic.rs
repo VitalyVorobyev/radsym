@@ -7,8 +7,8 @@ use radsym::propose::extract::extract_proposals;
 use radsym::propose::seed::Proposal;
 use radsym::support::score::{score_circle_support, score_ellipse_support};
 use radsym::{
-    pyramid_level_owned, refine_ellipse, Circle, Ellipse, EllipseRefineConfig, FrstConfig,
-    OwnedImage, PixelCoord, RadSymError, Result, ScoringConfig, SupportScore,
+    Circle, Ellipse, EllipseRefineConfig, FrstConfig, OwnedImage, PixelCoord, RadSymError, Result,
+    ScoringConfig, SupportScore, pyramid_level_owned, refine_ellipse,
 };
 
 pub const DEFAULT_PYRAMID_LEVEL: u8 = 3;

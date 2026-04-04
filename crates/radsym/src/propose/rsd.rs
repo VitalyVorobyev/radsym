@@ -291,7 +291,7 @@ mod tests {
     use super::*;
     use crate::core::gradient::sobel_gradient;
     use crate::core::image_view::ImageView;
-    use crate::core::nms::{non_maximum_suppression, NmsConfig};
+    use crate::core::nms::{NmsConfig, non_maximum_suppression};
 
     fn make_disk(size: usize, cx: f32, cy: f32, radius: f32) -> Vec<u8> {
         let mut data = vec![0u8; size * size];

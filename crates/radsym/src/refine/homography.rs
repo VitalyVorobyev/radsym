@@ -6,19 +6,20 @@ use crate::core::coords::PixelCoord;
 use crate::core::error::Result;
 use crate::core::geometry::{Circle, Ellipse};
 use crate::core::gradient::GradientField;
-use crate::core::homography::{rectified_circle_to_image_ellipse, Homography};
+use crate::core::homography::{Homography, rectified_circle_to_image_ellipse};
 use crate::core::scalar::Scalar;
 
 use super::circle_fit::{
-    approximate_rectified_circle_from_image_ellipse, circle_residual_and_jacobian,
-    compare_circle_fit_quality, fit_circle_initial, min_inlier_count,
-    refine_circle_from_observations, CircleFitOutcome,
+    CircleFitOutcome, approximate_rectified_circle_from_image_ellipse,
+    circle_residual_and_jacobian, compare_circle_fit_quality, fit_circle_initial, min_inlier_count,
+    refine_circle_from_observations,
 };
 use super::edge_profiles::{
-    best_hypotheses, clamp_center_shift, edge_candidates_along_ray, infer_expected_sign,
-    select_best_consistent_candidates, DEFAULT_MAX_EDGE_CANDIDATES, DEFAULT_PEAK_MIN_SEPARATION_PX,
+    DEFAULT_MAX_EDGE_CANDIDATES, DEFAULT_PEAK_MIN_SEPARATION_PX, best_hypotheses,
+    clamp_center_shift, edge_candidates_along_ray, infer_expected_sign,
+    select_best_consistent_candidates,
 };
-use super::radial_center::{radial_center_refine_from_gradient, RadialCenterConfig};
+use super::radial_center::{RadialCenterConfig, radial_center_refine_from_gradient};
 use super::result::RefinementStatus;
 
 const RADIAL_SAMPLE_STEP: Scalar = 1.0;
@@ -302,8 +303,8 @@ fn refine_circle_hypothesis(
     let mut selected = observations;
 
     let reassigned = select_observations_by_circle(sector_candidates, &fit.circle);
-    if reassigned.len() >= min_count {
-        if let Some(refined) = refine_circle_from_observations(
+    if reassigned.len() >= min_count
+        && let Some(refined) = refine_circle_from_observations(
             &reassigned,
             fit.circle,
             seed_circle,
@@ -311,10 +312,10 @@ fn refine_circle_hypothesis(
             observation_rectified_point,
             observation_score,
             observation_sector,
-        ) {
-            selected = reassigned;
-            fit = refined;
-        }
+        )
+    {
+        selected = reassigned;
+        fit = refined;
     }
 
     Some(CircleHypothesisFit {

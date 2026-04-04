@@ -120,6 +120,9 @@ pub fn frst_response_single(
     let gy_data = gradient.gy.data();
 
     let thresh_sq = config.gradient_threshold * config.gradient_threshold;
+    let vote_pos = config.polarity.votes_positive();
+    let vote_neg = config.polarity.votes_negative();
+    let n_f = n as Scalar;
 
     // Voting pass: each pixel casts votes to affected pixels
     for y in 0..h {
@@ -134,40 +137,31 @@ pub fn frst_response_single(
             }
 
             let mag = mag_sq.sqrt();
-            let dx = gx / mag;
-            let dy = gy / mag;
+            let inv_mag = mag.recip();
+            let dx = gx * inv_mag;
+            let dy = gy * inv_mag;
 
-            // Positive-affected pixel: p_+ = p + round(g/|g| * n)
-            let px_pos = x as i32 + (dx * n as Scalar).round() as i32;
-            let py_pos = y as i32 + (dy * n as Scalar).round() as i32;
+            let offset_x = (dx * n_f).round() as i32;
+            let offset_y = (dy * n_f).round() as i32;
 
-            // Negative-affected pixel: p_- = p - round(g/|g| * n)
-            let px_neg = x as i32 - (dx * n as Scalar).round() as i32;
-            let py_neg = y as i32 - (dy * n as Scalar).round() as i32;
-
-            let vote_pos = config.polarity.votes_positive();
-            let vote_neg = config.polarity.votes_negative();
-
-            if vote_pos
-                && px_pos >= 0
-                && (px_pos as usize) < w
-                && py_pos >= 0
-                && (py_pos as usize) < h
-            {
-                let pidx = py_pos as usize * w + px_pos as usize;
-                o_data[pidx] += 1.0;
-                m_data[pidx] += mag;
+            if vote_pos {
+                let px = x as i32 + offset_x;
+                let py = y as i32 + offset_y;
+                if px >= 0 && (px as usize) < w && py >= 0 && (py as usize) < h {
+                    let pidx = py as usize * w + px as usize;
+                    o_data[pidx] += 1.0;
+                    m_data[pidx] += mag;
+                }
             }
 
-            if vote_neg
-                && px_neg >= 0
-                && (px_neg as usize) < w
-                && py_neg >= 0
-                && (py_neg as usize) < h
-            {
-                let pidx = py_neg as usize * w + px_neg as usize;
-                o_data[pidx] -= 1.0;
-                m_data[pidx] += mag;
+            if vote_neg {
+                let px = x as i32 - offset_x;
+                let py = y as i32 - offset_y;
+                if px >= 0 && (px as usize) < w && py >= 0 && (py as usize) < h {
+                    let pidx = py as usize * w + px as usize;
+                    o_data[pidx] -= 1.0;
+                    m_data[pidx] += mag;
+                }
             }
         }
     }
@@ -188,10 +182,27 @@ pub fn frst_response_single(
     let mut f_n = OwnedImage::<Scalar>::zeros(w, h)?;
     let f_data = f_n.data_mut();
 
-    for i in 0..w * h {
-        let o_tilde = o_data[i] / o_max;
-        let m_tilde = m_data[i] / m_max;
-        f_data[i] = o_tilde.abs().powf(alpha) * m_tilde;
+    // Special-case common alpha values to avoid expensive powf.
+    // Alpha=2 is the paper's default; alpha=1 skips the exponent entirely.
+    match alpha as u32 {
+        1 if (alpha - 1.0).abs() < 1e-6 => {
+            for i in 0..w * h {
+                let o_abs = (o_data[i] / o_max).abs();
+                f_data[i] = o_abs * (m_data[i] / m_max);
+            }
+        }
+        2 if (alpha - 2.0).abs() < 1e-6 => {
+            for i in 0..w * h {
+                let o_abs = (o_data[i] / o_max).abs();
+                f_data[i] = o_abs * o_abs * (m_data[i] / m_max);
+            }
+        }
+        _ => {
+            for i in 0..w * h {
+                let o_abs = (o_data[i] / o_max).abs();
+                f_data[i] = o_abs.powf(alpha) * (m_data[i] / m_max);
+            }
+        }
     }
 
     // Gaussian smoothing

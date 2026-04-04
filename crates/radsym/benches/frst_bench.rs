@@ -1,8 +1,8 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 
 use radsym::core::gradient::sobel_gradient;
 use radsym::core::image_view::OwnedImage;
-use radsym::propose::frst::{frst_response, multiradius_response, FrstConfig};
+use radsym::propose::frst::{FrstConfig, frst_response, multiradius_response};
 
 /// Create a synthetic image with a bright disk at center.
 fn make_disk_image(size: usize) -> OwnedImage<u8> {
