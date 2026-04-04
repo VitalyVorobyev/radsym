@@ -234,6 +234,58 @@ pub fn rsd_response(
     ))
 }
 
+/// Compute a fused multi-radius RSD response map in a single pixel pass.
+///
+/// Unlike [`rsd_response`], which processes each radius independently
+/// (separate accumulator and Gaussian blur per radius), this function
+/// fuses all radii into **one** pixel traversal with a single shared
+/// accumulator and **one** final Gaussian blur.
+///
+/// - **One** image traversal (vs. N for standard RSD).
+/// - **One** Gaussian blur with `sigma = smoothing_factor * median(radii)`
+///   (vs. N per-radius blurs).
+/// - **One** accumulator allocation (vs. N).
+///
+/// # Example
+///
+/// ```rust
+/// use radsym::{ImageView, RsdConfig, sobel_gradient};
+/// use radsym::propose::rsd::rsd_response_fused;
+///
+/// let size = 64usize;
+/// let mut data = vec![0u8; size * size];
+/// for y in 0..size {
+///     for x in 0..size {
+///         let dx = x as f32 - 32.0;
+///         let dy = y as f32 - 32.0;
+///         if (dx * dx + dy * dy).sqrt() <= 10.0 { data[y * size + x] = 255; }
+///     }
+/// }
+/// let image = ImageView::from_slice(&data, size, size).unwrap();
+/// let grad = sobel_gradient(&image).unwrap();
+/// let config = RsdConfig { radii: vec![9, 10, 11], ..RsdConfig::default() };
+/// let response = rsd_response_fused(&grad, &config).unwrap();
+/// assert_eq!(response.response().width(), size);
+/// assert!(response.response().data().iter().any(|&v| v > 0.0));
+/// ```
+pub fn rsd_response_fused(
+    gradient: &GradientField,
+    config: &RsdConfig,
+) -> Result<super::extract::ResponseMap> {
+    config.validate()?;
+    let accumulator = super::fused::fused_voting_pass(
+        gradient,
+        &config.radii,
+        config.gradient_threshold,
+        config.polarity,
+        config.smoothing_factor,
+    )?;
+    Ok(super::extract::ResponseMap::new(
+        accumulator,
+        super::seed::ProposalSource::Rsd,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -434,5 +486,83 @@ mod tests {
         .sqrt();
         assert!(err_no < 5.0);
         assert!(err_th < 5.0);
+    }
+
+    // --- rsd_response_fused tests ---
+
+    #[test]
+    fn rsd_fused_detects_bright_disk() {
+        let size = 80;
+        let data = make_disk(size, 40.0, 40.0, 12.0);
+        let image = ImageView::from_slice(&data, size, size).unwrap();
+        let grad = sobel_gradient(&image).unwrap();
+
+        let config = RsdConfig {
+            radii: vec![11, 12, 13],
+            gradient_threshold: 1.0,
+            polarity: Polarity::Bright,
+            ..RsdConfig::default()
+        };
+
+        let response = rsd_response_fused(&grad, &config).unwrap();
+        let resp_data = response.response().data();
+        let (max_idx, _) = resp_data
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .unwrap();
+        let peak_x = max_idx % size;
+        let peak_y = max_idx / size;
+        let dx = peak_x as f32 - 40.0;
+        let dy = peak_y as f32 - 40.0;
+        assert!(
+            (dx * dx + dy * dy).sqrt() < 5.0,
+            "fused RSD peak at ({peak_x}, {peak_y}) too far from center (40, 40)"
+        );
+    }
+
+    #[test]
+    fn rsd_fused_dimensions_match() {
+        let data = vec![128u8; 40 * 30];
+        let image = ImageView::from_slice(&data, 40, 30).unwrap();
+        let grad = sobel_gradient(&image).unwrap();
+        let response = rsd_response_fused(&grad, &RsdConfig::default()).unwrap();
+        assert_eq!(response.response().width(), 40);
+        assert_eq!(response.response().height(), 30);
+    }
+
+    #[test]
+    fn rsd_fused_matches_rsd_peak_location() {
+        let size = 100;
+        let data = make_disk(size, 50.0, 50.0, 16.0);
+        let image = ImageView::from_slice(&data, size, size).unwrap();
+        let grad = sobel_gradient(&image).unwrap();
+
+        let config = RsdConfig {
+            radii: vec![14, 15, 16, 17, 18],
+            gradient_threshold: 1.0,
+            polarity: Polarity::Bright,
+            ..RsdConfig::default()
+        };
+
+        let rsd = rsd_response(&grad, &config).unwrap();
+        let fused = rsd_response_fused(&grad, &config).unwrap();
+
+        let find_peak = |data: &[f32], w: usize| -> (usize, usize) {
+            let (idx, _) = data
+                .iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+                .unwrap();
+            (idx % w, idx / w)
+        };
+
+        let (rx, ry) = find_peak(rsd.response().data(), size);
+        let (fx, fy) = find_peak(fused.response().data(), size);
+        let dist = ((rx as f32 - fx as f32).powi(2) + (ry as f32 - fy as f32).powi(2)).sqrt();
+        assert!(
+            dist < 3.0,
+            "peak locations differ by {dist}px: rsd=({rx},{ry}) fused=({fx},{fy})"
+        );
     }
 }

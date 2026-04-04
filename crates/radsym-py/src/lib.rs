@@ -129,6 +129,21 @@ fn rsd_response_py(
     Ok(PyResponseMap { inner: response })
 }
 
+/// Compute a fused multi-radius RSD response map in a single pixel pass.
+///
+/// Faster than ``rsd_response`` when testing many radii. Uses a single
+/// image pass and a single Gaussian blur.
+#[pyfunction]
+#[pyo3(name = "rsd_response_fused", signature = (gradient, config=None))]
+fn rsd_response_fused_py(
+    gradient: &PyGradientField,
+    config: Option<&PyRsdConfig>,
+) -> PyResult<PyResponseMap> {
+    let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
+    let response = radsym::rsd_response_fused(&gradient.inner, &cfg).map_err(to_pyerr)?;
+    Ok(PyResponseMap { inner: response })
+}
+
 /// Extract center proposals from a response map using non-maximum suppression.
 ///
 /// Args:
@@ -613,6 +628,7 @@ fn radsym_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(multiradius_response_py, m)?)?;
     m.add_function(wrap_pyfunction!(frst_response_homography_py, m)?)?;
     m.add_function(wrap_pyfunction!(rsd_response_py, m)?)?;
+    m.add_function(wrap_pyfunction!(rsd_response_fused_py, m)?)?;
     m.add_function(wrap_pyfunction!(extract_proposals_py, m)?)?;
     m.add_function(wrap_pyfunction!(extract_rectified_proposals_py, m)?)?;
     m.add_function(wrap_pyfunction!(rerank_proposals_homography_py, m)?)?;

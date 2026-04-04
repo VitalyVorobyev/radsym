@@ -98,7 +98,7 @@ pub use crate::propose::homography::{
     HomographyProposal, HomographyRerankConfig, RectifiedResponseMap, RerankedProposal,
 };
 pub use crate::propose::remap::{remap_proposal_to_image, remap_proposals_to_image};
-pub use crate::propose::rsd::{rsd_response, RsdConfig};
+pub use crate::propose::rsd::{rsd_response, rsd_response_fused, RsdConfig};
 pub use crate::propose::seed::{Proposal, ProposalSource, SeedPoint};
 
 // Support scoring

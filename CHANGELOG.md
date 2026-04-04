@@ -9,13 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `multiradius_response` — fused multi-radius magnitude-only voting that
+- `multiradius_response` — fused multi-radius magnitude-only FRST voting that
   processes all radii in a single pixel pass with one Gaussian blur, instead
-  of FRST's per-radius passes. Significantly faster when many radii are
-  tested (e.g. 1.5x on 256x192 with 5 radii; larger gains at higher
-  resolution). The `alpha` config field is ignored.
-- Criterion benchmarks comparing `multiradius_response` vs `frst_response`.
-- Python binding: `multiradius_response` exposed via `radsym-py`.
+  of FRST's per-radius passes. The `alpha` config field is ignored.
+- `rsd_response_fused` — same fused single-pass strategy for RSD. Shares the
+  voting kernel with `multiradius_response` via an internal helper.
+- Criterion benchmarks for both fused variants vs their per-radius originals.
+- Python bindings: `multiradius_response` and `rsd_response_fused` exposed
+  via `radsym-py`.
 
 ## [0.1.1] - 2026-04-03
 

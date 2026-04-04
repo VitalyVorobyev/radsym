@@ -268,18 +268,6 @@ pub fn frst_response(
     ))
 }
 
-/// Compute the median of a non-empty slice of radii.
-fn compute_median_radius(radii: &[u32]) -> Scalar {
-    let mut sorted = radii.to_vec();
-    sorted.sort_unstable();
-    let len = sorted.len();
-    if len % 2 == 1 {
-        sorted[len / 2] as Scalar
-    } else {
-        (sorted[len / 2 - 1] as Scalar + sorted[len / 2] as Scalar) * 0.5
-    }
-}
-
 /// Compute a fused multi-radius response map in a single pixel pass.
 ///
 /// Unlike [`frst_response`], which processes each radius independently
@@ -324,63 +312,13 @@ pub fn multiradius_response(
     config: &FrstConfig,
 ) -> Result<super::extract::ResponseMap> {
     config.validate()?;
-    let w = gradient.width();
-    let h = gradient.height();
-
-    let mut accumulator = OwnedImage::<Scalar>::zeros(w, h)?;
-    let acc_data = accumulator.data_mut();
-    let gx_data = gradient.gx.data();
-    let gy_data = gradient.gy.data();
-
-    let thresh_sq = config.gradient_threshold * config.gradient_threshold;
-    let vote_pos = config.polarity.votes_positive();
-    let vote_neg = config.polarity.votes_negative();
-
-    for y in 0..h {
-        for x in 0..w {
-            let idx = y * w + x;
-            let gx = gx_data[idx];
-            let gy = gy_data[idx];
-            let mag_sq = gx * gx + gy * gy;
-            if mag_sq < thresh_sq {
-                continue;
-            }
-
-            let mag = mag_sq.sqrt();
-            let inv_mag = mag.recip();
-            let dx = gx * inv_mag;
-            let dy = gy * inv_mag;
-
-            for &radius in &config.radii {
-                let n = radius as Scalar;
-                let offset_x = (dx * n).round() as isize;
-                let offset_y = (dy * n).round() as isize;
-
-                if vote_pos {
-                    let px = x as isize + offset_x;
-                    let py = y as isize + offset_y;
-                    if px >= 0 && (px as usize) < w && py >= 0 && (py as usize) < h {
-                        acc_data[py as usize * w + px as usize] += mag;
-                    }
-                }
-
-                if vote_neg {
-                    let px = x as isize - offset_x;
-                    let py = y as isize - offset_y;
-                    if px >= 0 && (px as usize) < w && py >= 0 && (py as usize) < h {
-                        acc_data[py as usize * w + px as usize] += mag;
-                    }
-                }
-            }
-        }
-    }
-
-    let median_radius = compute_median_radius(&config.radii);
-    let sigma = config.smoothing_factor * median_radius;
-    if sigma > 0.5 {
-        crate::core::blur::gaussian_blur_inplace(&mut accumulator, sigma);
-    }
-
+    let accumulator = super::fused::fused_voting_pass(
+        gradient,
+        &config.radii,
+        config.gradient_threshold,
+        config.polarity,
+        config.smoothing_factor,
+    )?;
     Ok(super::extract::ResponseMap::new(
         accumulator,
         super::seed::ProposalSource::Frst,
@@ -800,8 +738,7 @@ mod tests {
 
         let (fx, fy) = find_peak(frst.response().data(), size);
         let (mx, my) = find_peak(multi.response().data(), size);
-        let dist =
-            ((fx as f32 - mx as f32).powi(2) + (fy as f32 - my as f32).powi(2)).sqrt();
+        let dist = ((fx as f32 - mx as f32).powi(2) + (fy as f32 - my as f32).powi(2)).sqrt();
         assert!(
             dist < 3.0,
             "peak locations differ by {dist}px: frst=({fx},{fy}) multi=({mx},{my})"
@@ -810,14 +747,16 @@ mod tests {
 
     #[test]
     fn compute_median_radius_odd() {
-        assert_eq!(super::compute_median_radius(&[3, 7, 5]), 5.0);
-        assert_eq!(super::compute_median_radius(&[10]), 10.0);
-        assert_eq!(super::compute_median_radius(&[1, 2, 3, 4, 5]), 3.0);
+        use crate::propose::fused::compute_median_radius;
+        assert_eq!(compute_median_radius(&[3, 7, 5]), 5.0);
+        assert_eq!(compute_median_radius(&[10]), 10.0);
+        assert_eq!(compute_median_radius(&[1, 2, 3, 4, 5]), 3.0);
     }
 
     #[test]
     fn compute_median_radius_even() {
-        assert_eq!(super::compute_median_radius(&[4, 8]), 6.0);
-        assert_eq!(super::compute_median_radius(&[2, 4, 6, 8]), 5.0);
+        use crate::propose::fused::compute_median_radius;
+        assert_eq!(compute_median_radius(&[4, 8]), 6.0);
+        assert_eq!(compute_median_radius(&[2, 4, 6, 8]), 5.0);
     }
 }
