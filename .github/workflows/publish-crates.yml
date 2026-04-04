@@ -43,11 +43,22 @@ jobs:
           tag_version = tag[1:] if tag.startswith("v") else tag
           workspace_version = tomllib.loads((root / "Cargo.toml").read_text())["workspace"]["package"]["version"]
 
+          pyproject = tomllib.loads((root / "crates/radsym-py/pyproject.toml").read_text())
+          pyproject_version = pyproject.get("project", {}).get("version")
+
           print(f"tag version:       {tag_version}")
           print(f"workspace version: {workspace_version}")
+          print(f"pyproject version: {pyproject_version or '(dynamic)'}")
 
           if workspace_version != tag_version:
               raise SystemExit("version mismatch between tag and workspace Cargo.toml")
+
+          if pyproject_version is not None and pyproject_version != tag_version:
+              raise SystemExit(
+                  f"pyproject.toml has hardcoded version {pyproject_version!r} "
+                  f"instead of dynamic = ['version']. "
+                  f"Use dynamic = ['version'] in [project] to auto-sync from Cargo.toml."
+              )
           PY
 
       - name: Guard first release (manual publish required once)
