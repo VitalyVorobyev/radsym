@@ -1,8 +1,8 @@
 //! End-to-end pipeline integration tests.
 
 use radsym::{
-    detect_circles, CircleRefineConfig, DetectCirclesConfig, FrstConfig, ImageView, Polarity,
-    RadialCenterConfig,
+    CircleRefineConfig, DetectCirclesConfig, FrstConfig, ImageView, Polarity, RadialCenterConfig,
+    detect_circles,
 };
 
 /// Create a bright disk (white circle on black background).

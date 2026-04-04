@@ -169,7 +169,7 @@ mod tests {
     use super::*;
     use crate::core::gradient::sobel_gradient;
     use crate::core::image_view::ImageView;
-    use crate::core::nms::{non_maximum_suppression, NmsConfig};
+    use crate::core::nms::{NmsConfig, non_maximum_suppression};
 
     fn make_ellipse_image(size: usize, cx: f32, cy: f32, a: f32, b: f32, angle: f32) -> Vec<u8> {
         let cos_a = angle.cos();

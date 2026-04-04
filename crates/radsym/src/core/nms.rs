@@ -271,7 +271,7 @@ pub fn non_maximum_suppression(response: &ImageView<'_, Scalar>, config: &NmsCon
 mod tests {
     use super::*;
     use crate::core::image_view::OwnedImage;
-    use rand::{rngs::StdRng, RngExt, SeedableRng};
+    use rand::{RngExt, SeedableRng, rngs::StdRng};
 
     fn make_response_with_peaks(
         width: usize,
@@ -307,11 +307,11 @@ mod tests {
                         if nx == x && ny == y {
                             continue;
                         }
-                        if let Some(&neighbor) = response.get(nx, ny) {
-                            if neighbor >= val {
-                                is_max = false;
-                                break 'outer;
-                            }
+                        if let Some(&neighbor) = response.get(nx, ny)
+                            && neighbor >= val
+                        {
+                            is_max = false;
+                            break 'outer;
                         }
                     }
                 }

@@ -1,8 +1,8 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 
 use radsym::core::gradient::sobel_gradient;
 use radsym::core::image_view::OwnedImage;
-use radsym::propose::rsd::{rsd_response, rsd_response_fused, RsdConfig};
+use radsym::propose::rsd::{RsdConfig, rsd_response, rsd_response_fused};
 
 fn make_disk_image(size: usize) -> OwnedImage<u8> {
     let cx = size as f32 / 2.0;

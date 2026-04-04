@@ -1,12 +1,12 @@
 use std::hint::black_box;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use radsym::PyramidWorkspace;
 
 #[path = "../tests/support/surf_hole_synthetic.rs"]
 mod surf_hole_synthetic;
 
-use surf_hole_synthetic::{detect_case_image, render_case, CASES, DEFAULT_PYRAMID_LEVEL};
+use surf_hole_synthetic::{CASES, DEFAULT_PYRAMID_LEVEL, detect_case_image, render_case};
 
 fn bench_surf_hole(c: &mut Criterion) {
     let image = render_case(&CASES[0]);

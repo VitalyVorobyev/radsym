@@ -8,9 +8,9 @@
 use std::fs;
 
 use radsym::{
+    Circle, CircleRefineConfig, Colormap, FrstConfig, NmsConfig, Polarity, ScoringConfig,
     extract_proposals, frst_response, load_grayscale, refine_circle, response_heatmap,
-    save_diagnostic, score_circle_support, sobel_gradient, Circle, CircleRefineConfig, Colormap,
-    FrstConfig, NmsConfig, Polarity, ScoringConfig,
+    save_diagnostic, score_circle_support, sobel_gradient,
 };
 
 #[derive(serde::Deserialize)]

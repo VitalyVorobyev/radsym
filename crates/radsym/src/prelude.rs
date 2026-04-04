@@ -52,27 +52,27 @@ pub use crate::core::coords::PixelCoord;
 pub use crate::core::error::{RadSymError, Result};
 pub use crate::core::geometry::{Annulus, Circle, Ellipse};
 pub use crate::core::gradient::{
-    compute_gradient, scharr_gradient, sobel_gradient, GradientField, GradientOperator,
+    GradientField, GradientOperator, compute_gradient, scharr_gradient, sobel_gradient,
 };
 pub use crate::core::image_view::{ImageView, OwnedImage};
 pub use crate::core::nms::NmsConfig;
 pub use crate::core::polarity::Polarity;
 
 // Proposal generation
-pub use crate::propose::extract::{extract_proposals, ResponseMap};
-pub use crate::propose::frst::{frst_response, multiradius_response, FrstConfig};
-pub use crate::propose::rsd::{rsd_response, rsd_response_fused, RsdConfig};
+pub use crate::propose::extract::{ResponseMap, extract_proposals};
+pub use crate::propose::frst::{FrstConfig, frst_response, multiradius_response};
+pub use crate::propose::rsd::{RsdConfig, rsd_response, rsd_response_fused};
 pub use crate::propose::seed::Proposal;
 
 // Support scoring
 pub use crate::support::score::{
-    score_circle_support, score_ellipse_support, ScoringConfig, SupportScore,
+    ScoringConfig, SupportScore, score_circle_support, score_ellipse_support,
 };
 
 // Refinement
-pub use crate::refine::circle::{refine_circle, CircleRefineConfig};
-pub use crate::refine::ellipse::{refine_ellipse, EllipseRefineConfig};
+pub use crate::refine::circle::{CircleRefineConfig, refine_circle};
+pub use crate::refine::ellipse::{EllipseRefineConfig, refine_ellipse};
 pub use crate::refine::result::{RefinementResult, RefinementStatus};
 
 // Pipeline
-pub use crate::pipeline::{detect_circles, DetectCirclesConfig, Detection};
+pub use crate::pipeline::{DetectCirclesConfig, Detection, detect_circles};

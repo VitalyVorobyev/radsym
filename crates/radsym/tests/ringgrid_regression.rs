@@ -6,8 +6,8 @@ use radsym::core::gradient::sobel_gradient;
 use radsym::core::nms::NmsConfig;
 use radsym::propose::rsd::RsdConfig;
 use radsym::{
-    extract_proposals, refine_ellipse, rsd_response, suppress_proposals_by_distance, Ellipse,
-    EllipseRefineConfig, OwnedImage, PixelCoord, Polarity, Proposal,
+    Ellipse, EllipseRefineConfig, OwnedImage, PixelCoord, Polarity, Proposal, extract_proposals,
+    refine_ellipse, rsd_response, suppress_proposals_by_distance,
 };
 
 #[derive(serde::Deserialize)]

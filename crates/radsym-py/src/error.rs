@@ -1,5 +1,5 @@
-use pyo3::exceptions::{PyOSError, PyRuntimeError, PyValueError};
 use pyo3::PyErr;
+use pyo3::exceptions::{PyOSError, PyRuntimeError, PyValueError};
 use radsym::RadSymError;
 
 pub fn to_pyerr(e: RadSymError) -> PyErr {

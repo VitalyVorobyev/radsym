@@ -9,10 +9,10 @@ use crate::core::error::Result;
 use crate::core::geometry::Circle;
 use crate::core::gradient::GradientField;
 use crate::core::scalar::Scalar;
-use crate::support::annulus::{sample_annulus, AnnulusSamplingConfig};
+use crate::support::annulus::{AnnulusSamplingConfig, sample_annulus};
 
-use super::radial_center::radial_center_refine_from_gradient;
 use super::radial_center::RadialCenterConfig;
+use super::radial_center::radial_center_refine_from_gradient;
 use super::result::{RefinementResult, RefinementStatus};
 
 /// Configuration for iterative circle refinement.

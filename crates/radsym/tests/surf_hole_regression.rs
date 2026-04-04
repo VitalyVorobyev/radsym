@@ -4,7 +4,7 @@ mod surf_hole_synthetic;
 use radsym::Ellipse;
 
 use surf_hole_synthetic::{
-    detect_case_image, ellipse_iou, normalize_ellipse, render_case, CASES, DEFAULT_PYRAMID_LEVEL,
+    CASES, DEFAULT_PYRAMID_LEVEL, detect_case_image, ellipse_iou, normalize_ellipse, render_case,
 };
 
 #[test]

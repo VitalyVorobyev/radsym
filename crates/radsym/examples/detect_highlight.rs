@@ -9,8 +9,8 @@ use std::fs;
 
 use radsym::support::score::ScoringConfig;
 use radsym::{
-    extract_proposals, frst_response, load_grayscale, refine_ellipse, score_circle_support,
-    sobel_gradient, Circle, Ellipse, EllipseRefineConfig, FrstConfig, NmsConfig, Polarity,
+    Circle, Ellipse, EllipseRefineConfig, FrstConfig, NmsConfig, Polarity, extract_proposals,
+    frst_response, load_grayscale, refine_ellipse, score_circle_support, sobel_gradient,
 };
 
 #[derive(serde::Deserialize)]

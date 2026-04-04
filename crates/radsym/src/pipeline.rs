@@ -5,16 +5,16 @@
 
 use crate::core::error::Result;
 use crate::core::geometry::Circle;
-use crate::core::gradient::{compute_gradient, GradientOperator};
+use crate::core::gradient::{GradientOperator, compute_gradient};
 use crate::core::image_view::ImageView;
 use crate::core::nms::NmsConfig;
 use crate::core::polarity::Polarity;
 use crate::core::scalar::Scalar;
 use crate::propose::extract::extract_proposals;
-use crate::propose::frst::{frst_response, FrstConfig};
-use crate::refine::circle::{refine_circle, CircleRefineConfig};
+use crate::propose::frst::{FrstConfig, frst_response};
+use crate::refine::circle::{CircleRefineConfig, refine_circle};
 use crate::refine::result::RefinementStatus;
-use crate::support::score::{score_circle_support, ScoringConfig, SupportScore};
+use crate::support::score::{ScoringConfig, SupportScore, score_circle_support};
 
 /// Aggregated configuration for [`detect_circles`].
 #[derive(Debug, Clone)]
