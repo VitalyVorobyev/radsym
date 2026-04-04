@@ -97,6 +97,8 @@ impl GradientField {
 pub fn sobel_gradient(image: &ImageView<'_, u8>) -> Result<GradientField> {
     let w = image.width();
     let h = image.height();
+    let stride = image.stride();
+    let src = image.as_slice();
     let mut gx = OwnedImage::<Scalar>::zeros(w, h)?;
     let mut gy = OwnedImage::<Scalar>::zeros(w, h)?;
 
@@ -104,20 +106,21 @@ pub fn sobel_gradient(image: &ImageView<'_, u8>) -> Result<GradientField> {
     let gy_data = gy.data_mut();
 
     for y in 1..h - 1 {
+        let row_prev = (y - 1) * stride;
+        let row_curr = y * stride;
+        let row_next = (y + 1) * stride;
         for x in 1..w - 1 {
-            // Sobel 3x3 kernel
-            let p00 = image.get(x - 1, y - 1).copied().unwrap_or(0) as Scalar;
-            let p10 = image.get(x, y - 1).copied().unwrap_or(0) as Scalar;
-            let p20 = image.get(x + 1, y - 1).copied().unwrap_or(0) as Scalar;
-            let p01 = image.get(x - 1, y).copied().unwrap_or(0) as Scalar;
-            let p21 = image.get(x + 1, y).copied().unwrap_or(0) as Scalar;
-            let p02 = image.get(x - 1, y + 1).copied().unwrap_or(0) as Scalar;
-            let p12 = image.get(x, y + 1).copied().unwrap_or(0) as Scalar;
-            let p22 = image.get(x + 1, y + 1).copied().unwrap_or(0) as Scalar;
+            // Direct slice access — loop bounds guarantee all neighbors are in-bounds.
+            let p00 = src[row_prev + x - 1] as Scalar;
+            let p10 = src[row_prev + x] as Scalar;
+            let p20 = src[row_prev + x + 1] as Scalar;
+            let p01 = src[row_curr + x - 1] as Scalar;
+            let p21 = src[row_curr + x + 1] as Scalar;
+            let p02 = src[row_next + x - 1] as Scalar;
+            let p12 = src[row_next + x] as Scalar;
+            let p22 = src[row_next + x + 1] as Scalar;
 
-            // Sobel X: [-1 0 1; -2 0 2; -1 0 1] / 8
             let dx = (-p00 + p20 - 2.0 * p01 + 2.0 * p21 - p02 + p22) / 8.0;
-            // Sobel Y: [-1 -2 -1; 0 0 0; 1 2 1] / 8
             let dy = (-p00 - 2.0 * p10 - p20 + p02 + 2.0 * p12 + p22) / 8.0;
 
             let idx = y * w + x;
@@ -133,6 +136,8 @@ pub fn sobel_gradient(image: &ImageView<'_, u8>) -> Result<GradientField> {
 pub fn sobel_gradient_f32(image: &ImageView<'_, f32>) -> Result<GradientField> {
     let w = image.width();
     let h = image.height();
+    let stride = image.stride();
+    let src = image.as_slice();
     let mut gx = OwnedImage::<Scalar>::zeros(w, h)?;
     let mut gy = OwnedImage::<Scalar>::zeros(w, h)?;
 
@@ -140,15 +145,18 @@ pub fn sobel_gradient_f32(image: &ImageView<'_, f32>) -> Result<GradientField> {
     let gy_data = gy.data_mut();
 
     for y in 1..h - 1 {
+        let row_prev = (y - 1) * stride;
+        let row_curr = y * stride;
+        let row_next = (y + 1) * stride;
         for x in 1..w - 1 {
-            let p00 = *image.get(x - 1, y - 1).unwrap_or(&0.0);
-            let p10 = *image.get(x, y - 1).unwrap_or(&0.0);
-            let p20 = *image.get(x + 1, y - 1).unwrap_or(&0.0);
-            let p01 = *image.get(x - 1, y).unwrap_or(&0.0);
-            let p21 = *image.get(x + 1, y).unwrap_or(&0.0);
-            let p02 = *image.get(x - 1, y + 1).unwrap_or(&0.0);
-            let p12 = *image.get(x, y + 1).unwrap_or(&0.0);
-            let p22 = *image.get(x + 1, y + 1).unwrap_or(&0.0);
+            let p00 = src[row_prev + x - 1];
+            let p10 = src[row_prev + x];
+            let p20 = src[row_prev + x + 1];
+            let p01 = src[row_curr + x - 1];
+            let p21 = src[row_curr + x + 1];
+            let p02 = src[row_next + x - 1];
+            let p12 = src[row_next + x];
+            let p22 = src[row_next + x + 1];
 
             let dx = (-p00 + p20 - 2.0 * p01 + 2.0 * p21 - p02 + p22) / 8.0;
             let dy = (-p00 - 2.0 * p10 - p20 + p02 + 2.0 * p12 + p22) / 8.0;
@@ -222,6 +230,8 @@ pub enum GradientOperator {
 pub fn scharr_gradient(image: &ImageView<'_, u8>) -> Result<GradientField> {
     let w = image.width();
     let h = image.height();
+    let stride = image.stride();
+    let src = image.as_slice();
     let mut gx = OwnedImage::<Scalar>::zeros(w, h)?;
     let mut gy = OwnedImage::<Scalar>::zeros(w, h)?;
 
@@ -229,20 +239,21 @@ pub fn scharr_gradient(image: &ImageView<'_, u8>) -> Result<GradientField> {
     let gy_data = gy.data_mut();
 
     for y in 1..h - 1 {
+        let row_prev = (y - 1) * stride;
+        let row_curr = y * stride;
+        let row_next = (y + 1) * stride;
         for x in 1..w - 1 {
-            let p00 = image.get(x - 1, y - 1).copied().unwrap_or(0) as Scalar;
-            let p10 = image.get(x, y - 1).copied().unwrap_or(0) as Scalar;
-            let p20 = image.get(x + 1, y - 1).copied().unwrap_or(0) as Scalar;
-            let p01 = image.get(x - 1, y).copied().unwrap_or(0) as Scalar;
-            let p21 = image.get(x + 1, y).copied().unwrap_or(0) as Scalar;
-            let p02 = image.get(x - 1, y + 1).copied().unwrap_or(0) as Scalar;
-            let p12 = image.get(x, y + 1).copied().unwrap_or(0) as Scalar;
-            let p22 = image.get(x + 1, y + 1).copied().unwrap_or(0) as Scalar;
+            let p00 = src[row_prev + x - 1] as Scalar;
+            let p10 = src[row_prev + x] as Scalar;
+            let p20 = src[row_prev + x + 1] as Scalar;
+            let p01 = src[row_curr + x - 1] as Scalar;
+            let p21 = src[row_curr + x + 1] as Scalar;
+            let p02 = src[row_next + x - 1] as Scalar;
+            let p12 = src[row_next + x] as Scalar;
+            let p22 = src[row_next + x + 1] as Scalar;
 
-            // Scharr X: [-3 0 3; -10 0 10; -3 0 3] / 32
             let dx =
                 (-3.0 * p00 + 3.0 * p20 - 10.0 * p01 + 10.0 * p21 - 3.0 * p02 + 3.0 * p22) / 32.0;
-            // Scharr Y: [-3 -10 -3; 0 0 0; 3 10 3] / 32
             let dy =
                 (-3.0 * p00 - 10.0 * p10 - 3.0 * p20 + 3.0 * p02 + 10.0 * p12 + 3.0 * p22) / 32.0;
 
@@ -259,6 +270,8 @@ pub fn scharr_gradient(image: &ImageView<'_, u8>) -> Result<GradientField> {
 pub fn scharr_gradient_f32(image: &ImageView<'_, f32>) -> Result<GradientField> {
     let w = image.width();
     let h = image.height();
+    let stride = image.stride();
+    let src = image.as_slice();
     let mut gx = OwnedImage::<Scalar>::zeros(w, h)?;
     let mut gy = OwnedImage::<Scalar>::zeros(w, h)?;
 
@@ -266,15 +279,18 @@ pub fn scharr_gradient_f32(image: &ImageView<'_, f32>) -> Result<GradientField> 
     let gy_data = gy.data_mut();
 
     for y in 1..h - 1 {
+        let row_prev = (y - 1) * stride;
+        let row_curr = y * stride;
+        let row_next = (y + 1) * stride;
         for x in 1..w - 1 {
-            let p00 = *image.get(x - 1, y - 1).unwrap_or(&0.0);
-            let p10 = *image.get(x, y - 1).unwrap_or(&0.0);
-            let p20 = *image.get(x + 1, y - 1).unwrap_or(&0.0);
-            let p01 = *image.get(x - 1, y).unwrap_or(&0.0);
-            let p21 = *image.get(x + 1, y).unwrap_or(&0.0);
-            let p02 = *image.get(x - 1, y + 1).unwrap_or(&0.0);
-            let p12 = *image.get(x, y + 1).unwrap_or(&0.0);
-            let p22 = *image.get(x + 1, y + 1).unwrap_or(&0.0);
+            let p00 = src[row_prev + x - 1];
+            let p10 = src[row_prev + x];
+            let p20 = src[row_prev + x + 1];
+            let p01 = src[row_curr + x - 1];
+            let p21 = src[row_curr + x + 1];
+            let p02 = src[row_next + x - 1];
+            let p12 = src[row_next + x];
+            let p22 = src[row_next + x + 1];
 
             let dx =
                 (-3.0 * p00 + 3.0 * p20 - 10.0 * p01 + 10.0 * p21 - 3.0 * p02 + 3.0 * p22) / 32.0;
