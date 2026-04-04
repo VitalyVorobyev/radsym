@@ -155,7 +155,11 @@ pub fn affine_frst_responses(
     }
 
     // Sort by descending peak value
-    responses.sort_by(|a, b| b.peak_value.partial_cmp(&a.peak_value).unwrap());
+    responses.sort_by(|a, b| {
+        b.peak_value
+            .partial_cmp(&a.peak_value)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     Ok(responses)
 }

@@ -35,6 +35,24 @@ fn sobel_gradient_py(image: PyReadonlyArray2<u8>) -> PyResult<PyGradientField> {
     Ok(PyGradientField { inner: grad })
 }
 
+/// Compute Scharr gradient from a grayscale image.
+///
+/// The Scharr operator provides better rotational isotropy than Sobel,
+/// which can improve detection quality for circular structures.
+///
+/// Args:
+///     image: 2D numpy array (uint8, H x W) representing a grayscale image.
+///
+/// Returns:
+///     GradientField: opaque gradient object used by all downstream functions.
+#[pyfunction]
+#[pyo3(name = "scharr_gradient")]
+fn scharr_gradient_py(image: PyReadonlyArray2<u8>) -> PyResult<PyGradientField> {
+    let owned = numpy_to_owned_u8(&image)?;
+    let grad = radsym::scharr_gradient(&owned.view()).map_err(to_pyerr)?;
+    Ok(PyGradientField { inner: grad })
+}
+
 /// Extract a one-shot pyramid level from a grayscale image.
 ///
 /// Args:
@@ -79,6 +97,21 @@ fn frst_response_py(
     Ok(PyResponseMap { inner: response })
 }
 
+/// Compute a fused multi-radius magnitude-only response map.
+///
+/// Faster than ``frst_response`` when testing many radii. Uses a single
+/// image pass and a single blur. The ``alpha`` config field is ignored.
+#[pyfunction]
+#[pyo3(name = "multiradius_response", signature = (gradient, config=None))]
+fn multiradius_response_py(
+    gradient: &PyGradientField,
+    config: Option<&PyFrstConfig>,
+) -> PyResult<PyResponseMap> {
+    let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
+    let response = radsym::multiradius_response(&gradient.inner, &cfg).map_err(to_pyerr)?;
+    Ok(PyResponseMap { inner: response })
+}
+
 /// Compute homography-aware FRST on a rectified grid.
 #[pyfunction]
 #[pyo3(name = "frst_response_homography", signature = (gradient, homography, grid, config=None))]
@@ -111,6 +144,21 @@ fn rsd_response_py(
 ) -> PyResult<PyResponseMap> {
     let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
     let response = radsym::rsd_response(&gradient.inner, &cfg).map_err(to_pyerr)?;
+    Ok(PyResponseMap { inner: response })
+}
+
+/// Compute a fused multi-radius RSD response map in a single pixel pass.
+///
+/// Faster than ``rsd_response`` when testing many radii. Uses a single
+/// image pass and a single Gaussian blur.
+#[pyfunction]
+#[pyo3(name = "rsd_response_fused", signature = (gradient, config=None))]
+fn rsd_response_fused_py(
+    gradient: &PyGradientField,
+    config: Option<&PyRsdConfig>,
+) -> PyResult<PyResponseMap> {
+    let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
+    let response = radsym::rsd_response_fused(&gradient.inner, &cfg).map_err(to_pyerr)?;
     Ok(PyResponseMap { inner: response })
 }
 
@@ -593,10 +641,13 @@ fn radsym_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Functions — exposed without _py suffix via #[pyo3(name = "...")]
     m.add_function(wrap_pyfunction!(sobel_gradient_py, m)?)?;
+    m.add_function(wrap_pyfunction!(scharr_gradient_py, m)?)?;
     m.add_function(wrap_pyfunction!(pyramid_level_image_py, m)?)?;
     m.add_function(wrap_pyfunction!(frst_response_py, m)?)?;
+    m.add_function(wrap_pyfunction!(multiradius_response_py, m)?)?;
     m.add_function(wrap_pyfunction!(frst_response_homography_py, m)?)?;
     m.add_function(wrap_pyfunction!(rsd_response_py, m)?)?;
+    m.add_function(wrap_pyfunction!(rsd_response_fused_py, m)?)?;
     m.add_function(wrap_pyfunction!(extract_proposals_py, m)?)?;
     m.add_function(wrap_pyfunction!(extract_rectified_proposals_py, m)?)?;
     m.add_function(wrap_pyfunction!(rerank_proposals_homography_py, m)?)?;

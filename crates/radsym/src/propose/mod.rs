@@ -17,6 +17,7 @@
 
 pub mod extract;
 pub mod frst;
+pub(crate) mod fused;
 pub mod homography;
 pub mod remap;
 pub mod rsd;

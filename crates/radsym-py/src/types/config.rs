@@ -489,7 +489,8 @@ impl PyDetectCirclesConfig {
         refinement=None,
         polarity="both",
         radius_hint=10.0,
-        min_score=0.0
+        min_score=0.0,
+        gradient_operator="sobel"
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -500,6 +501,7 @@ impl PyDetectCirclesConfig {
         polarity: &str,
         radius_hint: f32,
         min_score: f32,
+        gradient_operator: &str,
     ) -> PyResult<Self> {
         let defaults = radsym::DetectCirclesConfig::default();
         Ok(Self {
@@ -513,6 +515,7 @@ impl PyDetectCirclesConfig {
                 polarity: polarity_from_str(polarity)?,
                 radius_hint,
                 min_score,
+                gradient_operator: gradient_operator_from_str(gradient_operator)?,
             },
         })
     }
@@ -539,4 +542,4 @@ impl PyDetectCirclesConfig {
 
 use pyo3::prelude::*;
 
-use crate::convert::{polarity_from_str, polarity_to_str};
+use crate::convert::{gradient_operator_from_str, polarity_from_str, polarity_to_str};

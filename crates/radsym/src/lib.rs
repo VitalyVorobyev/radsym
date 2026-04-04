@@ -79,7 +79,10 @@ pub use crate::core::circle_fit::{fit_circle, fit_circle_weighted};
 pub use crate::core::coords::PixelCoord;
 pub use crate::core::error::{RadSymError, Result};
 pub use crate::core::geometry::{Annulus, Circle, Ellipse};
-pub use crate::core::gradient::{sobel_gradient, sobel_gradient_f32, GradientField};
+pub use crate::core::gradient::{
+    compute_gradient, compute_gradient_f32, scharr_gradient, scharr_gradient_f32, sobel_gradient,
+    sobel_gradient_f32, GradientField, GradientOperator,
+};
 pub use crate::core::homography::{rectified_circle_to_image_ellipse, Homography, RectifiedGrid};
 pub use crate::core::image_view::{ImageView, OwnedImage};
 pub use crate::core::nms::NmsConfig;
@@ -90,13 +93,15 @@ pub use crate::core::pyramid::{
 
 // Proposal generation
 pub use crate::propose::extract::{extract_proposals, suppress_proposals_by_distance, ResponseMap};
-pub use crate::propose::frst::{frst_response, frst_response_single, FrstConfig};
+pub use crate::propose::frst::{
+    frst_response, frst_response_single, multiradius_response, FrstConfig,
+};
 pub use crate::propose::homography::{
     extract_rectified_proposals, frst_response_homography, rerank_proposals_homography,
     HomographyProposal, HomographyRerankConfig, RectifiedResponseMap, RerankedProposal,
 };
 pub use crate::propose::remap::{remap_proposal_to_image, remap_proposals_to_image};
-pub use crate::propose::rsd::{rsd_response, RsdConfig};
+pub use crate::propose::rsd::{rsd_response, rsd_response_fused, RsdConfig};
 pub use crate::propose::seed::{Proposal, ProposalSource, SeedPoint};
 
 // Support scoring

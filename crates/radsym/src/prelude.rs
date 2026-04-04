@@ -51,15 +51,17 @@
 pub use crate::core::coords::PixelCoord;
 pub use crate::core::error::{RadSymError, Result};
 pub use crate::core::geometry::{Annulus, Circle, Ellipse};
-pub use crate::core::gradient::{sobel_gradient, GradientField};
+pub use crate::core::gradient::{
+    compute_gradient, scharr_gradient, sobel_gradient, GradientField, GradientOperator,
+};
 pub use crate::core::image_view::{ImageView, OwnedImage};
 pub use crate::core::nms::NmsConfig;
 pub use crate::core::polarity::Polarity;
 
 // Proposal generation
 pub use crate::propose::extract::{extract_proposals, ResponseMap};
-pub use crate::propose::frst::{frst_response, FrstConfig};
-pub use crate::propose::rsd::{rsd_response, RsdConfig};
+pub use crate::propose::frst::{frst_response, multiradius_response, FrstConfig};
+pub use crate::propose::rsd::{rsd_response, rsd_response_fused, RsdConfig};
 pub use crate::propose::seed::Proposal;
 
 // Support scoring

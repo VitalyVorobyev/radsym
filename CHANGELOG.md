@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `scharr_gradient` — Scharr 3×3 gradient operator for `u8` images, providing
+  better rotational isotropy than Sobel for circular structure detection.
+- `scharr_gradient_f32` — Scharr operator variant accepting `f32` images.
+- `GradientOperator` — enum (`Sobel` | `Scharr`) for runtime operator selection;
+  derives `serde` under the `serde` feature flag.
+- `compute_gradient` — dispatcher that routes a `u8` image to `sobel_gradient`
+  or `scharr_gradient` based on `GradientOperator`.
+- `compute_gradient_f32` — same dispatcher for `f32` images.
+- `gradient_operator` field on `DetectCirclesConfig` (default: `GradientOperator::Sobel`)
+  so users can switch the pipeline gradient operator without touching internal code.
+
+## [0.1.2] - 2026-04-04
+
+### Added
+
+- `multiradius_response` — fused multi-radius magnitude-only FRST voting that
+  processes all radii in a single pixel pass with one Gaussian blur, instead
+  of FRST's per-radius passes. The `alpha` config field is ignored.
+- `rsd_response_fused` — same fused single-pass strategy for RSD. Shares the
+  voting kernel with `multiradius_response` via an internal helper.
+- Criterion benchmarks for both fused variants vs their per-radius originals.
+- Python bindings: `multiradius_response` and `rsd_response_fused` exposed
+  via `radsym-py`.
+
 ## [0.1.1] - 2026-04-03
 
 ### Added
@@ -59,5 +87,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Zero unsafe code; zero clippy warnings; 138 unit and integration tests.
 - mdBook documentation with full mathematical derivations.
 
+[0.1.2]: https://github.com/VitalyVorobyev/radsym/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/VitalyVorobyev/radsym/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/VitalyVorobyev/radsym/releases/tag/v0.1.0
