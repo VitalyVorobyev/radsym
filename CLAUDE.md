@@ -12,14 +12,16 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings  # lint
 cargo test --workspace --all-features                              # test (all)
 cargo test --workspace --no-default-features                       # test (minimal)
 cargo bench                                                        # benchmarks
+wasm-pack build crates/radsym-wasm --target web                    # WASM build
 ```
 
 ## Architecture
 
-Workspace with two crates:
+Workspace with three crates:
 
-- `crates/radsym/`    — core Rust library
-- `crates/radsym-py/` — Python bindings via PyO3
+- `crates/radsym/`      — core Rust library
+- `crates/radsym-py/`   — Python bindings via PyO3
+- `crates/radsym-wasm/` — WebAssembly bindings via wasm-bindgen (npm: `radsym`)
 
 ### radsym modules
 

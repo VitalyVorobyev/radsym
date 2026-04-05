@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/radsym",
     "crates/radsym-py",
+    "crates/radsym-wasm",
 ]
 
 [profile.release]
