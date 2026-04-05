@@ -21,7 +21,7 @@ Workspace with three crates:
 
 - `crates/radsym/`      — core Rust library
 - `crates/radsym-py/`   — Python bindings via PyO3
-- `crates/radsym-wasm/` — WebAssembly bindings via wasm-bindgen (npm: `radsym`)
+- `crates/radsym-wasm/` — WebAssembly bindings via wasm-bindgen (npm: `@vitavision/radsym`)
 
 ### radsym modules
 

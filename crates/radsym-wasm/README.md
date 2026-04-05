@@ -22,7 +22,7 @@ npm install ./crates/radsym-wasm/pkg
 Or from npm (when published):
 
 ```bash
-npm install radsym
+npm install @vitavision/radsym
 ```
 
 ## Usage
@@ -30,7 +30,7 @@ npm install radsym
 ### Initialization
 
 ```js
-import init, { RadSymProcessor } from 'radsym';
+import init, { RadSymProcessor } from '@vitavision/radsym';
 
 await init();
 const processor = new RadSymProcessor();
