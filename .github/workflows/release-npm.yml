@@ -3,7 +3,7 @@ name: Release to npm (WASM)
 on:
   push:
     tags:
-      - "wasm-v*"
+      - "v*"
 
 jobs:
   publish-wasm:
@@ -18,6 +18,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -51,13 +53,12 @@ jobs:
         run: cp crates/radsym-wasm/README.md crates/radsym-wasm/pkg/README.md
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
 
-      - name: Publish to npm with provenance
+      - name: Publish to npm via trusted publishing
         working-directory: crates/radsym-wasm/pkg
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --provenance
+        run: npm publish --access public
