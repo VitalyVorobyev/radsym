@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>radsym -- Radial Symmetry Detection</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "SF Mono", "Menlo", "Consolas", monospace; background: #f8f8f8; color: #222; padding: 1.5em; }
+    h1 { font-size: 1.3em; margin-bottom: 0.8em; }
+    h2 { font-size: 0.95em; margin-bottom: 0.4em; color: #555; }
+
+    .layout { display: flex; gap: 1.5em; }
+    .sidebar { width: 260px; flex-shrink: 0; }
+    .main { flex: 1; min-width: 0; }
+
+    .panel { background: #fff; border: 1px solid #ddd; padding: 1em; margin-bottom: 1em; border-radius: 4px; }
+    label { display: block; font-size: 0.8em; margin-top: 0.6em; color: #444; }
+    label:first-child { margin-top: 0; }
+    input[type="text"], input[type="number"], select {
+      width: 100%; padding: 4px 6px; font-family: inherit; font-size: 0.85em;
+      border: 1px solid #ccc; border-radius: 3px; margin-top: 2px;
+    }
+
+    .btn-row { display: flex; gap: 0.5em; margin-top: 1em; }
+    button {
+      padding: 6px 14px; font-family: inherit; font-size: 0.85em;
+      border: 1px solid #888; border-radius: 3px; cursor: pointer; background: #fff;
+    }
+    button:hover { background: #eee; }
+    button.primary { background: #2a6; color: #fff; border-color: #2a6; }
+    button.primary:hover { background: #196; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; }
+    .cell { background: #fff; border: 1px solid #ddd; padding: 0.6em; border-radius: 4px; }
+    .cell h2 { margin-bottom: 0.3em; }
+    .cell canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+
+    #timing { font-size: 0.8em; color: #666; margin-top: 0.8em; line-height: 1.6; }
+    #status { font-size: 0.8em; color: #888; margin-top: 0.5em; }
+
+    input[type="file"] { font-size: 0.8em; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h1>radsym -- Radial Symmetry Detection</h1>
+
+  <div class="layout">
+    <div class="sidebar">
+      <div class="panel">
+        <h2>Image</h2>
+        <label>Source
+          <input type="file" id="fileInput" accept="image/*">
+        </label>
+        <div id="status">Loading ringgrid.png...</div>
+      </div>
+
+      <div class="panel">
+        <h2>FRST Config</h2>
+        <label>Radii (comma-sep)
+          <input type="text" id="radii" value="9,11,13,15,17">
+        </label>
+        <label>Alpha
+          <input type="number" id="alpha" value="2.0" step="0.1" min="0.1">
+        </label>
+        <label>Gradient threshold
+          <input type="number" id="gradThreshold" value="0" step="0.5" min="0">
+        </label>
+        <label>Smoothing factor
+          <input type="number" id="smoothing" value="0.5" step="0.1" min="0">
+        </label>
+      </div>
+
+      <div class="panel">
+        <h2>Detection Config</h2>
+        <label>Polarity
+          <select id="polarity">
+            <option value="dark">dark</option>
+            <option value="bright">bright</option>
+            <option value="both" selected>both</option>
+          </select>
+        </label>
+        <label>Gradient operator
+          <select id="gradOp">
+            <option value="sobel" selected>sobel</option>
+            <option value="scharr">scharr</option>
+          </select>
+        </label>
+        <label>Radius hint
+          <input type="number" id="radiusHint" value="13" step="1" min="1">
+        </label>
+        <label>Min score
+          <input type="number" id="minScore" value="0" step="0.01" min="0">
+        </label>
+      </div>
+
+      <div class="panel">
+        <h2>NMS Config</h2>
+        <label>NMS radius (px)
+          <input type="number" id="nmsRadius" value="5" step="1" min="1">
+        </label>
+        <label>NMS threshold
+          <input type="number" id="nmsThreshold" value="0" step="0.01" min="0">
+        </label>
+        <label>Max detections
+          <input type="number" id="maxDetections" value="200" step="10" min="1">
+        </label>
+      </div>
+
+      <div class="panel">
+        <h2>Visualization</h2>
+        <label>Colormap
+          <select id="colormap">
+            <option value="hot" selected>hot</option>
+            <option value="jet">jet</option>
+            <option value="magma">magma</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="btn-row">
+        <button id="runBtn" class="primary" disabled>Run</button>
+      </div>
+      <div id="timing"></div>
+    </div>
+
+    <div class="main">
+      <div class="grid">
+        <div class="cell">
+          <h2>Original</h2>
+          <canvas id="cvOriginal"></canvas>
+        </div>
+        <div class="cell">
+          <h2>FRST Heatmap</h2>
+          <canvas id="cvHeatmap"></canvas>
+        </div>
+        <div class="cell">
+          <h2>Gradient Magnitude</h2>
+          <canvas id="cvGradient"></canvas>
+        </div>
+        <div class="cell">
+          <h2>Detected Circles</h2>
+          <canvas id="cvCircles"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

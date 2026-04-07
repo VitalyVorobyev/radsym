@@ -34,7 +34,7 @@ jobs:
         shell: bash
         run: |
           TAG="${GITHUB_REF_NAME}"
-          VER="${TAG#wasm-v}"
+          VER="${TAG#v}"
           WASM_VER="$(cargo metadata --format-version 1 --no-deps \
             | jq -r '.packages[] | select(.name=="radsym-wasm") | .version')"
           echo "tag version:  $VER"

@@ -113,6 +113,51 @@ All `DetectCirclesConfig` fields are exposed as flat setters:
 | `response_heatmap` | `Uint8Array` | 4 | R, G, B, A |
 | `gradient_field` | `Float32Array` | 2 | gx, gy |
 
+## Interactive demo
+
+An interactive browser demo is included in the `demo/` directory at the
+repository root. It loads a test image (or your own), lets you adjust all
+detection parameters, and renders four output panels: original image, FRST
+heatmap, gradient magnitude, and detected circles overlay.
+
+### Prerequisites
+
+- Rust toolchain with the `wasm32-unknown-unknown` target
+- [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/)
+
+### Build and run
+
+```bash
+# 1. Build the WASM package
+wasm-pack build crates/radsym-wasm --target web --release
+
+# 2. Serve from the repository root
+python3 -m http.server 8080
+
+# 3. Open in your browser
+open http://localhost:8080/demo/
+```
+
+The demo loads `testdata/ringgrid.png` by default. Use the file picker to try
+your own images.
+
+## Testing
+
+Run the WASM test suite in Safari (macOS):
+
+```bash
+# One-time setup
+sudo safaridriver --enable
+
+# Run tests (--release required for Safari's 10 MB WebDriver response limit)
+wasm-pack test --safari --headless --release crates/radsym-wasm
+```
+
+The test suite includes 15 tests: basic functionality, error handling, and
+WASM-vs-native output comparison on a synthetic ring grid image. The comparison
+tests verify bitwise equality between the WASM `RadSymProcessor` API and direct
+native `radsym` function calls.
+
 ## Cleanup
 
 Call `processor.free()` when done to release WASM memory.

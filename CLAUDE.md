@@ -13,6 +13,7 @@ cargo test --workspace --all-features                              # test (all)
 cargo test --workspace --no-default-features                       # test (minimal)
 cargo bench                                                        # benchmarks
 wasm-pack build crates/radsym-wasm --target web                    # WASM build
+wasm-pack test --safari --headless --release crates/radsym-wasm    # WASM tests (Safari)
 ```
 
 ## Architecture
@@ -86,6 +87,16 @@ rightward, y increases downward. `PixelCoord = nalgebra::Point2<f32>`.
 - Synthetic test generators for circles, rings, ellipses
 - Property tests: deterministic ordering, translation sanity
 - Benchmark with criterion before optimizing hot paths
+
+## Working Principles
+
+- **Every conclusion must be backed by reproducible proof.** Do not claim
+  something works, is correct, or is equivalent without a passing test, a
+  concrete benchmark result, or a verifiable code trace. "It should work" is
+  not acceptable — run the test, show the output.
+- **When in doubt, stop and ask.** If a requirement is ambiguous, a design
+  trade-off is unclear, or you are unsure whether a change is safe, ask the
+  user before proceeding. Do not guess or assume intent.
 
 ## Algorithm Families
 
