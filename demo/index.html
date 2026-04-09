@@ -5,13 +5,14 @@
   <title>radsym -- Radial Symmetry Detection</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "SF Mono", "Menlo", "Consolas", monospace; background: #f8f8f8; color: #222; padding: 1.5em; }
-    h1 { font-size: 1.3em; margin-bottom: 0.8em; }
+    html, body { height: 100%; }
+    body { font-family: "SF Mono", "Menlo", "Consolas", monospace; background: #f8f8f8; color: #222; padding: 1.5em; display: flex; flex-direction: column; }
+    h1 { font-size: 1.3em; margin-bottom: 0.8em; flex-shrink: 0; }
     h2 { font-size: 0.95em; margin-bottom: 0.4em; color: #555; }
 
-    .layout { display: flex; gap: 1.5em; }
-    .sidebar { width: 280px; flex-shrink: 0; }
-    .main { flex: 1; min-width: 0; }
+    .layout { display: flex; gap: 1.5em; flex: 1; min-height: 0; }
+    .sidebar { width: 280px; flex-shrink: 0; overflow-y: auto; }
+    .main { flex: 1; min-width: 0; overflow-y: auto; }
 
     .panel { background: #fff; border: 1px solid #ddd; padding: 1em; margin-bottom: 1em; border-radius: 4px; }
     label { display: block; font-size: 0.8em; margin-top: 0.6em; color: #444; }
@@ -29,7 +30,7 @@
     details.panel[open] > summary::before { transform: rotate(90deg); }
     details.panel > summary h2 { display: inline; }
 
-    .btn-row { display: flex; gap: 0.5em; margin-top: 1em; }
+    .btn-row { display: flex; gap: 0.5em; margin-bottom: 1em; }
     button {
       padding: 6px 14px; font-family: inherit; font-size: 0.85em;
       border: 1px solid #888; border-radius: 3px; cursor: pointer; background: #fff;
@@ -57,12 +58,17 @@
 
   <div class="layout">
     <div class="sidebar">
+      <div class="btn-row">
+        <button id="runBtn" class="primary" disabled>Run</button>
+        <span id="status" style="font-size:0.8em; color:#888; align-self:center;">Loading ringgrid.png...</span>
+      </div>
+      <div id="timing"></div>
+
       <div class="panel">
         <h2>Image</h2>
         <label>Source
           <input type="file" id="fileInput" accept="image/*">
         </label>
-        <div id="status">Loading ringgrid.png...</div>
       </div>
 
       <div class="panel">
@@ -182,11 +188,6 @@
         <label class="inline"><input type="checkbox" id="showStatus"> Status icons</label>
         <label class="inline"><input type="checkbox" id="showLegend" checked> Legend</label>
       </div>
-
-      <div class="btn-row">
-        <button id="runBtn" class="primary" disabled>Run</button>
-      </div>
-      <div id="timing"></div>
     </div>
 
     <div class="main">
@@ -198,6 +199,10 @@
         <div class="cell">
           <h2 id="heatmapTitle">Response Heatmap</h2>
           <canvas id="cvHeatmap"></canvas>
+        </div>
+        <div class="cell">
+          <h2>Gradient Magnitude</h2>
+          <canvas id="cvGradient"></canvas>
         </div>
         <div class="cell">
           <h2>Seed Proposals</h2>

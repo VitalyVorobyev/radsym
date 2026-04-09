@@ -8,6 +8,7 @@ const $ = id => document.getElementById(id);
 
 const cvOriginal   = $('cvOriginal');
 const cvHeatmap    = $('cvHeatmap');
+const cvGradient   = $('cvGradient');
 const cvProposals  = $('cvProposals');
 const cvCircles    = $('cvCircles');
 const runBtn       = $('runBtn');
@@ -114,6 +115,34 @@ function parseProposals(flat) {
     props.push({ x: flat[b], y: flat[b + 1], score: flat[b + 2] });
   }
   return props;
+}
+
+// ---------------------------------------------------------------------------
+// Visualization: gradient magnitude
+// ---------------------------------------------------------------------------
+
+function renderGradientMagnitude(gradField, w, h) {
+  const n = w * h;
+  const mag = new Float32Array(n);
+  let maxMag = 0;
+  for (let i = 0; i < n; i++) {
+    const gx = gradField[i * 2];
+    const gy = gradField[i * 2 + 1];
+    const m = Math.sqrt(gx * gx + gy * gy);
+    mag[i] = m;
+    if (m > maxMag) maxMag = m;
+  }
+
+  const rgba = new Uint8Array(n * 4);
+  const scale = maxMag > 0 ? 255 / maxMag : 0;
+  for (let i = 0; i < n; i++) {
+    const v = Math.round(mag[i] * scale);
+    rgba[i * 4]     = v;
+    rgba[i * 4 + 1] = v;
+    rgba[i * 4 + 2] = v;
+    rgba[i * 4 + 3] = 255;
+  }
+  return rgba;
 }
 
 // ---------------------------------------------------------------------------
@@ -443,20 +472,27 @@ function run() {
 
     heatmapTitle.textContent = `${ALGO_LABELS[algo]} Heatmap`;
 
-    // 1. Response heatmap
+    // 1. Gradient magnitude
     let t0 = performance.now();
+    const gradField = processor.gradient_field(pixels, w, h);
+    timings.push(`Gradient: ${(performance.now() - t0).toFixed(1)} ms`);
+    const gradRGBA = renderGradientMagnitude(gradField, w, h);
+    drawRGBA(cvGradient, gradRGBA, w, h);
+
+    // 2. Response heatmap
+    t0 = performance.now();
     const heatmapData = processor.response_heatmap(pixels, w, h, algo, colormap);
     timings.push(`Heatmap (${ALGO_LABELS[algo]}): ${(performance.now() - t0).toFixed(1)} ms`);
     drawRGBA(cvHeatmap, heatmapData, w, h);
 
-    // 2. Seed proposals
+    // 3. Seed proposals
     t0 = performance.now();
     const rawProps = processor.extract_proposals(pixels, w, h, algo);
     const proposals = parseProposals(rawProps);
     timings.push(`Proposals: ${proposals.length} in ${(performance.now() - t0).toFixed(1)} ms`);
     drawProposalsOverlay(cvProposals, cvOriginal, proposals);
 
-    // 3. Circle detection (full pipeline, always uses FRST internally)
+    // 4. Circle detection (full pipeline, always uses FRST internally)
     t0 = performance.now();
     const rawDets = processor.detect_circles_detailed(pixels, w, h);
     lastDetections = parseDetections(rawDets);
@@ -492,7 +528,7 @@ function setImage(img) {
   currentW = img.width;
   currentH = img.height;
 
-  for (const cv of [cvHeatmap, cvProposals, cvCircles]) {
+  for (const cv of [cvHeatmap, cvGradient, cvProposals, cvCircles]) {
     cv.width = img.width;
     cv.height = img.height;
   }

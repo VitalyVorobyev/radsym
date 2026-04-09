@@ -5,13 +5,14 @@
   <title>radsym -- Interactive Demo</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "SF Mono", "Menlo", "Consolas", monospace; background: #fff; color: #222; padding: 1em; }
-    h1 { font-size: 1.1em; margin-bottom: 0.6em; }
+    html, body { height: 100%; }
+    body { font-family: "SF Mono", "Menlo", "Consolas", monospace; background: #fff; color: #222; padding: 1em; display: flex; flex-direction: column; }
+    h1 { font-size: 1.1em; margin-bottom: 0.6em; flex-shrink: 0; }
     h2 { font-size: 0.9em; margin-bottom: 0.3em; color: #555; }
 
-    .layout { display: flex; gap: 1em; }
-    .sidebar { width: 260px; flex-shrink: 0; }
-    .main { flex: 1; min-width: 0; }
+    .layout { display: flex; gap: 1em; flex: 1; min-height: 0; }
+    .sidebar { width: 260px; flex-shrink: 0; overflow-y: auto; }
+    .main { flex: 1; min-width: 0; overflow-y: auto; }
 
     .panel { background: #fafafa; border: 1px solid #ddd; padding: 0.8em; margin-bottom: 0.7em; border-radius: 4px; }
     label { display: block; font-size: 0.78em; margin-top: 0.5em; color: #444; }
@@ -29,7 +30,7 @@
     details.panel[open] > summary::before { transform: rotate(90deg); }
     details.panel > summary h2 { display: inline; }
 
-    .btn-row { display: flex; gap: 0.5em; margin-top: 0.7em; }
+    .btn-row { display: flex; gap: 0.5em; margin-bottom: 0.7em; }
     button {
       padding: 5px 12px; font-family: inherit; font-size: 0.82em;
       border: 1px solid #888; border-radius: 3px; cursor: pointer; background: #fff;
@@ -44,8 +45,8 @@
     .cell h2 { margin-bottom: 0.2em; }
     .cell canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
 
-    #timing { font-size: 0.75em; color: #666; margin-top: 0.6em; line-height: 1.5; }
-    #status { font-size: 0.75em; color: #888; margin-top: 0.4em; }
+    #timing { font-size: 0.75em; color: #666; margin-bottom: 0.6em; line-height: 1.5; }
+    #status { font-size: 0.75em; color: #888; }
     input[type="file"] { font-size: 0.78em; margin-top: 4px; }
 
     #detailBox { display: none; margin-top: 0.7em; }
@@ -57,12 +58,17 @@
 
   <div class="layout">
     <div class="sidebar">
+      <div class="btn-row">
+        <button id="runBtn" class="primary" disabled>Run</button>
+        <span id="status" style="font-size:0.75em; color:#888; align-self:center;">Initializing...</span>
+      </div>
+      <div id="timing"></div>
+
       <div class="panel">
         <h2>Image</h2>
         <label>Source
           <input type="file" id="fileInput" accept="image/*">
         </label>
-        <div id="status">Initializing...</div>
       </div>
 
       <div class="panel">
@@ -104,25 +110,15 @@
             <option value="scharr">scharr</option>
           </select>
         </label>
-        <label>Radius hint
-          <input type="number" id="radiusHint" value="13" step="1" min="1">
-        </label>
-        <label>Min score
-          <input type="number" id="minScore" value="0" step="0.01" min="0">
-        </label>
+        <label>Radius hint <input type="number" id="radiusHint" value="13" step="1" min="1"></label>
+        <label>Min score <input type="number" id="minScore" value="0" step="0.01" min="0"></label>
       </div>
 
       <div class="panel">
         <h2>NMS</h2>
-        <label>NMS radius (px)
-          <input type="number" id="nmsRadius" value="5" step="1" min="1">
-        </label>
-        <label>NMS threshold
-          <input type="number" id="nmsThreshold" value="0" step="0.01" min="0">
-        </label>
-        <label>Max detections
-          <input type="number" id="maxDetections" value="200" step="10" min="1">
-        </label>
+        <label>NMS radius (px) <input type="number" id="nmsRadius" value="5" step="1" min="1"></label>
+        <label>NMS threshold <input type="number" id="nmsThreshold" value="0" step="0.01" min="0"></label>
+        <label>Max detections <input type="number" id="maxDetections" value="200" step="10" min="1"></label>
       </div>
 
       <details class="panel">
@@ -164,11 +160,6 @@
         <label class="inline"><input type="checkbox" id="showStatus"> Status icons</label>
         <label class="inline"><input type="checkbox" id="showLegend" checked> Legend</label>
       </div>
-
-      <div class="btn-row">
-        <button id="runBtn" class="primary" disabled>Run</button>
-      </div>
-      <div id="timing"></div>
     </div>
 
     <div class="main">
@@ -180,6 +171,10 @@
         <div class="cell">
           <h2 id="heatmapTitle">Response Heatmap</h2>
           <canvas id="cvHeatmap"></canvas>
+        </div>
+        <div class="cell">
+          <h2>Gradient Magnitude</h2>
+          <canvas id="cvGradient"></canvas>
         </div>
         <div class="cell">
           <h2>Seed Proposals</h2>
