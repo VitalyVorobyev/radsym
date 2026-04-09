@@ -1,4 +1,4 @@
-import init, { RadSymProcessor } from '../crates/radsym-wasm/pkg/radsym_wasm.js';
+import init, { RadSymProcessor } from './pkg/radsym_wasm.js';
 
 // ---------------------------------------------------------------------------
 // DOM references
@@ -522,7 +522,7 @@ async function main() {
     processor = new RadSymProcessor();
     setStatus('WASM initialized. Loading test image...');
 
-    const img = await loadImageFromURL('../testdata/ringgrid.png');
+    const img = await loadImageFromURL('./ringgrid.png');
     setImage(img);
     runBtn.disabled = false;
   } catch (e) {

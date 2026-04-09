@@ -11,4 +11,6 @@ __pycache__
 *.pyc
 .pytest_cache
 book/book
+book/src/demo/pkg
+book/src/demo/ringgrid.png
 _site

@@ -181,7 +181,236 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="api-documentation-rustdoc"><a class="header" href="#api-documentation-rustdoc">API Documentation (rustdoc)</a></h1>
+                        <!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>API Documentation (rustdoc) - radsym: Radial Symmetry Detection</title>
+<pre><code>    &lt;!-- Custom HTML head --&gt;
+
+    &lt;meta name="description" content="Algorithms and API guide for the radsym Rust library"&gt;
+    &lt;meta name="viewport" content="width=device-width, initial-scale=1"&gt;
+    &lt;meta name="theme-color" content="#ffffff"&gt;
+
+    &lt;link rel="icon" href="../../favicon.svg"&gt;
+    &lt;link rel="shortcut icon" href="../../favicon.png"&gt;
+    &lt;link rel="stylesheet" href="../../css/variables.css"&gt;
+    &lt;link rel="stylesheet" href="../../css/general.css"&gt;
+    &lt;link rel="stylesheet" href="../../css/chrome.css"&gt;
+    &lt;link rel="stylesheet" href="../../css/print.css" media="print"&gt;
+
+    &lt;!-- Fonts --&gt;
+    &lt;link rel="stylesheet" href="../../FontAwesome/css/font-awesome.css"&gt;
+    &lt;link rel="stylesheet" href="../../fonts/fonts.css"&gt;
+
+    &lt;!-- Highlight.js Stylesheets --&gt;
+    &lt;link rel="stylesheet" id="highlight-css" href="../../highlight.css"&gt;
+    &lt;link rel="stylesheet" id="tomorrow-night-css" href="../../tomorrow-night.css"&gt;
+    &lt;link rel="stylesheet" id="ayu-highlight-css" href="../../ayu-highlight.css"&gt;
+
+    &lt;!-- Custom theme stylesheets --&gt;
+
+
+    &lt;!-- Provide site root and default themes to javascript --&gt;
+    &lt;script&gt;
+        const path_to_root = "../../";
+        const default_light_theme = "light";
+        const default_dark_theme = "navy";
+        window.path_to_searchindex_js = "../../searchindex.js";
+    &lt;/script&gt;
+    &lt;!-- Start loading toc.js asap --&gt;
+    &lt;script src="../../toc.js"&gt;&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div id="mdbook-help-container"&gt;
+    &lt;div id="mdbook-help-popup"&gt;
+        &lt;h2 class="mdbook-help-title"&gt;Keyboard shortcuts&lt;/h2&gt;
+        &lt;div&gt;
+            &lt;p&gt;Press &lt;kbd&gt;←&lt;/kbd&gt; or &lt;kbd&gt;→&lt;/kbd&gt; to navigate between chapters&lt;/p&gt;
+            &lt;p&gt;Press &lt;kbd&gt;S&lt;/kbd&gt; or &lt;kbd&gt;/&lt;/kbd&gt; to search in the book&lt;/p&gt;
+            &lt;p&gt;Press &lt;kbd&gt;?&lt;/kbd&gt; to show this help&lt;/p&gt;
+            &lt;p&gt;Press &lt;kbd&gt;Esc&lt;/kbd&gt; to hide this help&lt;/p&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+&lt;div id="body-container"&gt;
+    &lt;!-- Work around some values being stored in localStorage wrapped in quotes --&gt;
+    &lt;script&gt;
+        try {
+            let theme = localStorage.getItem('mdbook-theme');
+            let sidebar = localStorage.getItem('mdbook-sidebar');
+
+            if (theme.startsWith('"') &amp;&amp; theme.endsWith('"')) {
+                localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+            }
+
+            if (sidebar.startsWith('"') &amp;&amp; sidebar.endsWith('"')) {
+                localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+            }
+        } catch (e) { }
+    &lt;/script&gt;
+
+    &lt;!-- Set the theme before any content is loaded, prevents flash --&gt;
+    &lt;script&gt;
+        const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+        let theme;
+        try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+        if (theme === null || theme === undefined) { theme = default_theme; }
+        const html = document.documentElement;
+        html.classList.remove('light')
+        html.classList.add(theme);
+        html.classList.add("js");
+    &lt;/script&gt;
+
+    &lt;input type="checkbox" id="sidebar-toggle-anchor" class="hidden"&gt;
+
+    &lt;!-- Hide / unhide sidebar before it is displayed --&gt;
+    &lt;script&gt;
+        let sidebar = null;
+        const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+        if (document.body.clientWidth &gt;= 1080) {
+            try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+            sidebar = sidebar || 'visible';
+        } else {
+            sidebar = 'hidden';
+            sidebar_toggle.checked = false;
+        }
+        if (sidebar === 'visible') {
+            sidebar_toggle.checked = true;
+        } else {
+            html.classList.remove('sidebar-visible');
+        }
+    &lt;/script&gt;
+
+    &lt;nav id="sidebar" class="sidebar" aria-label="Table of contents"&gt;
+        &lt;!-- populated by js --&gt;
+        &lt;mdbook-sidebar-scrollbox class="sidebar-scrollbox"&gt;&lt;/mdbook-sidebar-scrollbox&gt;
+        &lt;noscript&gt;
+            &lt;iframe class="sidebar-iframe-outer" src="../../toc.html"&gt;&lt;/iframe&gt;
+        &lt;/noscript&gt;
+        &lt;div id="sidebar-resize-handle" class="sidebar-resize-handle"&gt;
+            &lt;div class="sidebar-resize-indicator"&gt;&lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/nav&gt;
+
+    &lt;div id="page-wrapper" class="page-wrapper"&gt;
+
+        &lt;div class="page"&gt;
+            &lt;div id="menu-bar-hover-placeholder"&gt;&lt;/div&gt;
+            &lt;div id="menu-bar" class="menu-bar sticky"&gt;
+                &lt;div class="left-buttons"&gt;
+                    &lt;label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar"&gt;
+                        &lt;i class="fa fa-bars"&gt;&lt;/i&gt;
+                    &lt;/label&gt;
+                    &lt;button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list"&gt;
+                        &lt;i class="fa fa-paint-brush"&gt;&lt;/i&gt;
+                    &lt;/button&gt;
+                    &lt;ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu"&gt;
+                        &lt;li role="none"&gt;&lt;button role="menuitem" class="theme" id="default_theme"&gt;Auto&lt;/button&gt;&lt;/li&gt;
+                        &lt;li role="none"&gt;&lt;button role="menuitem" class="theme" id="light"&gt;Light&lt;/button&gt;&lt;/li&gt;
+                        &lt;li role="none"&gt;&lt;button role="menuitem" class="theme" id="rust"&gt;Rust&lt;/button&gt;&lt;/li&gt;
+                        &lt;li role="none"&gt;&lt;button role="menuitem" class="theme" id="coal"&gt;Coal&lt;/button&gt;&lt;/li&gt;
+                        &lt;li role="none"&gt;&lt;button role="menuitem" class="theme" id="navy"&gt;Navy&lt;/button&gt;&lt;/li&gt;
+                        &lt;li role="none"&gt;&lt;button role="menuitem" class="theme" id="ayu"&gt;Ayu&lt;/button&gt;&lt;/li&gt;
+                    &lt;/ul&gt;
+                    &lt;button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar"&gt;
+                        &lt;i class="fa fa-search"&gt;&lt;/i&gt;
+                    &lt;/button&gt;
+                &lt;/div&gt;
+
+                &lt;h1 class="menu-title"&gt;radsym: Radial Symmetry Detection&lt;/h1&gt;
+
+                &lt;div class="right-buttons"&gt;
+                    &lt;a href="../../print.html" title="Print this book" aria-label="Print this book"&gt;
+                        &lt;i id="print-button" class="fa fa-print"&gt;&lt;/i&gt;
+                    &lt;/a&gt;
+                    &lt;a href="https://github.com/VitalyVorobyev/radsym" title="Git repository" aria-label="Git repository"&gt;
+                        &lt;i id="git-repository-button" class="fa fa-github"&gt;&lt;/i&gt;
+                    &lt;/a&gt;
+                    &lt;a href="https://github.com/VitalyVorobyev/radsym/edit/main/book/src/../api/radsym/index.html" title="Suggest an edit" aria-label="Suggest an edit" rel="edit"&gt;
+                        &lt;i id="git-edit-button" class="fa fa-edit"&gt;&lt;/i&gt;
+                    &lt;/a&gt;
+
+                &lt;/div&gt;
+            &lt;/div&gt;
+
+            &lt;div id="search-wrapper" class="hidden"&gt;
+                &lt;form id="searchbar-outer" class="searchbar-outer"&gt;
+                    &lt;div class="search-wrapper"&gt;
+                        &lt;input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header"&gt;
+                        &lt;div class="spinner-wrapper"&gt;
+                            &lt;i class="fa fa-spinner fa-spin"&gt;&lt;/i&gt;
+                        &lt;/div&gt;
+                    &lt;/div&gt;
+                &lt;/form&gt;
+                &lt;div id="searchresults-outer" class="searchresults-outer hidden"&gt;
+                    &lt;div id="searchresults-header" class="searchresults-header"&gt;&lt;/div&gt;
+                    &lt;ul id="searchresults"&gt;
+                    &lt;/ul&gt;
+                &lt;/div&gt;
+            &lt;/div&gt;
+
+            &lt;!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM --&gt;
+            &lt;script&gt;
+                document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                    link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                });
+            &lt;/script&gt;
+
+            &lt;div id="content" class="content"&gt;
+                &lt;main&gt;
+                    &lt;h1 id="api-documentation-rustdoc"&gt;&lt;a class="header" href="#api-documentation-rustdoc"&gt;API Documentation (rustdoc)&lt;/a&gt;&lt;/h1&gt;
+
+                &lt;/main&gt;
+
+                &lt;nav class="nav-wrapper" aria-label="Page navigation"&gt;
+                    &lt;!-- Mobile navigation buttons --&gt;
+                        &lt;a rel="prev" href="../../references.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left"&gt;
+                            &lt;i class="fa fa-angle-left"&gt;&lt;/i&gt;
+                        &lt;/a&gt;
+
+
+                    &lt;div style="clear: both"&gt;&lt;/div&gt;
+                &lt;/nav&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;nav class="nav-wide-wrapper" aria-label="Page navigation"&gt;
+                &lt;a rel="prev" href="../../references.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left"&gt;
+                    &lt;i class="fa fa-angle-left"&gt;&lt;/i&gt;
+                &lt;/a&gt;
+
+        &lt;/nav&gt;
+
+    &lt;/div&gt;
+
+
+
+
+    &lt;script&gt;
+        window.playground_copyable = true;
+    &lt;/script&gt;
+
+
+    &lt;script src="../../elasticlunr.min.js"&gt;&lt;/script&gt;
+    &lt;script src="../../mark.min.js"&gt;&lt;/script&gt;
+    &lt;script src="../../searcher.js"&gt;&lt;/script&gt;
+
+    &lt;script src="../../clipboard.min.js"&gt;&lt;/script&gt;
+    &lt;script src="../../highlight.js"&gt;&lt;/script&gt;
+    &lt;script src="../../book.js"&gt;&lt;/script&gt;
+
+    &lt;!-- Custom JS scripts --&gt;
+
+
+
+&lt;/div&gt;
+&lt;/body&gt;
+</code></pre>
+</html>
 
                     </main>
 

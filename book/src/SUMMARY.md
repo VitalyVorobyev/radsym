@@ -29,6 +29,10 @@
 - [Gaussian Blur](internals/blur.md)
 - [Image Pyramids](internals/pyramid.md)
 
+# Demo
+
+- [Interactive Demo](demo.md)
+
 # Reference
 
 - [Configuration Guide](configuration.md)

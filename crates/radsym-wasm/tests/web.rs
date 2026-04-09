@@ -141,7 +141,7 @@ fn test_response_heatmap_dimensions() {
 
     let mut processor = RadSymProcessor::new();
     let heatmap = processor
-        .response_heatmap(&pixels, size, size, "hot")
+        .response_heatmap(&pixels, size, size, "frst", "hot")
         .expect("response_heatmap should succeed");
     assert_eq!(
         heatmap.len(),
@@ -177,7 +177,7 @@ fn test_invalid_colormap() {
     let mut processor = RadSymProcessor::new();
     assert!(
         processor
-            .response_heatmap(&pixels, size, size, "invalid")
+            .response_heatmap(&pixels, size, size, "frst", "invalid")
             .is_err()
     );
 }
@@ -248,7 +248,9 @@ fn test_response_heatmap_matches_native_ringgrid() {
 
     // WASM path
     let mut processor = RadSymProcessor::new();
-    let wasm_heatmap = processor.response_heatmap(&rgba, w, h, "hot").unwrap();
+    let wasm_heatmap = processor
+        .response_heatmap(&rgba, w, h, "frst", "hot")
+        .unwrap();
 
     // Native path
     let view = radsym::ImageView::from_slice(&gray, w, h).unwrap();
@@ -325,6 +327,116 @@ fn test_detect_circles_matches_native_ringgrid() {
 }
 
 #[wasm_bindgen_test]
+fn test_detect_circles_detailed_stride_and_values() {
+    let size = 128;
+    let pixels = synthetic_disk_rgba(size, 64.0, 64.0, 18.0);
+
+    let mut processor = RadSymProcessor::new();
+    processor.set_radii(&[17, 18, 19]);
+    processor.set_polarity("bright").unwrap();
+    processor.set_radius_hint(18.0);
+
+    let result = processor
+        .detect_circles_detailed(&pixels, size, size)
+        .expect("detect_circles_detailed should succeed");
+    assert!(result.length() > 0, "should detect at least one circle");
+    assert_eq!(
+        result.length() % 8,
+        0,
+        "result length must be multiple of 8"
+    );
+
+    let data: Vec<f32> = result.to_vec();
+    let count = data.len() / 8;
+    for i in 0..count {
+        let base = i * 8;
+        let total = data[base + 3];
+        let ringness = data[base + 4];
+        let coverage = data[base + 5];
+        let degenerate = data[base + 6];
+        let status = data[base + 7];
+
+        assert!((0.0..=1.0).contains(&total), "total score in [0, 1]");
+        assert!((0.0..=1.0).contains(&ringness), "ringness in [0, 1]");
+        assert!((0.0..=1.0).contains(&coverage), "coverage in [0, 1]");
+        assert!(
+            degenerate == 0.0 || degenerate == 1.0,
+            "is_degenerate must be 0 or 1"
+        );
+        assert!(
+            status == 0.0 || status == 1.0 || status == 2.0 || status == 3.0,
+            "status must be 0..3"
+        );
+    }
+}
+
+#[wasm_bindgen_test]
+fn test_detect_circles_detailed_matches_native_ringgrid() {
+    let (w, h, gray) = synthetic_ringgrid();
+    let rgba = gray_to_rgba(&gray);
+
+    let radii = vec![9u32, 11, 13, 15, 17];
+
+    // WASM path
+    let mut processor = RadSymProcessor::new();
+    processor.set_radii(&radii);
+    processor.set_polarity("dark").unwrap();
+    processor.set_radius_hint(13.0);
+    let wasm_result = processor.detect_circles_detailed(&rgba, w, h).unwrap();
+    let wasm_data: Vec<f32> = wasm_result.to_vec();
+
+    // Also get stride-4 result to verify count matches
+    let wasm_basic = processor.detect_circles(&rgba, w, h).unwrap();
+    assert_eq!(
+        wasm_data.len() / 8,
+        wasm_basic.length() as usize / 4,
+        "detailed and basic must have same detection count"
+    );
+
+    // Native path
+    let view = radsym::ImageView::from_slice(&gray, w, h).unwrap();
+    let config = radsym::DetectCirclesConfig {
+        frst: radsym::FrstConfig {
+            radii: radii.clone(),
+            ..radsym::FrstConfig::default()
+        },
+        polarity: radsym::Polarity::Dark,
+        radius_hint: 13.0,
+        ..radsym::DetectCirclesConfig::default()
+    };
+    let detections = radsym::detect_circles(&view, &config).unwrap();
+
+    assert_eq!(
+        wasm_data.len(),
+        detections.len() * 8,
+        "detection count mismatch"
+    );
+    for (i, det) in detections.iter().enumerate() {
+        let base = i * 8;
+        assert_eq!(wasm_data[base], det.hypothesis.center.x, "det {i} x");
+        assert_eq!(wasm_data[base + 1], det.hypothesis.center.y, "det {i} y");
+        assert_eq!(wasm_data[base + 2], det.hypothesis.radius, "det {i} r");
+        assert_eq!(wasm_data[base + 3], det.score.total, "det {i} total");
+        assert_eq!(wasm_data[base + 4], det.score.ringness, "det {i} ringness");
+        assert_eq!(
+            wasm_data[base + 5],
+            det.score.angular_coverage,
+            "det {i} coverage"
+        );
+        let expected_degen = if det.score.is_degenerate { 1.0 } else { 0.0 };
+        assert_eq!(wasm_data[base + 6], expected_degen, "det {i} is_degenerate");
+        let expected_status = match det.status {
+            radsym::RefinementStatus::Converged => 0.0,
+            radsym::RefinementStatus::MaxIterations => 1.0,
+            radsym::RefinementStatus::Degenerate => 2.0,
+            radsym::RefinementStatus::OutOfBounds => 3.0,
+            _ => -1.0,
+        };
+        assert_eq!(wasm_data[base + 7], expected_status, "det {i} status");
+    }
+}
+
+#[wasm_bindgen_test]
 fn test_polarity_config_affects_frst_output() {
     let (w, h, gray) = synthetic_ringgrid();
     let rgba = gray_to_rgba(&gray);
@@ -358,5 +470,126 @@ fn test_gradient_operator_config_affects_output() {
     assert_ne!(
         sobel, scharr,
         "Sobel and Scharr gradient fields must differ"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// RSD and fused algorithm tests
+// ---------------------------------------------------------------------------
+
+#[wasm_bindgen_test]
+fn test_rsd_response_dimensions() {
+    let size = 64;
+    let pixels = synthetic_disk_rgba(size, 32.0, 32.0, 10.0);
+
+    let mut processor = RadSymProcessor::new();
+    let response = processor
+        .rsd_response(&pixels, size, size)
+        .expect("rsd_response should succeed");
+    assert_eq!(
+        response.length() as usize,
+        size * size,
+        "RSD response must have width*height elements"
+    );
+}
+
+#[wasm_bindgen_test]
+fn test_rsd_response_fused_dimensions() {
+    let size = 64;
+    let pixels = synthetic_disk_rgba(size, 32.0, 32.0, 10.0);
+
+    let mut processor = RadSymProcessor::new();
+    let response = processor
+        .rsd_response_fused(&pixels, size, size)
+        .expect("rsd_response_fused should succeed");
+    assert_eq!(response.length() as usize, size * size);
+}
+
+#[wasm_bindgen_test]
+fn test_multiradius_response_dimensions() {
+    let size = 64;
+    let pixels = synthetic_disk_rgba(size, 32.0, 32.0, 10.0);
+
+    let mut processor = RadSymProcessor::new();
+    let response = processor
+        .multiradius_response(&pixels, size, size)
+        .expect("multiradius_response should succeed");
+    assert_eq!(response.length() as usize, size * size);
+}
+
+#[wasm_bindgen_test]
+fn test_rsd_differs_from_frst() {
+    let (w, h, gray) = synthetic_ringgrid();
+    let rgba = gray_to_rgba(&gray);
+
+    let mut processor = RadSymProcessor::new();
+    let frst: Vec<f32> = processor.frst_response(&rgba, w, h).unwrap().to_vec();
+    let rsd: Vec<f32> = processor.rsd_response(&rgba, w, h).unwrap().to_vec();
+
+    assert_eq!(frst.len(), rsd.len());
+    assert_ne!(frst, rsd, "FRST and RSD responses must differ");
+}
+
+#[wasm_bindgen_test]
+fn test_extract_proposals_frst() {
+    let (w, h, gray) = synthetic_ringgrid();
+    let rgba = gray_to_rgba(&gray);
+
+    let mut processor = RadSymProcessor::new();
+    processor.set_polarity("dark").unwrap();
+    processor.set_radii(&[9, 11, 13, 15, 17]);
+    let proposals = processor
+        .extract_proposals(&rgba, w, h, "frst")
+        .expect("extract_proposals should succeed");
+    assert!(proposals.length() > 0, "should find proposals");
+    assert_eq!(proposals.length() % 3, 0, "proposals must have stride 3");
+}
+
+#[wasm_bindgen_test]
+fn test_extract_proposals_rsd() {
+    let (w, h, gray) = synthetic_ringgrid();
+    let rgba = gray_to_rgba(&gray);
+
+    let mut processor = RadSymProcessor::new();
+    processor.set_polarity("dark").unwrap();
+    processor.set_radii(&[9, 11, 13, 15, 17]);
+    let proposals = processor
+        .extract_proposals(&rgba, w, h, "rsd")
+        .expect("extract_proposals rsd should succeed");
+    assert!(proposals.length() > 0, "RSD should find proposals");
+}
+
+#[wasm_bindgen_test]
+fn test_response_heatmap_all_algorithms() {
+    let size = 64;
+    let pixels = synthetic_disk_rgba(size, 32.0, 32.0, 10.0);
+
+    let mut processor = RadSymProcessor::new();
+    for algo in &["frst", "frst_fused", "rsd", "rsd_fused"] {
+        let heatmap = processor
+            .response_heatmap(&pixels, size, size, algo, "hot")
+            .unwrap_or_else(|_| panic!("response_heatmap({algo}) should succeed"));
+        assert_eq!(
+            heatmap.len(),
+            size * size * 4,
+            "{algo}: heatmap must have correct size"
+        );
+    }
+}
+
+#[wasm_bindgen_test]
+fn test_invalid_algorithm_name() {
+    let size = 16;
+    let pixels = vec![128u8; size * size * 4];
+    let mut processor = RadSymProcessor::new();
+    assert!(
+        processor
+            .response_heatmap(&pixels, size, size, "bogus", "hot")
+            .is_err()
+    );
+    assert!(
+        processor
+            .extract_proposals(&pixels, size, size, "bogus")
+            .is_err()
     );
 }
