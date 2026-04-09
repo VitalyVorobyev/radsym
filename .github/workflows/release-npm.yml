@@ -1,0 +1,64 @@
+name: Release to npm (WASM)
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish-wasm:
+    name: Build & publish WASM package
+    runs-on: ubuntu-latest
+
+    environment: npm
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Verify version matches tag
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VER="${TAG#v}"
+          WASM_VER="$(cargo metadata --format-version 1 --no-deps \
+            | jq -r '.packages[] | select(.name=="radsym-wasm") | .version')"
+          echo "tag version:  $VER"
+          echo "wasm version: $WASM_VER"
+          test "$WASM_VER" = "$VER"
+
+      - name: Build WASM package
+        run: wasm-pack build crates/radsym-wasm --target web --release
+
+      - name: Patch npm package name
+        run: |
+          cd crates/radsym-wasm/pkg
+          sed -i 's/"name": "radsym-wasm"/"name": "@vitavision\/radsym"/' package.json
+
+      - name: Copy README into pkg
+        run: cp crates/radsym-wasm/README.md crates/radsym-wasm/pkg/README.md
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Publish to npm via trusted publishing
+        working-directory: crates/radsym-wasm/pkg
+        run: npm publish --access public

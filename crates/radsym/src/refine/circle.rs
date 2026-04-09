@@ -25,6 +25,11 @@ pub struct CircleRefineConfig {
     pub convergence_tol: Scalar,
     /// Fractional annulus margin around the hypothesized radius.
     pub annulus_margin: Scalar,
+    /// Maximum allowed total center drift as a fraction of the initial radius.
+    ///
+    /// If the refined center moves farther than `max_center_drift * radius`
+    /// from the initial center, refinement stops with [`RefinementStatus::OutOfBounds`].
+    pub max_center_drift: Scalar,
     /// Radial center config for center refinement sub-step.
     pub radial_center: RadialCenterConfig,
     /// Annulus sampling config for radius estimation.
@@ -50,6 +55,11 @@ impl CircleRefineConfig {
                 reason: "annulus_margin must be > 0.0",
             });
         }
+        if self.max_center_drift <= 0.0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "max_center_drift must be > 0.0",
+            });
+        }
         Ok(())
     }
 }
@@ -60,6 +70,7 @@ impl Default for CircleRefineConfig {
             max_iterations: 10,
             convergence_tol: 0.1,
             annulus_margin: 0.3,
+            max_center_drift: 0.5,
             radial_center: RadialCenterConfig::default(),
             sampling: AnnulusSamplingConfig::default(),
         }
@@ -104,6 +115,7 @@ pub fn refine_circle(
     config.validate()?;
     let mut center = initial.center;
     let mut radius = initial.radius;
+    let max_drift = config.max_center_drift * initial.radius;
 
     for iter in 0..config.max_iterations {
         // Step 1: Refine center
@@ -132,6 +144,19 @@ pub fn refine_circle(
         }
 
         let new_center = center_result.hypothesis;
+
+        // Guard: total drift from the initial center must stay bounded.
+        let total_drift = ((new_center.x - initial.center.x).powi(2)
+            + (new_center.y - initial.center.y).powi(2))
+        .sqrt();
+        if total_drift > max_drift {
+            return Ok(RefinementResult {
+                hypothesis: Circle::new(center, radius),
+                status: RefinementStatus::OutOfBounds,
+                residual: total_drift,
+                iterations: iter,
+            });
+        }
 
         // Step 2: Re-estimate radius from gradient evidence
         let inner_r = (radius * (1.0 - config.annulus_margin)).max(1.0);

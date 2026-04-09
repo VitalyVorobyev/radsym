@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-04-09
+
+### Added
+
+- **RSD algorithm in WASM**: `rsd_response` and `rsd_response_fused` methods
+  exposed via `RadSymProcessor`, providing ~2x faster magnitude-only proposal
+  generation alongside FRST.
+- **Fused FRST in WASM**: `multiradius_response` method for single-pass
+  multi-radius FRST voting.
+- **Proposal extraction in WASM**: `extract_proposals` method returns NMS seed
+  proposals as stride-3 `[x, y, score]` arrays for any algorithm.
+- **Detailed detection output**: `detect_circles_detailed` returns stride-8
+  arrays with score breakdown (ringness, angular coverage) and refinement
+  status per detection.
+- **Algorithm selector in demo**: choose between FRST, FRST (fused), RSD, and
+  RSD (fused) for heatmap and proposal visualization.
+- **Seed Proposals panel** in demo showing NMS-extracted proposal locations.
+- **Interactive demo in mdBook**: new "Interactive Demo" chapter with embedded
+  WASM demo and `book/build.sh` for asset management.
+- **demo/README.md** documenting scope, config reference, and overlay features.
+
+### Changed
+
+- **Circle refinement stability**: added `max_center_drift` parameter to
+  `CircleRefineConfig` (default: 0.5x radius). Refinement now stops with
+  `OutOfBounds` if the center drifts beyond `max_center_drift * radius` from
+  its initial position, preventing cascading divergence over multiple
+  iterations.
+- **`response_heatmap` API**: now accepts an `algorithm` parameter (`"frst"`,
+  `"frst_fused"`, `"rsd"`, `"rsd_fused"`) to select the proposal method.
+- Demo layout: sidebar and main area scroll independently; Run button moved to
+  top of sidebar; gradient magnitude panel restored alongside proposals.
+- All 19 config parameters (including `max_center_drift`) exposed in demo UI.
+
 ## [0.1.3] - 2026-04-04
 
 ### Changed

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>radsym WASM smoke test</title>
+  <style>
+    body { font-family: monospace; margin: 2em; }
+    canvas { border: 1px solid #ccc; margin: 0.5em; }
+    #log { background: #f5f5f5; padding: 1em; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h2>radsym WASM smoke test</h2>
+  <div>
+    <canvas id="input" width="128" height="128"></canvas>
+    <canvas id="heatmap" width="128" height="128"></canvas>
+  </div>
+  <pre id="log"></pre>
+
+  <script type="module">
+    import init, { RadSymProcessor } from '../pkg/radsym_wasm.js';
+
+    function log(msg) {
+      const el = document.getElementById('log');
+      el.textContent += msg + '\n';
+      console.log(msg);
+    }
+
+    async function run() {
+      await init();
+      log('WASM initialized');
+
+      const processor = new RadSymProcessor();
+      processor.set_radii(new Uint32Array([9, 10, 11]));
+      processor.set_polarity('bright');
+      processor.set_radius_hint(10.0);
+      log('Processor configured');
+
+      // Generate a synthetic bright disk (128x128)
+      const W = 128, H = 128;
+      const cx = 64, cy = 64, r = 10;
+      const pixels = new Uint8Array(W * H * 4);
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const dx = x - cx, dy = y - cy;
+          const v = Math.sqrt(dx * dx + dy * dy) <= r ? 255 : 0;
+          const i = (y * W + x) * 4;
+          pixels[i] = pixels[i + 1] = pixels[i + 2] = v;
+          pixels[i + 3] = 255;
+        }
+      }
+
+      // Draw input
+      const inputCanvas = document.getElementById('input');
+      const inputCtx = inputCanvas.getContext('2d');
+      const inputImg = inputCtx.createImageData(W, H);
+      inputImg.data.set(pixels);
+      inputCtx.putImageData(inputImg, 0, 0);
+      log('Input drawn');
+
+      // Detect circles
+      const result = processor.detect_circles(pixels, W, H);
+      const count = result.length / 4;
+      log(`Detected ${count} circle(s)`);
+      for (let i = 0; i < count; i++) {
+        const x = result[i * 4];
+        const y = result[i * 4 + 1];
+        const rad = result[i * 4 + 2];
+        const score = result[i * 4 + 3];
+        log(`  #${i}: center=(${x.toFixed(1)}, ${y.toFixed(1)}) r=${rad.toFixed(1)} score=${score.toFixed(3)}`);
+      }
+
+      // Response heatmap
+      const heatmapData = processor.response_heatmap(pixels, W, H, 'hot');
+      const hmCanvas = document.getElementById('heatmap');
+      const hmCtx = hmCanvas.getContext('2d');
+      const hmImg = hmCtx.createImageData(W, H);
+      hmImg.data.set(new Uint8ClampedArray(heatmapData));
+      hmCtx.putImageData(hmImg, 0, 0);
+      log('Heatmap drawn');
+
+      processor.free();
+      log('Done');
+    }
+
+    run().catch(e => log('ERROR: ' + e));
+  </script>
+</body>
+</html>

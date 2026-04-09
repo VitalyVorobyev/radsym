@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>radsym -- Interactive Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { font-family: "SF Mono", "Menlo", "Consolas", monospace; background: #fff; color: #222; padding: 1em; display: flex; flex-direction: column; }
+    h1 { font-size: 1.1em; margin-bottom: 0.6em; flex-shrink: 0; }
+    h2 { font-size: 0.9em; margin-bottom: 0.3em; color: #555; }
+
+    .layout { display: flex; gap: 1em; flex: 1; min-height: 0; }
+    .sidebar { width: 260px; flex-shrink: 0; overflow-y: auto; }
+    .main { flex: 1; min-width: 0; overflow-y: auto; }
+
+    .panel { background: #fafafa; border: 1px solid #ddd; padding: 0.8em; margin-bottom: 0.7em; border-radius: 4px; }
+    label { display: block; font-size: 0.78em; margin-top: 0.5em; color: #444; }
+    label:first-child { margin-top: 0; }
+    label.inline { display: inline-flex; align-items: center; gap: 0.3em; margin-top: 0.4em; }
+    input[type="text"], input[type="number"], select {
+      width: 100%; padding: 3px 5px; font-family: inherit; font-size: 0.82em;
+      border: 1px solid #ccc; border-radius: 3px; margin-top: 2px;
+    }
+    input[type="checkbox"] { margin: 0; }
+
+    details.panel > summary { cursor: pointer; list-style: none; }
+    details.panel > summary::-webkit-details-marker { display: none; }
+    details.panel > summary::before { content: "\25b6"; display: inline-block; width: 1em; font-size: 0.7em; transition: transform 0.15s; }
+    details.panel[open] > summary::before { transform: rotate(90deg); }
+    details.panel > summary h2 { display: inline; }
+
+    .btn-row { display: flex; gap: 0.5em; margin-bottom: 0.7em; }
+    button {
+      padding: 5px 12px; font-family: inherit; font-size: 0.82em;
+      border: 1px solid #888; border-radius: 3px; cursor: pointer; background: #fff;
+    }
+    button:hover { background: #eee; }
+    button.primary { background: #2a6; color: #fff; border-color: #2a6; }
+    button.primary:hover { background: #196; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8em; }
+    .cell { background: #fafafa; border: 1px solid #ddd; padding: 0.5em; border-radius: 4px; position: relative; }
+    .cell h2 { margin-bottom: 0.2em; }
+    .cell canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+
+    #timing { font-size: 0.75em; color: #666; margin-bottom: 0.6em; line-height: 1.5; }
+    #status { font-size: 0.75em; color: #888; }
+    input[type="file"] { font-size: 0.78em; margin-top: 4px; }
+
+    #detailBox { display: none; margin-top: 0.7em; }
+    #detailBox pre { font-size: 0.75em; line-height: 1.4; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>radsym -- Radial Symmetry Detection</h1>
+
+  <div class="layout">
+    <div class="sidebar">
+      <div class="btn-row">
+        <button id="runBtn" class="primary" disabled>Run</button>
+        <span id="status" style="font-size:0.75em; color:#888; align-self:center;">Initializing...</span>
+      </div>
+      <div id="timing"></div>
+
+      <div class="panel">
+        <h2>Image</h2>
+        <label>Source
+          <input type="file" id="fileInput" accept="image/*">
+        </label>
+      </div>
+
+      <div class="panel">
+        <h2>Algorithm</h2>
+        <label>Proposal method
+          <select id="algorithm">
+            <option value="frst" selected>FRST</option>
+            <option value="frst_fused">FRST (fused)</option>
+            <option value="rsd">RSD</option>
+            <option value="rsd_fused">RSD (fused)</option>
+          </select>
+        </label>
+        <label>Radii (comma-sep)
+          <input type="text" id="radii" value="9,11,13,15,17">
+        </label>
+        <label>Alpha (FRST only)
+          <input type="number" id="alpha" value="2.0" step="0.1" min="0.1">
+        </label>
+        <label>Gradient threshold
+          <input type="number" id="gradThreshold" value="0" step="0.5" min="0">
+        </label>
+        <label>Smoothing factor
+          <input type="number" id="smoothing" value="0.5" step="0.1" min="0">
+        </label>
+      </div>
+
+      <div class="panel">
+        <h2>Detection</h2>
+        <label>Polarity
+          <select id="polarity">
+            <option value="dark">dark</option>
+            <option value="bright">bright</option>
+            <option value="both" selected>both</option>
+          </select>
+        </label>
+        <label>Gradient operator
+          <select id="gradOp">
+            <option value="sobel" selected>sobel</option>
+            <option value="scharr">scharr</option>
+          </select>
+        </label>
+        <label>Radius hint <input type="number" id="radiusHint" value="13" step="1" min="1"></label>
+        <label>Min score <input type="number" id="minScore" value="0" step="0.01" min="0"></label>
+      </div>
+
+      <div class="panel">
+        <h2>NMS</h2>
+        <label>NMS radius (px) <input type="number" id="nmsRadius" value="5" step="1" min="1"></label>
+        <label>NMS threshold <input type="number" id="nmsThreshold" value="0" step="0.01" min="0"></label>
+        <label>Max detections <input type="number" id="maxDetections" value="200" step="10" min="1"></label>
+      </div>
+
+      <details class="panel">
+        <summary><h2>Support Scoring</h2></summary>
+        <label>Angular samples <input type="number" id="numAngularSamples" value="64" step="8" min="4"></label>
+        <label>Radial samples <input type="number" id="numRadialSamples" value="9" step="1" min="1"></label>
+        <label>Annulus margin <input type="number" id="annulusMargin" value="0.3" step="0.05" min="0.01"></label>
+        <label>Min samples <input type="number" id="minSamples" value="8" step="1" min="1"></label>
+        <label>Weight: ringness <input type="number" id="weightRingness" value="0.6" step="0.05" min="0" max="1"></label>
+        <label>Weight: coverage <input type="number" id="weightCoverage" value="0.4" step="0.05" min="0" max="1"></label>
+      </details>
+
+      <details class="panel">
+        <summary><h2>Refinement</h2></summary>
+        <label>Max iterations <input type="number" id="maxIterations" value="10" step="1" min="1"></label>
+        <label>Convergence tol (px) <input type="number" id="convergenceTol" value="0.1" step="0.01" min="0.001"></label>
+        <label>Max center drift (x radius) <input type="number" id="maxCenterDrift" value="0.5" step="0.1" min="0.1"></label>
+      </details>
+
+      <div class="panel">
+        <h2>Visualization</h2>
+        <label>Colormap
+          <select id="colormap">
+            <option value="hot" selected>hot</option>
+            <option value="jet">jet</option>
+            <option value="magma">magma</option>
+          </select>
+        </label>
+        <label>Overlay color mode
+          <select id="colorMode">
+            <option value="score" selected>Total score</option>
+            <option value="ringness">Ringness</option>
+            <option value="coverage">Angular coverage</option>
+            <option value="status">Refinement status</option>
+          </select>
+        </label>
+        <label class="inline"><input type="checkbox" id="showLabels"> Score labels</label>
+        <label class="inline"><input type="checkbox" id="showAnnulus"> Annulus rings</label>
+        <label class="inline"><input type="checkbox" id="showStatus"> Status icons</label>
+        <label class="inline"><input type="checkbox" id="showLegend" checked> Legend</label>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="grid">
+        <div class="cell">
+          <h2>Original</h2>
+          <canvas id="cvOriginal"></canvas>
+        </div>
+        <div class="cell">
+          <h2 id="heatmapTitle">Response Heatmap</h2>
+          <canvas id="cvHeatmap"></canvas>
+        </div>
+        <div class="cell">
+          <h2>Gradient Magnitude</h2>
+          <canvas id="cvGradient"></canvas>
+        </div>
+        <div class="cell">
+          <h2>Seed Proposals</h2>
+          <canvas id="cvProposals"></canvas>
+        </div>
+        <div class="cell">
+          <h2>Detected Circles</h2>
+          <canvas id="cvCircles"></canvas>
+        </div>
+      </div>
+      <div id="detailBox" class="panel">
+        <h2>Detection Detail</h2>
+        <pre id="detailContent">Click a detection in the overlay to inspect it.</pre>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
