@@ -162,10 +162,9 @@ pub struct Detection<T> {
 
 /// The concrete result type produced by [`detect_circles`].
 ///
-/// This is an alias for [`Detection<Circle>`](Detection): the generic
-/// `Detection<T>` struct is shared with ellipse-refinement results, so the
-/// circle-detection path names the contract through this alias rather than
-/// duplicating the struct.
+/// This is an alias for [`Detection<Circle>`](Detection). The `Detection<T>`
+/// struct is generic to leave room for future hypothesis types, but today
+/// `Detection<Circle>` is the only instantiation produced by this crate.
 pub type CircleDetection = Detection<Circle>;
 
 /// Detect circles in a grayscale image using the full propose-score-refine pipeline.

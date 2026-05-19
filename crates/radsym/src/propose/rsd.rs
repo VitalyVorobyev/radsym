@@ -94,7 +94,9 @@ fn accumulate_response(sum: &mut OwnedImage<Scalar>, single: &OwnedImage<Scalar>
 ///
 /// Magnitude-only voting: each pixel with sufficient gradient magnitude
 /// votes along its gradient direction, accumulating `|g|` at the target
-/// pixel. No orientation accumulator is maintained.
+/// pixel. No orientation accumulator is maintained. This is the
+/// single-radius vote primitive; use [`rsd_response`] to combine
+/// contributions across all radii in [`RsdConfig::radii`].
 pub fn rsd_response_single(
     gradient: &GradientField,
     radius: u32,

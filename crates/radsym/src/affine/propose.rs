@@ -27,6 +27,7 @@ use super::transform::AffineMap;
 /// Configuration for affine-aware FRST response.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct AffineFrstConfig {
     /// Radius for voting (single radius for simplicity).
     pub radius: u32,

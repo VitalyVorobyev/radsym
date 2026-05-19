@@ -75,7 +75,13 @@ Breaking for the `radsym` crate and both binding packages.
   is unchanged in effect, and pipeline/refinement results are identical.
   Migration: struct literals that set a moved field must nest it under
   `advanced: <Name>Advanced { .. }`. The new advanced structs are re-exported at
-  the crate root and in the prelude.
+  the crate root.
+- **Prelude no longer re-exports the `*Advanced` expert configs**: the
+  `radsym::prelude` glob no longer brings `DetectCirclesAdvanced`,
+  `CircleRefineAdvanced`, and `EllipseRefineAdvanced` into scope, keeping the
+  expert tuning knobs out of the effortless common-case import. They remain
+  reachable at the crate root (`radsym::CircleRefineAdvanced`) and via their
+  modules. Migration: import the `*Advanced` type explicitly when needed.
 - **Growth-prone config and result structs are now `#[non_exhaustive]`
   (breaking)**: the public configuration, advanced sub-config, result, and
   detection-diagnostics structs are now `#[non_exhaustive]`, so fields can be
@@ -88,9 +94,10 @@ Breaking for the `radsym` crate and both binding packages.
     `CircleRefineConfig`, `CircleRefineAdvanced`, `EllipseRefineConfig`,
     `EllipseRefineAdvanced`, `HomographyRerankConfig`, `HomographyRerankAdvanced`,
     `HomographyEllipseRefineConfig`, `HomographyEllipseRefineAdvanced`,
-    `RadialCenterConfig`.
+    `RadialCenterConfig`, `AffineFrstConfig`.
   - Results: `Detection<T>` (and its alias `CircleDetection`),
-    `RefinementResult<H>`, `RerankedProposal`, `HomographyRefinementResult`.
+    `RefinementResult<H>`, `RerankedProposal`, `HomographyRefinementResult`,
+    `Proposal`, `HomographyProposal`.
   - Detection diagnostics: `CircleDetectionDiagnostics`, `RejectedProposal`,
     `SupportScoreBreakdown`.
 
@@ -131,8 +138,6 @@ Breaking for the `radsym` crate and both binding packages.
   - `radsym::PyramidWorkspace`, `PyramidLevelView`, `OwnedPyramidLevel`,
     `pyramid_level_owned` → `radsym::core::pyramid::*`
   - `radsym::SupportEvidence` → `radsym::support::evidence::SupportEvidence`
-  - `radsym::AnnulusHypothesis`, `CircleHypothesis`, `ConcentricPairHypothesis`,
-    `EllipseHypothesis` → `radsym::support::hypothesis::*`
   - `radsym::frst_response_single` →
     `radsym::propose::frst::frst_response_single`
   - `radsym::Colormap`, `radsym::DiagnosticImage`, `radsym::response_heatmap`,
@@ -141,6 +146,14 @@ Breaking for the `radsym` crate and both binding packages.
   removed (use `score_circle_support`); `support::coverage` is now a crate-private
   module; `support::annulus::{sample_annulus, sample_elliptical_annulus}` are now
   crate-private. `support::annulus::AnnulusSamplingConfig` remains public.
+- **Support intermediate-state modules trimmed (breaking)**: the
+  `support::hypothesis` and `support::profile` modules are deleted outright,
+  removing the `AnnulusHypothesis`, `CircleHypothesis`, `ConcentricPairHypothesis`
+  and `EllipseHypothesis` types together with `RadialProfile`,
+  `compute_radial_profile` and `compute_normal_profile` — these had no consumers.
+  `support::evidence` is now a crate-private module — its type `SupportEvidence`
+  is no longer public. It holds intermediate state that `score_circle_support` /
+  `score_ellipse_support` build and consume internally.
 
 ## [0.1.4] - 2026-04-09
 

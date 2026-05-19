@@ -75,6 +75,7 @@ impl RectifiedResponseMap {
 /// Proposal extracted from a rectified response map.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct HomographyProposal {
     /// Peak location in the rectified frame.
     pub rectified_seed: SeedPoint,

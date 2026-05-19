@@ -1,7 +1,7 @@
 //! Annulus sampling for local support extraction.
 //!
 //! Samples gradient vectors along circular or elliptical annuli around a
-//! hypothesis center, producing [`SupportEvidence`] for scoring.
+//! hypothesis center, producing the gradient evidence consumed by scoring.
 
 use crate::core::coords::PixelCoord;
 use crate::core::geometry::Ellipse;

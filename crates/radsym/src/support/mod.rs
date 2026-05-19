@@ -9,7 +9,5 @@
 
 pub mod annulus;
 pub(crate) mod coverage;
-pub mod evidence;
-pub mod hypothesis;
-pub mod profile;
+pub(crate) mod evidence;
 pub mod score;

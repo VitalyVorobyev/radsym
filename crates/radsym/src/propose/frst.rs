@@ -100,7 +100,9 @@ impl Default for FrstConfig {
 
 /// Compute the FRST response map for a single radius.
 ///
-/// Returns the smoothed per-radius contribution `S_n`.
+/// Returns the smoothed per-radius contribution `S_n`. This is the
+/// single-radius vote primitive; use [`frst_response`] to combine
+/// contributions across all radii in [`FrstConfig::radii`].
 pub fn frst_response_single(
     gradient: &GradientField,
     radius: u32,

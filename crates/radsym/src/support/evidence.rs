@@ -21,14 +21,6 @@ pub struct GradientSample {
     pub radial_alignment: Scalar,
 }
 
-impl GradientSample {
-    /// Gradient magnitude.
-    #[inline]
-    pub fn magnitude(&self) -> Scalar {
-        (self.gx * self.gx + self.gy * self.gy).sqrt()
-    }
-}
-
 /// Extracted local evidence around a hypothesis.
 ///
 /// Produced by annulus sampling functions and consumed by scoring functions.

@@ -66,11 +66,9 @@ pub use crate::support::score::{
 };
 
 // Refinement
-pub use crate::refine::circle::{CircleRefineAdvanced, CircleRefineConfig, refine_circle};
-pub use crate::refine::ellipse::{EllipseRefineAdvanced, EllipseRefineConfig, refine_ellipse};
+pub use crate::refine::circle::{CircleRefineConfig, refine_circle};
+pub use crate::refine::ellipse::{EllipseRefineConfig, refine_ellipse};
 pub use crate::refine::result::{RefinementResult, RefinementStatus};
 
 // Pipeline
-pub use crate::pipeline::{
-    CircleDetection, DetectCirclesAdvanced, DetectCirclesConfig, Detection, detect_circles,
-};
+pub use crate::pipeline::{CircleDetection, DetectCirclesConfig, Detection, detect_circles};
