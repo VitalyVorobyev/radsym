@@ -12,10 +12,6 @@ use crate::core::scalar::Scalar;
 pub struct GradientSample {
     /// Sample position in image coordinates.
     pub position: PixelCoord,
-    /// Horizontal gradient component.
-    pub gx: Scalar,
-    /// Vertical gradient component.
-    pub gy: Scalar,
     /// Absolute cosine between gradient direction and the radial direction
     /// from the hypothesis center. Range `[0, 1]`: 1 = perfectly radial.
     pub radial_alignment: Scalar,
@@ -29,9 +25,6 @@ pub struct GradientSample {
 pub struct SupportEvidence {
     /// Individual gradient samples with alignment scores.
     pub gradient_samples: Vec<GradientSample>,
-    /// Fraction of the annulus that has well-aligned gradient support.
-    /// Range `[0, 1]`.
-    pub angular_coverage: Scalar,
     /// Number of valid samples (with non-negligible gradient).
     pub sample_count: usize,
     /// Mean absolute radial alignment across all samples. Range `[0, 1]`.
