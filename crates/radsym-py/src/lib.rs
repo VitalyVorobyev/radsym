@@ -66,7 +66,8 @@ fn scharr_gradient_py(image: PyReadonlyArray2<u8>) -> PyResult<PyGradientField> 
 #[pyo3(name = "pyramid_level_image")]
 fn pyramid_level_image_py(image: PyReadonlyArray2<u8>, level: u8) -> PyResult<PyPyramidLevelImage> {
     let owned = numpy_to_owned_u8(&image)?;
-    let level_image = radsym::pyramid_level_owned(&owned.view(), level).map_err(to_pyerr)?;
+    let level_image =
+        radsym::core::pyramid::pyramid_level_owned(&owned.view(), level).map_err(to_pyerr)?;
     Ok(PyPyramidLevelImage { inner: level_image })
 }
 
@@ -97,18 +98,18 @@ fn frst_response_py(
     Ok(PyResponseMap { inner: response })
 }
 
-/// Compute a fused multi-radius magnitude-only response map.
+/// Compute a fused multi-radius magnitude-only FRST response map.
 ///
 /// Faster than ``frst_response`` when testing many radii. Uses a single
 /// image pass and a single blur. The ``alpha`` config field is ignored.
 #[pyfunction]
-#[pyo3(name = "multiradius_response", signature = (gradient, config=None))]
-fn multiradius_response_py(
+#[pyo3(name = "frst_response_fused", signature = (gradient, config=None))]
+fn frst_response_fused_py(
     gradient: &PyGradientField,
     config: Option<&PyFrstConfig>,
 ) -> PyResult<PyResponseMap> {
     let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
-    let response = radsym::multiradius_response(&gradient.inner, &cfg).map_err(to_pyerr)?;
+    let response = radsym::frst_response_fused(&gradient.inner, &cfg).map_err(to_pyerr)?;
     Ok(PyResponseMap { inner: response })
 }
 
@@ -644,7 +645,7 @@ fn radsym_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(scharr_gradient_py, m)?)?;
     m.add_function(wrap_pyfunction!(pyramid_level_image_py, m)?)?;
     m.add_function(wrap_pyfunction!(frst_response_py, m)?)?;
-    m.add_function(wrap_pyfunction!(multiradius_response_py, m)?)?;
+    m.add_function(wrap_pyfunction!(frst_response_fused_py, m)?)?;
     m.add_function(wrap_pyfunction!(frst_response_homography_py, m)?)?;
     m.add_function(wrap_pyfunction!(rsd_response_py, m)?)?;
     m.add_function(wrap_pyfunction!(rsd_response_fused_py, m)?)?;

@@ -31,6 +31,7 @@ use rayon::prelude::*;
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(default))]
+#[non_exhaustive]
 pub struct RsdConfig {
     /// Set of discrete radii to test (in pixels).
     pub radii: Vec<u32>,
@@ -93,7 +94,9 @@ fn accumulate_response(sum: &mut OwnedImage<Scalar>, single: &OwnedImage<Scalar>
 ///
 /// Magnitude-only voting: each pixel with sufficient gradient magnitude
 /// votes along its gradient direction, accumulating `|g|` at the target
-/// pixel. No orientation accumulator is maintained.
+/// pixel. No orientation accumulator is maintained. This is the
+/// single-radius vote primitive; use [`rsd_response`] to combine
+/// contributions across all radii in [`RsdConfig::radii`].
 pub fn rsd_response_single(
     gradient: &GradientField,
     radius: u32,
@@ -263,7 +266,8 @@ pub fn rsd_response(
 /// }
 /// let image = ImageView::from_slice(&data, size, size).unwrap();
 /// let grad = sobel_gradient(&image).unwrap();
-/// let config = RsdConfig { radii: vec![9, 10, 11], ..RsdConfig::default() };
+/// let mut config = RsdConfig::default();
+/// config.radii = vec![9, 10, 11];
 /// let response = rsd_response_fused(&grad, &config).unwrap();
 /// assert_eq!(response.response().width(), size);
 /// assert!(response.response().data().iter().any(|&v| v > 0.0));

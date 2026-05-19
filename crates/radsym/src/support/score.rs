@@ -1,7 +1,10 @@
 //! Support scoring for circle and ellipse hypotheses.
 //!
-//! Produces a structured [`SupportScore`] that quantifies how strongly local
-//! image evidence supports a given geometric hypothesis.
+//! The scoring functions produce a [`SupportScoreBreakdown`] that quantifies
+//! how strongly local image evidence supports a given geometric hypothesis,
+//! exposing the individual evidence components. A compact [`SupportScore`]
+//! carrying only the headline `total` is also available for result types that
+//! do not need the breakdown.
 
 use crate::core::coords::PixelCoord;
 use crate::core::geometry::{Circle, Ellipse};
@@ -13,10 +16,36 @@ use nalgebra::Vector2;
 use super::annulus::{AnnulusSamplingConfig, sample_annulus, sample_elliptical_annulus};
 use super::coverage::{angular_coverage, ellipse_angular_coverage};
 
-/// Structured support score with component breakdown.
+/// Compact support score carrying only the headline `total`.
+///
+/// This is the minimal result-tier score: it answers "how well does the
+/// evidence support this hypothesis?" with a single number in `[0, 1]`. The
+/// scoring functions ([`score_circle_support`], [`score_ellipse_support`],
+/// [`score_rectified_circle_support`]) return the richer
+/// [`SupportScoreBreakdown`], which exposes the individual evidence components
+/// and converts into this type via `From`. The detection pipeline stores a
+/// `SupportScore` on each result and carries the full breakdown in its
+/// diagnostics channel.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct SupportScore {
+    /// Combined total score in `[0, 1]`.
+    pub total: Scalar,
+}
+
+/// Detailed component breakdown of a support score.
+///
+/// This is the evidence-rich counterpart of [`SupportScore`]: it exposes the
+/// individual evidence components that combine into the headline `total`. The
+/// scoring functions ([`score_circle_support`], [`score_ellipse_support`],
+/// [`score_rectified_circle_support`]) return this type; the compact
+/// [`SupportScore`] is obtained via [`SupportScoreBreakdown::score`] or the
+/// `From` impl.
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub struct SupportScoreBreakdown {
     /// Combined total score in `[0, 1]`.
     pub total: Scalar,
     /// Ring-like support strength (gradient alignment).
@@ -27,9 +56,25 @@ pub struct SupportScore {
     pub is_degenerate: bool,
 }
 
+impl SupportScoreBreakdown {
+    /// Reduce this breakdown to the compact headline [`SupportScore`].
+    pub fn score(&self) -> SupportScore {
+        SupportScore { total: self.total }
+    }
+}
+
+impl From<SupportScoreBreakdown> for SupportScore {
+    fn from(breakdown: SupportScoreBreakdown) -> Self {
+        SupportScore {
+            total: breakdown.total,
+        }
+    }
+}
+
 /// Configuration for support scoring.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct ScoringConfig {
     /// Annulus sampling configuration.
     pub sampling: AnnulusSamplingConfig,
@@ -86,6 +131,10 @@ impl Default for ScoringConfig {
 
 /// Score how strongly the local image evidence supports a circle hypothesis.
 ///
+/// Returns a [`SupportScoreBreakdown`] with the headline `total` and its
+/// individual evidence components. Use [`SupportScoreBreakdown::score`] for the
+/// compact [`SupportScore`].
+///
 /// # Example
 ///
 /// ```rust
@@ -112,7 +161,7 @@ pub fn score_circle_support(
     gradient: &GradientField,
     circle: &Circle,
     config: &ScoringConfig,
-) -> SupportScore {
+) -> SupportScoreBreakdown {
     let inner_r = circle.radius * (1.0 - config.annulus_margin);
     let outer_r = circle.radius * (1.0 + config.annulus_margin);
 
@@ -141,7 +190,7 @@ pub fn score_circle_support(
         (config.weight_ringness * ringness + config.weight_coverage * cov).clamp(0.0, 1.0)
     };
 
-    SupportScore {
+    SupportScoreBreakdown {
         total,
         ringness,
 
@@ -151,11 +200,15 @@ pub fn score_circle_support(
 }
 
 /// Score how strongly the local image evidence supports an ellipse hypothesis.
+///
+/// Returns a [`SupportScoreBreakdown`] with the headline `total` and its
+/// individual evidence components. Use [`SupportScoreBreakdown::score`] for the
+/// compact [`SupportScore`].
 pub fn score_ellipse_support(
     gradient: &GradientField,
     ellipse: &Ellipse,
     config: &ScoringConfig,
-) -> SupportScore {
+) -> SupportScoreBreakdown {
     let inner_scale = 1.0 - config.annulus_margin;
     let outer_scale = 1.0 + config.annulus_margin;
 
@@ -178,7 +231,7 @@ pub fn score_ellipse_support(
         (config.weight_ringness * ringness + config.weight_coverage * cov).clamp(0.0, 1.0)
     };
 
-    SupportScore {
+    SupportScoreBreakdown {
         total,
         ringness,
 
@@ -189,14 +242,18 @@ pub fn score_ellipse_support(
 
 /// Score support for a rectified-frame circle by sampling in rectified angle
 /// and evaluating the pulled-back normal alignment in image space.
+///
+/// Returns a [`SupportScoreBreakdown`] with the headline `total` and its
+/// individual evidence components. Use [`SupportScoreBreakdown::score`] for the
+/// compact [`SupportScore`].
 pub fn score_rectified_circle_support(
     gradient: &GradientField,
     rectified_circle: &Circle,
     homography: &Homography,
     config: &ScoringConfig,
-) -> SupportScore {
+) -> SupportScoreBreakdown {
     if rectified_circle.radius <= 1e-6 {
-        return SupportScore {
+        return SupportScoreBreakdown {
             total: 0.0,
             ringness: 0.0,
 
@@ -278,26 +335,13 @@ pub fn score_rectified_circle_support(
         (config.weight_ringness * ringness + config.weight_coverage * coverage).clamp(0.0, 1.0)
     };
 
-    SupportScore {
+    SupportScoreBreakdown {
         total,
         ringness,
 
         angular_coverage: coverage,
         is_degenerate,
     }
-}
-
-/// Score support for a circle hypothesis given a precomputed center.
-///
-/// Convenience function that constructs a [`Circle`] from center and radius.
-pub fn score_at(
-    gradient: &GradientField,
-    center: PixelCoord,
-    radius: Scalar,
-    config: &ScoringConfig,
-) -> SupportScore {
-    let circle = Circle::new(center, radius);
-    score_circle_support(gradient, &circle, config)
 }
 
 #[cfg(test)]
@@ -399,22 +443,6 @@ mod tests {
             "ellipse on circle should score well, got {}",
             score.total
         );
-    }
-
-    #[test]
-    fn score_at_convenience() {
-        let size = 80;
-        let data = make_ring_u8(size, 40.0, 40.0, 14.0, 18.0);
-        let image = ImageView::from_slice(&data, size, size).unwrap();
-        let grad = sobel_gradient(&image).unwrap();
-
-        let score = score_at(
-            &grad,
-            PixelCoord::new(40.0, 40.0),
-            16.0,
-            &ScoringConfig::default(),
-        );
-        assert!(score.total > 0.2);
     }
 
     #[test]

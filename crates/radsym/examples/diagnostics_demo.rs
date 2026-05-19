@@ -7,11 +7,12 @@
 
 use std::fs;
 
-use radsym::diagnostics::overlay::overlay_proposals;
+use radsym::diagnostics::{
+    Colormap, DiagnosticImage, overlay_circle, overlay_proposals, response_heatmap,
+};
 use radsym::{
-    Circle, CircleRefineConfig, Colormap, DiagnosticImage, FrstConfig, NmsConfig, Polarity,
-    extract_proposals, frst_response, load_grayscale, overlay_circle, refine_circle,
-    response_heatmap, save_diagnostic, sobel_gradient,
+    Circle, CircleRefineConfig, FrstConfig, NmsConfig, Polarity, extract_proposals, frst_response,
+    load_grayscale, refine_circle, save_diagnostic, sobel_gradient,
 };
 
 #[derive(serde::Deserialize)]

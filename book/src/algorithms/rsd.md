@@ -72,6 +72,8 @@ from a textured corner -- prefer FRST.
 
 ## Configuration
 
+`RsdConfig` is `#[non_exhaustive]`; its fields are:
+
 ```rust
 pub struct RsdConfig {
     /// Discrete radii to test (pixels). Default: [3, 5, 7, 9, 11].
@@ -90,6 +92,9 @@ is no orientation accumulator to normalize.
 
 ## API usage
 
+Because `RsdConfig` is `#[non_exhaustive]`, construct it from
+`RsdConfig::default()` and assign the fields you want to change:
+
 ```rust
 use radsym::core::gradient::sobel_gradient;
 use radsym::core::image_view::ImageView;
@@ -99,16 +104,16 @@ use radsym::core::polarity::Polarity;
 let image = ImageView::from_slice(&pixels, width, height)?;
 let gradient = sobel_gradient(&image)?;
 
-let config = RsdConfig {
-    radii: vec![8, 10, 12],
-    gradient_threshold: 2.0,
-    polarity: Polarity::Bright,
-    smoothing_factor: 0.5,
-};
+let mut config = RsdConfig::default();
+config.radii = vec![8, 10, 12];
+config.gradient_threshold = 2.0;
+config.polarity = Polarity::Bright;
 
 let response_map = rsd_response(&gradient, &config)?;
 // response_map.response() is an OwnedImage<f32> — apply NMS to extract peaks
 ```
+
+The single-pass fused variant is `rsd_response_fused`.
 
 ## Reference
 

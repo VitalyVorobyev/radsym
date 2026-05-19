@@ -209,10 +209,8 @@ fn bench_frst_homography(c: &mut Criterion) {
     let image = make_projective_disk_image(size, &homography, rectified_circle);
     let gradient = sobel_gradient(&image.view()).unwrap();
     let grid = RectifiedGrid::new(size, size).unwrap();
-    let config = FrstConfig {
-        radii: vec![28, 30, 32],
-        ..FrstConfig::default()
-    };
+    let mut config = FrstConfig::default();
+    config.radii = vec![28, 30, 32];
 
     c.bench_function("frst_homography_256", |b| {
         b.iter(|| frst_response_homography(&gradient, &homography, grid, &config));

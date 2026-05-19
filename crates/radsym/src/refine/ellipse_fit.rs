@@ -371,7 +371,7 @@ where
     FScore: Fn(&T) -> Scalar + Copy,
     FSector: Fn(&T) -> usize + Copy,
 {
-    let ray_count = config.ray_count.max(16);
+    let ray_count = config.advanced.ray_count.max(16);
     let min_count = min_inlier_count(ray_count);
     let mut ellipse = initial;
     let mut evaluation = evaluate_fit(
@@ -382,7 +382,9 @@ where
         score_of,
         sector_of,
     )?;
-    if evaluation.inlier_count < min_count || evaluation.coverage < config.min_inlier_coverage {
+    if evaluation.inlier_count < min_count
+        || evaluation.coverage < config.advanced.min_inlier_coverage
+    {
         return None;
     }
 
@@ -462,7 +464,7 @@ where
                 <= 1e-6
                 && candidate_eval.trimmed_mean_edge_score > evaluation.trimmed_mean_edge_score;
             if candidate_eval.inlier_count < min_count
-                || candidate_eval.coverage < config.min_inlier_coverage
+                || candidate_eval.coverage < config.advanced.min_inlier_coverage
                 || (!improves_objective && !improves_edge_score)
             {
                 continue;

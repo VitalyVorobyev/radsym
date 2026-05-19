@@ -12,16 +12,16 @@ single end-to-end pipeline.
 
 ```toml
 [dependencies]
-radsym = "0.1"
+radsym = "0.2"
 ```
 
 ## Quick start
 
+The one-call `detect_circles` runs the full propose-score-refine pipeline.
+Configure it with the `DetectCirclesConfig::for_radii` builder:
+
 ```rust
-use radsym::{
-    ImageView, FrstConfig, Circle, Polarity, ScoringConfig, NmsConfig,
-    sobel_gradient, frst_response, extract_proposals, score_circle_support,
-};
+use radsym::{detect_circles, DetectCirclesConfig, ImageView, Polarity};
 
 let size = 64;
 let mut data = vec![0u8; size * size];
@@ -36,29 +36,50 @@ for y in 0..size {
 }
 
 let image = ImageView::from_slice(&data, size, size).unwrap();
-let gradient = sobel_gradient(&image).unwrap();
 
-let config = FrstConfig { radii: vec![9, 10, 11], ..FrstConfig::default() };
-let response = frst_response(&gradient, &config).unwrap();
+let config = DetectCirclesConfig::for_radii([9, 10, 11])
+    .polarity(Polarity::Bright)
+    .radius_hint(10.0)
+    .min_score(0.2);
+let detections = detect_circles(&image, &config).unwrap();
 
-let nms = NmsConfig { radius: 5, threshold: 0.0, max_detections: 5 };
-let proposals = extract_proposals(&response, &nms, Polarity::Bright);
-
-if let Some(best) = proposals.first() {
-    let circle = Circle::new(best.seed.position, 10.0);
-    let score = score_circle_support(&gradient, &circle, &ScoringConfig::default());
-    assert!(score.total > 0.0);
+for det in &detections {
+    println!(
+        "center=({:.1}, {:.1}) r={:.1} score={:.3}",
+        det.hypothesis.center.x, det.hypothesis.center.y,
+        det.hypothesis.radius, det.score.total,
+    );
 }
 ```
 
+`detect_circles` returns `Vec<CircleDetection>` sorted by descending support
+score. Use `detect_circles_with_diagnostics` to also receive a
+`CircleDetectionDiagnostics` with the response map, raw proposals, rejected
+candidates, and per-detection `SupportScoreBreakdown`.
+
+For per-stage control, the propose-score-refine stages remain available as
+free functions: `sobel_gradient`, `frst_response` / `rsd_response` (and the
+fused `frst_response_fused` / `rsd_response_fused`), `extract_proposals`,
+`score_circle_support` / `score_ellipse_support`, and `refine_circle` /
+`refine_ellipse`.
+
 ## Modules
 
-- `core`: image views, geometry, gradients, NMS, errors
+- `core`: image views, geometry, gradients, NMS, pyramids, Kåsa circle fit,
+  errors
 - `propose`: FRST, RSD, proposal extraction, homography-aware proposal tools
-- `support`: annulus sampling, evidence extraction, support scoring
+- `support`: annulus sampling, support evidence, support scoring
 - `refine`: radial center, circle refinement, ellipse refinement
-- `diagnostics`: response heatmaps and overlays
+- `diagnostics`: response heatmaps, overlays, detection diagnostics
 - `affine`: experimental affine-aware extensions behind the `affine` feature
+
+The crate root carries the common detect-score-refine contract. Low-level
+helpers stay under their module paths — circle fitting under
+`core::circle_fit`, pyramids under `core::pyramid`, raw support evidence under
+`support::evidence`, and visualization under `diagnostics`.
+
+Most config and result structs are `#[non_exhaustive]`: construct them via
+`Config::default()` plus field assignment rather than struct literals.
 
 ## Feature flags
 

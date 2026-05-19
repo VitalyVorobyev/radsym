@@ -1,7 +1,7 @@
 use std::hint::black_box;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use radsym::PyramidWorkspace;
+use radsym::core::pyramid::PyramidWorkspace;
 
 #[path = "../tests/support/surf_hole_synthetic.rs"]
 mod surf_hole_synthetic;
@@ -16,7 +16,11 @@ fn bench_surf_hole(c: &mut Criterion) {
 
     group.bench_function("pyramid_level_owned_synthetic_2048x1536_l3", |b| {
         b.iter(|| {
-            radsym::pyramid_level_owned(black_box(&view), black_box(DEFAULT_PYRAMID_LEVEL)).unwrap()
+            radsym::core::pyramid::pyramid_level_owned(
+                black_box(&view),
+                black_box(DEFAULT_PYRAMID_LEVEL),
+            )
+            .unwrap()
         })
     });
 

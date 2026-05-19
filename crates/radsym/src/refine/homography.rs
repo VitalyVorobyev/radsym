@@ -28,11 +28,31 @@ const NORMAL_SAMPLE_STEP: Scalar = 0.75;
 /// Configuration for homography-aware ellipse refinement.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct HomographyEllipseRefineConfig {
     /// Maximum refinement iterations.
     pub max_iterations: usize,
     /// Convergence tolerance for center and radius updates in rectified pixels.
     pub convergence_tol: Scalar,
+    /// Maximum center shift from the initial rectified circle, as a radius fraction.
+    pub max_center_shift_fraction: Scalar,
+    /// Maximum radius change from the initial rectified circle, as a radius fraction.
+    pub max_radius_change_fraction: Scalar,
+    /// Advanced edge-acquisition and sampling knobs.
+    pub advanced: HomographyEllipseRefineAdvanced,
+}
+
+/// Advanced tuning knobs for [`HomographyEllipseRefineConfig`].
+///
+/// These fields control image-space edge acquisition (ray count, radial and
+/// normal search windows), inlier coverage, and the radial-center seed
+/// stabilization sub-step. Most callers should leave them at their defaults;
+/// they are split out of the stable [`HomographyEllipseRefineConfig`] surface
+/// so the common config reads as user intent rather than algorithm internals.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub struct HomographyEllipseRefineAdvanced {
     /// Radial center config for bounded image-space seed stabilization.
     pub radial_center: RadialCenterConfig,
     /// Number of angular sectors used for image-space edge acquisition.
@@ -45,10 +65,19 @@ pub struct HomographyEllipseRefineConfig {
     pub normal_search_half_width: Scalar,
     /// Minimum accepted rectified angular coverage.
     pub min_inlier_coverage: Scalar,
-    /// Maximum center shift from the initial rectified circle, as a radius fraction.
-    pub max_center_shift_fraction: Scalar,
-    /// Maximum radius change from the initial rectified circle, as a radius fraction.
-    pub max_radius_change_fraction: Scalar,
+}
+
+impl Default for HomographyEllipseRefineAdvanced {
+    fn default() -> Self {
+        Self {
+            radial_center: RadialCenterConfig::default(),
+            ray_count: 96,
+            radial_search_inner: 0.6,
+            radial_search_outer: 1.45,
+            normal_search_half_width: 6.0,
+            min_inlier_coverage: 0.45,
+        }
+    }
 }
 
 impl Default for HomographyEllipseRefineConfig {
@@ -56,14 +85,9 @@ impl Default for HomographyEllipseRefineConfig {
         Self {
             max_iterations: 5,
             convergence_tol: 0.1,
-            radial_center: RadialCenterConfig::default(),
-            ray_count: 96,
-            radial_search_inner: 0.6,
-            radial_search_outer: 1.45,
-            normal_search_half_width: 6.0,
-            min_inlier_coverage: 0.45,
             max_center_shift_fraction: 0.4,
             max_radius_change_fraction: 0.6,
+            advanced: HomographyEllipseRefineAdvanced::default(),
         }
     }
 }
@@ -71,6 +95,7 @@ impl Default for HomographyEllipseRefineConfig {
 /// Result of homography-aware refinement.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct HomographyRefinementResult {
     /// Final image-space ellipse.
     pub image_ellipse: Ellipse,
@@ -147,9 +172,9 @@ fn collect_radial_candidates(
 ) -> Vec<Vec<ImageObservation>> {
     let gx_view = gradient.gx();
     let gy_view = gradient.gy();
-    let ray_count = config.ray_count.max(16);
-    let start = config.radial_search_inner * radius;
-    let stop = config.radial_search_outer * radius;
+    let ray_count = config.advanced.ray_count.max(16);
+    let start = config.advanced.radial_search_inner * radius;
+    let stop = config.advanced.radial_search_outer * radius;
     let sigma = 0.35 * radius.max(1.0);
     let mut sectors = vec![Vec::new(); ray_count];
 
@@ -198,10 +223,10 @@ fn collect_normal_candidates(
 ) -> Vec<Vec<ImageObservation>> {
     let gx_view = gradient.gx();
     let gy_view = gradient.gy();
-    let ray_count = config.ray_count.max(16);
+    let ray_count = config.advanced.ray_count.max(16);
     let cos_a = image_ellipse.angle.cos();
     let sin_a = image_ellipse.angle.sin();
-    let sigma = (config.normal_search_half_width * 0.5).max(1.0);
+    let sigma = (config.advanced.normal_search_half_width * 0.5).max(1.0);
     let mut sectors = vec![Vec::new(); ray_count];
 
     for (sector, slot) in sectors.iter_mut().enumerate() {
@@ -229,8 +254,8 @@ fn collect_normal_candidates(
             base,
             dir_x,
             dir_y,
-            -config.normal_search_half_width,
-            config.normal_search_half_width,
+            -config.advanced.normal_search_half_width,
+            config.advanced.normal_search_half_width,
             NORMAL_SAMPLE_STEP,
             sector,
             0.0,
@@ -281,7 +306,7 @@ fn refine_circle_hypothesis(
     seed_circle: &Circle,
     config: &HomographyEllipseRefineConfig,
 ) -> Option<CircleHypothesisFit> {
-    let min_count = min_inlier_count(config.ray_count.max(16));
+    let min_count = min_inlier_count(config.advanced.ray_count.max(16));
     if observations.len() < min_count {
         return None;
     }
@@ -392,10 +417,10 @@ pub fn refine_ellipse_homography(
 ) -> Result<HomographyRefinementResult> {
     let seed_radius = initial_image_ellipse.mean_radius();
     let seed_center = initial_image_ellipse.center;
-    let min_count = min_inlier_count(config.ray_count.max(16));
+    let min_count = min_inlier_count(config.advanced.ray_count.max(16));
 
     let radial_center =
-        radial_center_refine_from_gradient(gradient, seed_center, &config.radial_center)?;
+        radial_center_refine_from_gradient(gradient, seed_center, &config.advanced.radial_center)?;
     let stabilized_center = match radial_center.status {
         RefinementStatus::Converged => clamp_center_shift(
             seed_center,
@@ -408,7 +433,7 @@ pub fn refine_ellipse_homography(
     let fallback_rectified = approximate_rectified_circle_from_image_ellipse(
         homography,
         initial_image_ellipse,
-        config.ray_count.max(48),
+        config.advanced.ray_count.max(48),
     )
     .unwrap_or_else(|| {
         Circle::new(
@@ -540,7 +565,7 @@ pub fn refine_ellipse_homography(
         }
     }
 
-    if fit.fit.evaluation.coverage < config.min_inlier_coverage
+    if fit.fit.evaluation.coverage < config.advanced.min_inlier_coverage
         || fit.fit.evaluation.inlier_count < min_count
     {
         status = RefinementStatus::Degenerate;
@@ -706,7 +731,10 @@ mod tests {
             true_image_ellipse.angle + 0.08,
         );
         let config = HomographyEllipseRefineConfig {
-            radial_search_inner: 0.3,
+            advanced: HomographyEllipseRefineAdvanced {
+                radial_search_inner: 0.3,
+                ..HomographyEllipseRefineAdvanced::default()
+            },
             ..HomographyEllipseRefineConfig::default()
         };
 

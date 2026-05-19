@@ -33,6 +33,7 @@ pub enum ProposalSource {
 /// candidate center locations for downstream support analysis and refinement.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct Proposal {
     /// The seed point (position + score).
     pub seed: SeedPoint,

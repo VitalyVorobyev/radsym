@@ -101,28 +101,36 @@ a better starting point than the seed circle alone.
 
 ## Configuration
 
+`EllipseRefineConfig` is split into a small stable config plus an `advanced`
+sub-config that holds the edge-acquisition and sampling knobs. Both are
+`#[non_exhaustive]` — construct them from `default()` and assign fields.
+
 ```rust
 pub struct EllipseRefineConfig {
-    pub max_iterations: usize,          // 5
-    pub convergence_tol: f32,           // 0.1
-    pub annulus_margin: f32,            // 0.3
+    pub max_iterations: usize,           // 5
+    pub convergence_tol: f32,            // 0.1
+    pub max_center_shift_fraction: f32,  // 0.4
+    pub max_axis_ratio: f32,             // 1.8
+    pub advanced: EllipseRefineAdvanced,
+}
+
+pub struct EllipseRefineAdvanced {
+    pub annulus_margin: f32,             // 0.3
     pub radial_center: RadialCenterConfig,
     pub sampling: AnnulusSamplingConfig,
-    pub min_alignment: f32,             // 0.3
-    pub ray_count: usize,              // 96
-    pub radial_search_inner: f32,      // 0.6
-    pub radial_search_outer: f32,      // 1.45
-    pub normal_search_half_width: f32, // 6.0
-    pub min_inlier_coverage: f32,      // 0.6
-    pub max_center_shift_fraction: f32,// 0.4
-    pub max_axis_ratio: f32,           // 1.8
+    pub min_alignment: f32,              // 0.3
+    pub ray_count: usize,                // 96
+    pub radial_search_inner: f32,        // 0.6
+    pub radial_search_outer: f32,        // 1.45
+    pub normal_search_half_width: f32,   // 6.0
+    pub min_inlier_coverage: f32,        // 0.6
 }
 ```
 
 | Field | Effect of increasing |
 |-------|---------------------|
-| `ray_count` | Denser angular sampling, better coverage but slower |
-| `normal_search_half_width` | Wider search window, tolerates larger initial error |
+| `advanced.ray_count` | Denser angular sampling, better coverage but slower |
+| `advanced.normal_search_half_width` | Wider search window, tolerates larger initial error |
 | `max_axis_ratio` | Permits more eccentric ellipses |
 | `max_center_shift_fraction` | Allows larger center correction from the seed |
 

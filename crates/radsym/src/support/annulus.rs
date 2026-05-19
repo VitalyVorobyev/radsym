@@ -1,7 +1,7 @@
 //! Annulus sampling for local support extraction.
 //!
 //! Samples gradient vectors along circular or elliptical annuli around a
-//! hypothesis center, producing [`SupportEvidence`] for scoring.
+//! hypothesis center, producing the gradient evidence consumed by scoring.
 
 use crate::core::coords::PixelCoord;
 use crate::core::geometry::Ellipse;
@@ -13,6 +13,7 @@ use super::evidence::{GradientSample, SupportEvidence};
 /// Configuration for annulus sampling.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct AnnulusSamplingConfig {
     /// Number of angular samples around the annulus.
     pub num_angular_samples: usize,
@@ -52,7 +53,7 @@ impl Default for AnnulusSamplingConfig {
 /// Samples at evenly spaced angles around the annulus, at multiple radial
 /// offsets between `inner_radius` and `outer_radius`. For each sample,
 /// records the gradient vector and its alignment with the radial direction.
-pub fn sample_annulus(
+pub(crate) fn sample_annulus(
     gradient: &GradientField,
     center: PixelCoord,
     inner_radius: Scalar,
@@ -99,8 +100,6 @@ pub fn sample_annulus(
 
             samples.push(GradientSample {
                 position: PixelCoord::new(sx, sy),
-                gx,
-                gy,
                 radial_alignment: alignment,
             });
         }
@@ -113,10 +112,8 @@ pub fn sample_annulus(
         0.0
     };
 
-    let coverage = compute_circular_angular_coverage(&samples, center, config.num_angular_samples);
     SupportEvidence {
         gradient_samples: samples,
-        angular_coverage: coverage,
         sample_count,
         mean_gradient_alignment: mean_alignment,
     }
@@ -126,7 +123,7 @@ pub fn sample_annulus(
 ///
 /// The ellipse is parameterized by semi-major/minor axes and angle. Samples
 /// follow the ellipse boundary scaled between inner and outer factors.
-pub fn sample_elliptical_annulus(
+pub(crate) fn sample_elliptical_annulus(
     gradient: &GradientField,
     ellipse: &Ellipse,
     inner_scale: Scalar,
@@ -195,8 +192,6 @@ pub fn sample_elliptical_annulus(
 
             samples.push(GradientSample {
                 position: PixelCoord::new(sx, sy),
-                gx,
-                gy,
                 radial_alignment: alignment,
             });
         }
@@ -209,73 +204,11 @@ pub fn sample_elliptical_annulus(
         0.0
     };
 
-    let coverage =
-        compute_elliptical_angular_coverage(&samples, ellipse, config.num_angular_samples);
     SupportEvidence {
         gradient_samples: samples,
-        angular_coverage: coverage,
         sample_count,
         mean_gradient_alignment: mean_alignment,
     }
-}
-
-/// Estimate angular coverage from gradient samples.
-///
-/// Divides the annulus into `n_bins` angular bins and counts what fraction
-/// of bins have at least one well-aligned sample (alignment > 0.5).
-fn compute_circular_angular_coverage(
-    samples: &[GradientSample],
-    center: PixelCoord,
-    n_bins: usize,
-) -> Scalar {
-    if samples.is_empty() || n_bins == 0 {
-        return 0.0;
-    }
-    let mut bins = vec![false; n_bins];
-    for s in samples {
-        if s.radial_alignment > 0.5 {
-            let angle = (s.position.y - center.y).atan2(s.position.x - center.x);
-            let normalized = (angle + std::f32::consts::PI) / (2.0 * std::f32::consts::PI);
-            let bin = (normalized * n_bins as Scalar) as usize;
-            let bin = bin.min(n_bins - 1);
-            bins[bin] = true;
-        }
-    }
-    let filled = bins.iter().filter(|&&b| b).count();
-    filled as Scalar / n_bins as Scalar
-}
-
-fn compute_elliptical_angular_coverage(
-    samples: &[GradientSample],
-    ellipse: &Ellipse,
-    n_bins: usize,
-) -> Scalar {
-    if samples.is_empty() || n_bins == 0 || ellipse.semi_major <= 1e-6 || ellipse.semi_minor <= 1e-6
-    {
-        return 0.0;
-    }
-
-    let cos_a = ellipse.angle.cos();
-    let sin_a = ellipse.angle.sin();
-    let mut bins = vec![false; n_bins];
-
-    for s in samples {
-        if s.radial_alignment <= 0.5 {
-            continue;
-        }
-
-        let dx = s.position.x - ellipse.center.x;
-        let dy = s.position.y - ellipse.center.y;
-        let lx = dx * cos_a + dy * sin_a;
-        let ly = -dx * sin_a + dy * cos_a;
-        let angle = (ly / ellipse.semi_minor).atan2(lx / ellipse.semi_major);
-        let normalized = (angle + std::f32::consts::PI) / (2.0 * std::f32::consts::PI);
-        let bin = ((normalized * n_bins as Scalar) as usize).min(n_bins - 1);
-        bins[bin] = true;
-    }
-
-    let filled = bins.iter().filter(|&&b| b).count();
-    filled as Scalar / n_bins as Scalar
 }
 
 #[cfg(test)]

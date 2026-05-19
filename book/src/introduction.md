@@ -39,9 +39,11 @@ Detection follows a propose-score-refine architecture:
    at likely centers of radial symmetry. Non-maximum suppression extracts a
    sparse set of candidate locations.
 2. **Score.** Each proposal is evaluated by sampling gradients in an annulus
-   around the hypothesized circle or ellipse. The resulting `SupportScore`
-   combines a *ringness* metric (gradient alignment) with *angular coverage*
-   (how much of the circumference has evidence).
+   around the hypothesized circle or ellipse. The resulting score combines a
+   *ringness* metric (gradient alignment) with *angular coverage* (how much of
+   the circumference has evidence). The scoring functions return a
+   `SupportScoreBreakdown` with these components; the compact `SupportScore`
+   carries just the headline `total`.
 3. **Refine.** Surviving hypotheses are refined to subpixel accuracy using the
    Parthasarathy radial center algorithm for center position and iterative
    least-squares fitting for radius and ellipse parameters.

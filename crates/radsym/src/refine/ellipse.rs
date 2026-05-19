@@ -56,11 +56,31 @@ struct HypothesisFit {
 /// Configuration for iterative ellipse refinement.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct EllipseRefineConfig {
     /// Maximum refinement iterations.
     pub max_iterations: usize,
     /// Convergence tolerance for center and axis updates (pixels).
     pub convergence_tol: Scalar,
+    /// Maximum allowed center shift from the original seed, as a fraction of the seed radius.
+    pub max_center_shift_fraction: Scalar,
+    /// Maximum allowed ellipse axis ratio.
+    pub max_axis_ratio: Scalar,
+    /// Advanced edge-acquisition and sampling knobs.
+    pub advanced: EllipseRefineAdvanced,
+}
+
+/// Advanced tuning knobs for [`EllipseRefineConfig`].
+///
+/// These fields control edge acquisition (ray counts, radial and normal search
+/// windows), inlier coverage, and legacy annulus sampling. Most callers should
+/// leave them at their defaults; they are split out of the stable
+/// [`EllipseRefineConfig`] surface so the common config reads as user intent
+/// rather than algorithm internals.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub struct EllipseRefineAdvanced {
     /// Fractional annulus margin retained for compatibility and downstream diagnostics.
     pub annulus_margin: Scalar,
     /// Radial center config for bounded seed stabilization.
@@ -79,10 +99,35 @@ pub struct EllipseRefineConfig {
     pub normal_search_half_width: Scalar,
     /// Minimum sector coverage of accepted inliers.
     pub min_inlier_coverage: Scalar,
-    /// Maximum allowed center shift from the original seed, as a fraction of the seed radius.
-    pub max_center_shift_fraction: Scalar,
-    /// Maximum allowed ellipse axis ratio.
-    pub max_axis_ratio: Scalar,
+}
+
+impl EllipseRefineAdvanced {
+    /// Validate advanced configuration parameters.
+    pub fn validate(&self) -> crate::core::error::Result<()> {
+        use crate::core::error::RadSymError;
+        if self.ray_count < 8 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "ray_count must be >= 8",
+            });
+        }
+        Ok(())
+    }
+}
+
+impl Default for EllipseRefineAdvanced {
+    fn default() -> Self {
+        Self {
+            annulus_margin: 0.3,
+            radial_center: RadialCenterConfig::default(),
+            sampling: AnnulusSamplingConfig::default(),
+            min_alignment: 0.3,
+            ray_count: 96,
+            radial_search_inner: 0.6,
+            radial_search_outer: 1.45,
+            normal_search_half_width: 6.0,
+            min_inlier_coverage: 0.6,
+        }
+    }
 }
 
 impl EllipseRefineConfig {
@@ -99,11 +144,7 @@ impl EllipseRefineConfig {
                 reason: "convergence_tol must be > 0.0",
             });
         }
-        if self.ray_count < 8 {
-            return Err(RadSymError::InvalidConfig {
-                reason: "ray_count must be >= 8",
-            });
-        }
+        self.advanced.validate()?;
         Ok(())
     }
 }
@@ -113,17 +154,9 @@ impl Default for EllipseRefineConfig {
         Self {
             max_iterations: 5,
             convergence_tol: 0.1,
-            annulus_margin: 0.3,
-            radial_center: RadialCenterConfig::default(),
-            sampling: AnnulusSamplingConfig::default(),
-            min_alignment: 0.3,
-            ray_count: 96,
-            radial_search_inner: 0.6,
-            radial_search_outer: 1.45,
-            normal_search_half_width: 6.0,
-            min_inlier_coverage: 0.6,
             max_center_shift_fraction: 0.4,
             max_axis_ratio: 1.8,
+            advanced: EllipseRefineAdvanced::default(),
         }
     }
 }
@@ -165,9 +198,9 @@ fn collect_radial_candidates(
     seed_radius: Scalar,
     config: &EllipseRefineConfig,
 ) -> Vec<Vec<EdgeObservation>> {
-    let ray_count = config.ray_count.max(16);
-    let start = config.radial_search_inner * seed_radius;
-    let stop = config.radial_search_outer * seed_radius;
+    let ray_count = config.advanced.ray_count.max(16);
+    let start = config.advanced.radial_search_inner * seed_radius;
+    let stop = config.advanced.radial_search_outer * seed_radius;
     let sigma = 0.35 * seed_radius.max(1.0);
     let mut sectors = vec![Vec::new(); ray_count];
 
@@ -212,10 +245,10 @@ fn collect_normal_candidates(
     config: &EllipseRefineConfig,
     expected_sign: Scalar,
 ) -> Vec<Vec<EdgeObservation>> {
-    let ray_count = config.ray_count.max(16);
+    let ray_count = config.advanced.ray_count.max(16);
     let cos_a = ellipse.angle.cos();
     let sin_a = ellipse.angle.sin();
-    let sigma = (config.normal_search_half_width * 0.5).max(1.0);
+    let sigma = (config.advanced.normal_search_half_width * 0.5).max(1.0);
     let mut sectors = vec![Vec::new(); ray_count];
 
     for (sector, slot) in sectors.iter_mut().enumerate() {
@@ -245,8 +278,8 @@ fn collect_normal_candidates(
             base,
             dir_x,
             dir_y,
-            -config.normal_search_half_width,
-            config.normal_search_half_width,
+            -config.advanced.normal_search_half_width,
+            config.advanced.normal_search_half_width,
             NORMAL_SAMPLE_STEP,
             sector,
             0.0,
@@ -296,7 +329,7 @@ fn refine_hypothesis(
     width: usize,
     height: usize,
 ) -> Option<HypothesisFit> {
-    let min_count = min_inlier_count(config.ray_count.max(16));
+    let min_count = min_inlier_count(config.advanced.ray_count.max(16));
     if observations.len() < min_count {
         return None;
     }
@@ -395,10 +428,10 @@ pub fn refine_ellipse(
     let height = gradient.height();
     let gx_view = gradient.gx();
     let gy_view = gradient.gy();
-    let min_count = min_inlier_count(config.ray_count.max(16));
+    let min_count = min_inlier_count(config.advanced.ray_count.max(16));
 
     let radial_center =
-        radial_center_refine_from_gradient(gradient, seed_center, &config.radial_center)?;
+        radial_center_refine_from_gradient(gradient, seed_center, &config.advanced.radial_center)?;
     let stabilized_center = match radial_center.status {
         RefinementStatus::Converged => {
             clamp_center_shift(seed_center, radial_center.hypothesis, 0.25 * seed_radius)
@@ -544,7 +577,7 @@ pub fn refine_ellipse(
         }
     }
 
-    if fit.fit.evaluation.coverage < config.min_inlier_coverage
+    if fit.fit.evaluation.coverage < config.advanced.min_inlier_coverage
         || fit.fit.evaluation.inlier_count < min_count
     {
         status = RefinementStatus::Degenerate;
@@ -762,7 +795,10 @@ mod tests {
             0.0,
         );
         let config = EllipseRefineConfig {
-            radial_search_inner: 0.3,
+            advanced: EllipseRefineAdvanced {
+                radial_search_inner: 0.3,
+                ..EllipseRefineAdvanced::default()
+            },
             ..EllipseRefineConfig::default()
         };
 

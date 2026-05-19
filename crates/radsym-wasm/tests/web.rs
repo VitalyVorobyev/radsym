@@ -227,10 +227,8 @@ fn test_frst_response_matches_native_ringgrid() {
     // Native path — replicate what RadSymProcessor::frst_response does internally
     let view = radsym::ImageView::from_slice(&gray, w, h).unwrap();
     let gradient = radsym::compute_gradient(&view, radsym::GradientOperator::Sobel).unwrap();
-    let frst_cfg = radsym::FrstConfig {
-        polarity: radsym::Polarity::Both,
-        ..radsym::FrstConfig::default()
-    };
+    let mut frst_cfg = radsym::FrstConfig::default();
+    frst_cfg.polarity = radsym::Polarity::Both;
     let response = radsym::frst_response(&gradient, &frst_cfg).unwrap();
     let native_data: &[f32] = response.response().data();
 
@@ -255,12 +253,13 @@ fn test_response_heatmap_matches_native_ringgrid() {
     // Native path
     let view = radsym::ImageView::from_slice(&gray, w, h).unwrap();
     let gradient = radsym::compute_gradient(&view, radsym::GradientOperator::Sobel).unwrap();
-    let frst_cfg = radsym::FrstConfig {
-        polarity: radsym::Polarity::Both,
-        ..radsym::FrstConfig::default()
-    };
+    let mut frst_cfg = radsym::FrstConfig::default();
+    frst_cfg.polarity = radsym::Polarity::Both;
     let response = radsym::frst_response(&gradient, &frst_cfg).unwrap();
-    let native_heatmap = radsym::response_heatmap(response.response(), radsym::Colormap::Hot);
+    let native_heatmap = radsym::diagnostics::response_heatmap(
+        response.response(),
+        radsym::diagnostics::Colormap::Hot,
+    );
     let native_data = native_heatmap.into_data();
 
     assert_eq!(wasm_heatmap.len(), native_data.len());
@@ -284,15 +283,10 @@ fn test_detect_circles_matches_native_ringgrid() {
 
     // Native path
     let view = radsym::ImageView::from_slice(&gray, w, h).unwrap();
-    let config = radsym::DetectCirclesConfig {
-        frst: radsym::FrstConfig {
-            radii: radii.clone(),
-            ..radsym::FrstConfig::default()
-        },
-        polarity: radsym::Polarity::Dark,
-        radius_hint: 13.0,
-        ..radsym::DetectCirclesConfig::default()
-    };
+    let mut config = radsym::DetectCirclesConfig::default();
+    config.radii = radii.clone();
+    config.polarity = radsym::Polarity::Dark;
+    config.radius_hint = 13.0;
     let detections = radsym::detect_circles(&view, &config).unwrap();
 
     assert_eq!(
@@ -395,35 +389,35 @@ fn test_detect_circles_detailed_matches_native_ringgrid() {
 
     // Native path
     let view = radsym::ImageView::from_slice(&gray, w, h).unwrap();
-    let config = radsym::DetectCirclesConfig {
-        frst: radsym::FrstConfig {
-            radii: radii.clone(),
-            ..radsym::FrstConfig::default()
-        },
-        polarity: radsym::Polarity::Dark,
-        radius_hint: 13.0,
-        ..radsym::DetectCirclesConfig::default()
-    };
-    let detections = radsym::detect_circles(&view, &config).unwrap();
+    let mut config = radsym::DetectCirclesConfig::default();
+    config.radii = radii.clone();
+    config.polarity = radsym::Polarity::Dark;
+    config.radius_hint = 13.0;
+    let (detections, diagnostics) =
+        radsym::detect_circles_with_diagnostics(&view, &config).unwrap();
 
     assert_eq!(
         wasm_data.len(),
         detections.len() * 8,
         "detection count mismatch"
     );
-    for (i, det) in detections.iter().enumerate() {
+    for (i, (det, breakdown)) in detections
+        .iter()
+        .zip(&diagnostics.score_breakdowns)
+        .enumerate()
+    {
         let base = i * 8;
         assert_eq!(wasm_data[base], det.hypothesis.center.x, "det {i} x");
         assert_eq!(wasm_data[base + 1], det.hypothesis.center.y, "det {i} y");
         assert_eq!(wasm_data[base + 2], det.hypothesis.radius, "det {i} r");
         assert_eq!(wasm_data[base + 3], det.score.total, "det {i} total");
-        assert_eq!(wasm_data[base + 4], det.score.ringness, "det {i} ringness");
+        assert_eq!(wasm_data[base + 4], breakdown.ringness, "det {i} ringness");
         assert_eq!(
             wasm_data[base + 5],
-            det.score.angular_coverage,
+            breakdown.angular_coverage,
             "det {i} coverage"
         );
-        let expected_degen = if det.score.is_degenerate { 1.0 } else { 0.0 };
+        let expected_degen = if breakdown.is_degenerate { 1.0 } else { 0.0 };
         assert_eq!(wasm_data[base + 6], expected_degen, "det {i} is_degenerate");
         let expected_status = match det.status {
             radsym::RefinementStatus::Converged => 0.0,
@@ -506,14 +500,14 @@ fn test_rsd_response_fused_dimensions() {
 }
 
 #[wasm_bindgen_test]
-fn test_multiradius_response_dimensions() {
+fn test_frst_response_fused_dimensions() {
     let size = 64;
     let pixels = synthetic_disk_rgba(size, 32.0, 32.0, 10.0);
 
     let mut processor = RadSymProcessor::new();
     let response = processor
-        .multiradius_response(&pixels, size, size)
-        .expect("multiradius_response should succeed");
+        .frst_response_fused(&pixels, size, size)
+        .expect("frst_response_fused should succeed");
     assert_eq!(response.length() as usize, size * size);
 }
 

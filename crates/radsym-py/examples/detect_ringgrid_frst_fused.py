@@ -1,9 +1,9 @@
 """Detect ring markers using fused multi-radius FRST proposals.
 
 Usage:
-    python detect_ringgrid_multiradius.py path/to/ringgrid.png [--output result.png]
+    python detect_ringgrid_frst_fused.py path/to/ringgrid.png [--output result.png]
 
-Uses multiradius_response (fused single-pass FRST variant) which is faster
+Uses frst_response_fused (fused single-pass FRST variant) which is faster
 than per-radius frst_response when many radii are tested.
 """
 
@@ -56,7 +56,7 @@ def main() -> int:
         polarity=args.polarity, smoothing_factor=0.5,
     )
     response = timed_call(
-        metrics, "multiradius_response", radsym.multiradius_response, gradient, config,
+        metrics, "frst_response_fused", radsym.frst_response_fused, gradient, config,
     )
 
     nms = radsym.NmsConfig(
@@ -75,14 +75,14 @@ def main() -> int:
 
     overlay_path = args.output.expanduser().resolve() if args.output else None
     heatmap_path = args.heatmap_output.expanduser().resolve() if args.heatmap_output else None
-    overlay_fig = render_overlay(image, centers, "multiradius (fused FRST)")
-    heatmap_fig = render_heatmap(response, centers, "multiradius (fused FRST)")
+    overlay_fig = render_overlay(image, centers, "fused FRST")
+    heatmap_fig = render_heatmap(response, centers, "fused FRST")
     show_or_save([(overlay_fig, overlay_path), (heatmap_fig, heatmap_path)])
 
     render_summary(
-        str(args.image), width, height, "multiradius (fused FRST)",
+        str(args.image), width, height, "fused FRST",
         radii, raw_count, len(proposals), processing_ms,
-        title="Multiradius Detection",
+        title="Fused FRST Detection",
     )
     render_performance(metrics)
     return 0
