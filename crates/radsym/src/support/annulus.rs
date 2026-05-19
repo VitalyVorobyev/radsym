@@ -13,6 +13,7 @@ use super::evidence::{GradientSample, SupportEvidence};
 /// Configuration for annulus sampling.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct AnnulusSamplingConfig {
     /// Number of angular samples around the annulus.
     pub num_angular_samples: usize,
@@ -52,7 +53,7 @@ impl Default for AnnulusSamplingConfig {
 /// Samples at evenly spaced angles around the annulus, at multiple radial
 /// offsets between `inner_radius` and `outer_radius`. For each sample,
 /// records the gradient vector and its alignment with the radial direction.
-pub fn sample_annulus(
+pub(crate) fn sample_annulus(
     gradient: &GradientField,
     center: PixelCoord,
     inner_radius: Scalar,
@@ -126,7 +127,7 @@ pub fn sample_annulus(
 ///
 /// The ellipse is parameterized by semi-major/minor axes and angle. Samples
 /// follow the ellipse boundary scaled between inner and outer factors.
-pub fn sample_elliptical_annulus(
+pub(crate) fn sample_elliptical_annulus(
     gradient: &GradientField,
     ellipse: &Ellipse,
     inner_scale: Scalar,

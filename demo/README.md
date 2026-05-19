@@ -41,7 +41,7 @@ your own images.
 | Algorithm | WASM Method | Description |
 |-----------|------------|-------------|
 | **FRST** | `frst_response` | Multi-radius with orientation accumulator (Loy & Zelinsky 2002) |
-| **FRST (fused)** | `multiradius_response` | Single-pass fused variant, faster |
+| **FRST (fused)** | `frst_response_fused` | Single-pass fused variant, faster |
 | **RSD** | `rsd_response` | Magnitude-only voting, ~2x faster (Barnes et al. 2008) |
 | **RSD (fused)** | `rsd_response_fused` | Single-pass fused RSD |
 

@@ -141,7 +141,7 @@ impl PyRectifiedResponseMap {
 /// One-shot owned image at a selected pyramid level.
 #[pyclass(name = "PyramidLevelImage")]
 pub struct PyPyramidLevelImage {
-    pub inner: radsym::OwnedPyramidLevel,
+    pub inner: radsym::core::pyramid::OwnedPyramidLevel,
 }
 
 #[pymethods]

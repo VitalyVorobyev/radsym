@@ -2,7 +2,7 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 
 use radsym::core::gradient::sobel_gradient;
 use radsym::core::image_view::OwnedImage;
-use radsym::propose::frst::{FrstConfig, frst_response, multiradius_response};
+use radsym::propose::frst::{FrstConfig, frst_response, frst_response_fused};
 
 /// Create a synthetic image with a bright disk at center.
 fn make_disk_image(size: usize) -> OwnedImage<u8> {
@@ -23,10 +23,8 @@ fn make_disk_image(size: usize) -> OwnedImage<u8> {
 }
 
 fn bench_frst(c: &mut Criterion) {
-    let config = FrstConfig {
-        radii: vec![5, 7, 9, 11, 13],
-        ..FrstConfig::default()
-    };
+    let mut config = FrstConfig::default();
+    config.radii = vec![5, 7, 9, 11, 13];
 
     let mut group = c.benchmark_group("frst");
 
@@ -66,12 +64,10 @@ fn bench_gradient(c: &mut Criterion) {
 fn bench_frst_large_radii(c: &mut Criterion) {
     let w = 256;
     let h = 192;
-    let config = FrstConfig {
-        radii: vec![20, 25, 30, 36, 41],
-        smoothing_factor: 0.5,
-        gradient_threshold: 1.5,
-        ..FrstConfig::default()
-    };
+    let mut config = FrstConfig::default();
+    config.radii = vec![20, 25, 30, 36, 41];
+    config.smoothing_factor = 0.5;
+    config.gradient_threshold = 1.5;
 
     // Create a disk that fits this image size
     let cx = w as f32 / 2.0;
@@ -95,13 +91,11 @@ fn bench_frst_large_radii(c: &mut Criterion) {
     });
 }
 
-fn bench_multiradius(c: &mut Criterion) {
-    let config = FrstConfig {
-        radii: vec![5, 7, 9, 11, 13],
-        ..FrstConfig::default()
-    };
+fn bench_frst_fused(c: &mut Criterion) {
+    let mut config = FrstConfig::default();
+    config.radii = vec![5, 7, 9, 11, 13];
 
-    let mut group = c.benchmark_group("multiradius");
+    let mut group = c.benchmark_group("frst_fused");
 
     for &size in &[256, 512, 1024] {
         let image = make_disk_image(size);
@@ -109,22 +103,20 @@ fn bench_multiradius(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements((size * size) as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), &gradient, |b, grad| {
-            b.iter(|| multiradius_response(grad, &config).unwrap());
+            b.iter(|| frst_response_fused(grad, &config).unwrap());
         });
     }
 
     group.finish();
 }
 
-fn bench_multiradius_large_radii(c: &mut Criterion) {
+fn bench_frst_fused_large_radii(c: &mut Criterion) {
     let w = 256;
     let h = 192;
-    let config = FrstConfig {
-        radii: vec![20, 25, 30, 36, 41],
-        smoothing_factor: 0.5,
-        gradient_threshold: 1.5,
-        ..FrstConfig::default()
-    };
+    let mut config = FrstConfig::default();
+    config.radii = vec![20, 25, 30, 36, 41];
+    config.smoothing_factor = 0.5;
+    config.gradient_threshold = 1.5;
 
     let cx = w as f32 / 2.0;
     let cy = h as f32 / 2.0;
@@ -142,8 +134,8 @@ fn bench_multiradius_large_radii(c: &mut Criterion) {
     let image = OwnedImage::from_vec(data, w, h).unwrap();
     let gradient = sobel_gradient(&image.view()).unwrap();
 
-    c.bench_function("multiradius_large_radii_256x192", |b| {
-        b.iter(|| multiradius_response(&gradient, &config).unwrap());
+    c.bench_function("frst_fused_large_radii_256x192", |b| {
+        b.iter(|| frst_response_fused(&gradient, &config).unwrap());
     });
 }
 
@@ -152,7 +144,7 @@ criterion_group!(
     bench_frst,
     bench_gradient,
     bench_frst_large_radii,
-    bench_multiradius,
-    bench_multiradius_large_radii,
+    bench_frst_fused,
+    bench_frst_fused_large_radii,
 );
 criterion_main!(benches);

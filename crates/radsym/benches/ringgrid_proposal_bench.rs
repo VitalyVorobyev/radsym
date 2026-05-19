@@ -41,37 +41,32 @@ fn build_fixture() -> BenchFixture {
     let gradient = sobel_gradient(&image.view()).unwrap();
 
     let radii = vec![18, 20, 22, 24, 26];
-    let single_vote_only = RsdConfig {
-        radii: vec![22],
-        gradient_threshold: 2.0,
-        polarity: Polarity::Dark,
-        smoothing_factor: 0.0,
-    };
-    let single_smoothed = RsdConfig {
-        radii: vec![22],
-        gradient_threshold: 2.0,
-        polarity: Polarity::Dark,
-        smoothing_factor: 0.5,
-    };
-    let multi_vote_only = RsdConfig {
-        radii: vec![18, 20, 22, 24, 26],
-        gradient_threshold: 2.0,
-        polarity: Polarity::Dark,
-        smoothing_factor: 0.0,
-    };
-    let multi_radius = RsdConfig {
-        radii,
-        gradient_threshold: 2.0,
-        polarity: Polarity::Dark,
-        smoothing_factor: 0.5,
-    };
+    let mut single_vote_only = RsdConfig::default();
+    single_vote_only.radii = vec![22];
+    single_vote_only.gradient_threshold = 2.0;
+    single_vote_only.polarity = Polarity::Dark;
+    single_vote_only.smoothing_factor = 0.0;
+    let mut single_smoothed = RsdConfig::default();
+    single_smoothed.radii = vec![22];
+    single_smoothed.gradient_threshold = 2.0;
+    single_smoothed.polarity = Polarity::Dark;
+    single_smoothed.smoothing_factor = 0.5;
+    let mut multi_vote_only = RsdConfig::default();
+    multi_vote_only.radii = vec![18, 20, 22, 24, 26];
+    multi_vote_only.gradient_threshold = 2.0;
+    multi_vote_only.polarity = Polarity::Dark;
+    multi_vote_only.smoothing_factor = 0.0;
+    let mut multi_radius = RsdConfig::default();
+    multi_radius.radii = radii;
+    multi_radius.gradient_threshold = 2.0;
+    multi_radius.polarity = Polarity::Dark;
+    multi_radius.smoothing_factor = 0.5;
 
     let response = rsd_response(&gradient, &multi_radius).unwrap();
-    let nms = NmsConfig {
-        radius: 13,
-        threshold: 0.01,
-        max_detections: 256,
-    };
+    let mut nms = NmsConfig::default();
+    nms.radius = 13;
+    nms.threshold = 0.01;
+    nms.max_detections = 256;
 
     BenchFixture {
         gradient,

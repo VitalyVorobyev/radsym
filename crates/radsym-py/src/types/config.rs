@@ -15,15 +15,13 @@ impl PyFrstConfig {
         polarity: &str,
         smoothing_factor: f32,
     ) -> PyResult<Self> {
-        Ok(Self {
-            inner: radsym::FrstConfig {
-                radii: radii.unwrap_or_else(|| vec![3, 5, 7, 9, 11]),
-                alpha,
-                gradient_threshold,
-                polarity: polarity_from_str(polarity)?,
-                smoothing_factor,
-            },
-        })
+        let mut inner = radsym::FrstConfig::default();
+        inner.radii = radii.unwrap_or_else(|| vec![3, 5, 7, 9, 11]);
+        inner.alpha = alpha;
+        inner.gradient_threshold = gradient_threshold;
+        inner.polarity = polarity_from_str(polarity)?;
+        inner.smoothing_factor = smoothing_factor;
+        Ok(Self { inner })
     }
 
     /// List of discrete radii to test, in pixels.
@@ -89,14 +87,12 @@ impl PyRsdConfig {
         polarity: &str,
         smoothing_factor: f32,
     ) -> PyResult<Self> {
-        Ok(Self {
-            inner: radsym::RsdConfig {
-                radii: radii.unwrap_or_else(|| vec![3, 5, 7, 9, 11]),
-                gradient_threshold,
-                polarity: polarity_from_str(polarity)?,
-                smoothing_factor,
-            },
-        })
+        let mut inner = radsym::RsdConfig::default();
+        inner.radii = radii.unwrap_or_else(|| vec![3, 5, 7, 9, 11]);
+        inner.gradient_threshold = gradient_threshold;
+        inner.polarity = polarity_from_str(polarity)?;
+        inner.smoothing_factor = smoothing_factor;
+        Ok(Self { inner })
     }
 
     fn __repr__(&self) -> String {
@@ -129,13 +125,11 @@ impl PyNmsConfig {
     #[new]
     #[pyo3(signature = (radius=5, threshold=0.0, max_detections=1000))]
     fn new(radius: usize, threshold: f32, max_detections: usize) -> Self {
-        Self {
-            inner: radsym::core::nms::NmsConfig {
-                radius,
-                threshold,
-                max_detections,
-            },
-        }
+        let mut inner = radsym::core::nms::NmsConfig::default();
+        inner.radius = radius;
+        inner.threshold = threshold;
+        inner.max_detections = max_detections;
+        Self { inner }
     }
 
     /// Suppression radius in pixels.
@@ -188,15 +182,12 @@ impl PyScoringConfig {
         weight_ringness: f32,
         weight_coverage: f32,
     ) -> Self {
-        Self {
-            inner: radsym::ScoringConfig {
-                annulus_margin,
-                min_samples,
-                weight_ringness,
-                weight_coverage,
-                ..Default::default()
-            },
-        }
+        let mut inner = radsym::ScoringConfig::default();
+        inner.annulus_margin = annulus_margin;
+        inner.min_samples = min_samples;
+        inner.weight_ringness = weight_ringness;
+        inner.weight_coverage = weight_coverage;
+        Self { inner }
     }
 
     fn __repr__(&self) -> String {
@@ -224,14 +215,13 @@ impl PyCircleRefineConfig {
     #[new]
     #[pyo3(signature = (max_iterations=10, convergence_tol=0.1, annulus_margin=0.3))]
     fn new(max_iterations: usize, convergence_tol: f32, annulus_margin: f32) -> Self {
-        Self {
-            inner: radsym::CircleRefineConfig {
-                max_iterations,
-                convergence_tol,
-                annulus_margin,
-                ..Default::default()
-            },
-        }
+        let mut advanced = radsym::CircleRefineAdvanced::default();
+        advanced.annulus_margin = annulus_margin;
+        let mut inner = radsym::CircleRefineConfig::default();
+        inner.max_iterations = max_iterations;
+        inner.convergence_tol = convergence_tol;
+        inner.advanced = advanced;
+        Self { inner }
     }
 
     fn __repr__(&self) -> String {
@@ -289,27 +279,26 @@ impl PyEllipseRefineConfig {
         max_center_shift_fraction: f32,
         max_axis_ratio: f32,
     ) -> PyResult<Self> {
-        Ok(Self {
-            inner: radsym::EllipseRefineConfig {
-                max_iterations,
-                convergence_tol,
-                annulus_margin,
-                ray_count,
-                radial_search_inner,
-                radial_search_outer,
-                normal_search_half_width,
-                min_inlier_coverage,
-                max_center_shift_fraction,
-                max_axis_ratio,
-                ..Default::default()
-            },
-        })
+        let mut advanced = radsym::EllipseRefineAdvanced::default();
+        advanced.annulus_margin = annulus_margin;
+        advanced.ray_count = ray_count;
+        advanced.radial_search_inner = radial_search_inner;
+        advanced.radial_search_outer = radial_search_outer;
+        advanced.normal_search_half_width = normal_search_half_width;
+        advanced.min_inlier_coverage = min_inlier_coverage;
+        let mut inner = radsym::EllipseRefineConfig::default();
+        inner.max_iterations = max_iterations;
+        inner.convergence_tol = convergence_tol;
+        inner.max_center_shift_fraction = max_center_shift_fraction;
+        inner.max_axis_ratio = max_axis_ratio;
+        inner.advanced = advanced;
+        Ok(Self { inner })
     }
 
     fn __repr__(&self) -> String {
         format!(
             "EllipseRefineConfig(max_iterations={}, convergence_tol={}, ray_count={})",
-            self.inner.max_iterations, self.inner.convergence_tol, self.inner.ray_count,
+            self.inner.max_iterations, self.inner.convergence_tol, self.inner.advanced.ray_count,
         )
     }
 }
@@ -345,24 +334,24 @@ impl PyHomographyRerankConfig {
         size_prior_sigma: f32,
         center_prior_sigma_fraction: f32,
     ) -> Self {
-        Self {
-            inner: radsym::HomographyRerankConfig {
-                min_radius,
-                max_radius,
-                radius_step,
-                ray_count,
-                radial_search_inner,
-                radial_search_outer,
-                size_prior_sigma,
-                center_prior_sigma_fraction,
-            },
-        }
+        let mut advanced = radsym::HomographyRerankAdvanced::default();
+        advanced.ray_count = ray_count;
+        advanced.radial_search_inner = radial_search_inner;
+        advanced.radial_search_outer = radial_search_outer;
+        advanced.size_prior_sigma = size_prior_sigma;
+        advanced.center_prior_sigma_fraction = center_prior_sigma_fraction;
+        let mut inner = radsym::HomographyRerankConfig::default();
+        inner.min_radius = min_radius;
+        inner.max_radius = max_radius;
+        inner.radius_step = radius_step;
+        inner.advanced = advanced;
+        Self { inner }
     }
 
     fn __repr__(&self) -> String {
         format!(
             "HomographyRerankConfig(min_radius={}, max_radius={}, ray_count={})",
-            self.inner.min_radius, self.inner.max_radius, self.inner.ray_count
+            self.inner.min_radius, self.inner.max_radius, self.inner.advanced.ray_count
         )
     }
 }
@@ -400,26 +389,25 @@ impl PyHomographyEllipseRefineConfig {
         max_center_shift_fraction: f32,
         max_radius_change_fraction: f32,
     ) -> PyResult<Self> {
-        Ok(Self {
-            inner: radsym::HomographyEllipseRefineConfig {
-                max_iterations,
-                convergence_tol,
-                ray_count,
-                radial_search_inner,
-                radial_search_outer,
-                normal_search_half_width,
-                min_inlier_coverage,
-                max_center_shift_fraction,
-                max_radius_change_fraction,
-                ..Default::default()
-            },
-        })
+        let mut advanced = radsym::HomographyEllipseRefineAdvanced::default();
+        advanced.ray_count = ray_count;
+        advanced.radial_search_inner = radial_search_inner;
+        advanced.radial_search_outer = radial_search_outer;
+        advanced.normal_search_half_width = normal_search_half_width;
+        advanced.min_inlier_coverage = min_inlier_coverage;
+        let mut inner = radsym::HomographyEllipseRefineConfig::default();
+        inner.max_iterations = max_iterations;
+        inner.convergence_tol = convergence_tol;
+        inner.max_center_shift_fraction = max_center_shift_fraction;
+        inner.max_radius_change_fraction = max_radius_change_fraction;
+        inner.advanced = advanced;
+        Ok(Self { inner })
     }
 
     fn __repr__(&self) -> String {
         format!(
             "HomographyEllipseRefineConfig(max_iterations={}, ray_count={})",
-            self.inner.max_iterations, self.inner.ray_count,
+            self.inner.max_iterations, self.inner.advanced.ray_count,
         )
     }
 }
@@ -504,20 +492,32 @@ impl PyDetectCirclesConfig {
         gradient_operator: &str,
     ) -> PyResult<Self> {
         let defaults = radsym::DetectCirclesConfig::default();
-        Ok(Self {
-            inner: radsym::DetectCirclesConfig {
-                frst: frst.map(|c| c.inner.clone()).unwrap_or(defaults.frst),
-                nms: nms.map(|c| c.inner.clone()).unwrap_or(defaults.nms),
-                scoring: scoring.map(|c| c.inner.clone()).unwrap_or(defaults.scoring),
-                refinement: refinement
-                    .map(|c| c.inner.clone())
-                    .unwrap_or(defaults.refinement),
-                polarity: polarity_from_str(polarity)?,
-                radius_hint,
-                min_score,
-                gradient_operator: gradient_operator_from_str(gradient_operator)?,
-            },
-        })
+        let frst_config = frst
+            .map(|c| c.inner.clone())
+            .unwrap_or(defaults.advanced.frst);
+        let mut advanced = radsym::DetectCirclesAdvanced::default();
+        // `radii` (set below) is the top-level source of truth for FRST voting;
+        // keep it aligned with the FRST config so a caller-supplied `frst` still
+        // drives the radii the pipeline votes over.
+        let radii = frst_config.radii.clone();
+        advanced.frst = frst_config;
+        advanced.nms = nms
+            .map(|c| c.inner.clone())
+            .unwrap_or(defaults.advanced.nms);
+        advanced.scoring = scoring
+            .map(|c| c.inner.clone())
+            .unwrap_or(defaults.advanced.scoring);
+        advanced.refinement = refinement
+            .map(|c| c.inner.clone())
+            .unwrap_or(defaults.advanced.refinement);
+        let mut inner = radsym::DetectCirclesConfig::default();
+        inner.radii = radii;
+        inner.polarity = polarity_from_str(polarity)?;
+        inner.radius_hint = radius_hint;
+        inner.min_score = min_score;
+        inner.gradient_operator = gradient_operator_from_str(gradient_operator)?;
+        inner.advanced = advanced;
+        Ok(Self { inner })
     }
 
     /// Approximate expected radius hint in pixels.

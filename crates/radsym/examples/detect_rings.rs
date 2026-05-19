@@ -7,10 +7,11 @@
 
 use std::fs;
 
+use radsym::diagnostics::{Colormap, response_heatmap};
 use radsym::{
-    Circle, CircleRefineConfig, Colormap, FrstConfig, NmsConfig, Polarity, ScoringConfig,
-    extract_proposals, frst_response, load_grayscale, refine_circle, response_heatmap,
-    save_diagnostic, score_circle_support, sobel_gradient,
+    Circle, CircleRefineConfig, FrstConfig, NmsConfig, Polarity, ScoringConfig, extract_proposals,
+    frst_response, load_grayscale, refine_circle, save_diagnostic, score_circle_support,
+    sobel_gradient,
 };
 
 #[derive(serde::Deserialize)]

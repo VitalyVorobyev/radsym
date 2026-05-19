@@ -3,8 +3,17 @@
 ## Overview
 
 Support scoring quantifies how strongly local image evidence supports a
-geometric hypothesis (circle or ellipse). The output is a `SupportScore` with
-component breakdown, used to rank hypotheses and reject weak detections.
+geometric hypothesis (circle or ellipse), used to rank hypotheses and reject
+weak detections.
+
+`score_circle_support` and `score_ellipse_support` return a
+`SupportScoreBreakdown`, which exposes the headline `total` alongside its
+`ringness`, `angular_coverage`, and `is_degenerate` components. The compact
+`SupportScore` carries only `total` — it is the result-tier score stored on
+each `CircleDetection`. Convert a breakdown to it with
+`SupportScoreBreakdown::score` or the `From` impl. In the one-call
+`detect_circles` pipeline the full breakdowns are surfaced through the
+diagnostics channel (`detect_circles_with_diagnostics`).
 
 ## Score components
 
@@ -56,6 +65,9 @@ homography Jacobian to compute alignment. This ensures correct scoring even
 under perspective distortion.
 
 ## Configuration
+
+`ScoringConfig` is `#[non_exhaustive]`; construct it from
+`ScoringConfig::default()` and assign fields. Its fields are:
 
 ```rust
 pub struct ScoringConfig {

@@ -1,6 +1,6 @@
 #[pyclass(name = "SupportScore")]
 pub struct PySupportScore {
-    pub inner: radsym::SupportScore,
+    pub inner: radsym::support::score::SupportScoreBreakdown,
 }
 
 #[pymethods]
@@ -427,7 +427,9 @@ impl PyPointRefinementResult {
 ///
 /// Attributes:
 ///     hypothesis (Circle): Refined circle hypothesis.
-///     score (SupportScore): Gradient evidence score.
+///     score (float): Headline support score (``total``) in ``[0, 1]``. The
+///         per-component breakdown (ringness, angular coverage, degeneracy) is
+///         available through the diagnostics channel, not the detection.
 ///     status (str): Refinement convergence status.
 ///     converged (bool): True if refinement converged.
 #[pyclass(name = "Detection")]
@@ -445,12 +447,13 @@ impl PyDetection {
         }
     }
 
-    /// Support score from gradient evidence.
+    /// Headline support score (``total``) from gradient evidence.
+    ///
+    /// The compact :class:`Detection` carries only the headline total. The
+    /// per-component breakdown is reached through the diagnostics channel.
     #[getter]
-    fn score(&self) -> PySupportScore {
-        PySupportScore {
-            inner: self.inner.score,
-        }
+    fn score(&self) -> f32 {
+        self.inner.score.total
     }
 
     /// Convergence status string.

@@ -23,7 +23,14 @@ The result is a `Vec<Peak>`, where each `Peak` carries a `PixelCoord`
 value at that location). Peaks are returned in descending score order,
 providing a natural ranking for downstream stages.
 
+`non_maximum_suppression` and `Peak` are exposed under `radsym::core::nms`.
+`extract_proposals` is the higher-level wrapper that runs NMS on a `ResponseMap`
+and returns `Proposal` values.
+
 ## Configuration
+
+`NmsConfig` is `#[non_exhaustive]`; construct it from `NmsConfig::default()`
+and assign fields. Its fields are:
 
 ```rust
 pub struct NmsConfig {

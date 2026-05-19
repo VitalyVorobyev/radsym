@@ -6,8 +6,8 @@ use radsym::core::gradient::sobel_gradient;
 use radsym::core::nms::NmsConfig;
 use radsym::propose::rsd::RsdConfig;
 use radsym::{
-    Ellipse, EllipseRefineConfig, OwnedImage, PixelCoord, Polarity, Proposal, extract_proposals,
-    refine_ellipse, rsd_response, suppress_proposals_by_distance,
+    Ellipse, EllipseRefineAdvanced, EllipseRefineConfig, OwnedImage, PixelCoord, Polarity,
+    Proposal, extract_proposals, refine_ellipse, rsd_response, suppress_proposals_by_distance,
 };
 
 #[derive(serde::Deserialize)]
@@ -233,25 +233,17 @@ fn detect_outer_rsd_candidates(
     gradient: &radsym::core::gradient::GradientField,
 ) -> Vec<Proposal> {
     let outer_hint = outer_radius_hint(fixture);
-    let response = rsd_response(
-        gradient,
-        &RsdConfig {
-            radii: build_radius_band(outer_hint, 0.8, 1.16, 5),
-            gradient_threshold: 2.0,
-            polarity: Polarity::Dark,
-            smoothing_factor: 0.5,
-        },
-    )
-    .unwrap();
-    let proposals = extract_proposals(
-        &response,
-        &NmsConfig {
-            radius: (0.55 * outer_hint).round().max(6.0) as usize,
-            threshold: 0.01,
-            max_detections: 256,
-        },
-        Polarity::Dark,
-    );
+    let mut rsd_config = RsdConfig::default();
+    rsd_config.radii = build_radius_band(outer_hint, 0.8, 1.16, 5);
+    rsd_config.gradient_threshold = 2.0;
+    rsd_config.polarity = Polarity::Dark;
+    rsd_config.smoothing_factor = 0.5;
+    let response = rsd_response(gradient, &rsd_config).unwrap();
+    let mut nms_config = NmsConfig::default();
+    nms_config.radius = (0.55 * outer_hint).round().max(6.0) as usize;
+    nms_config.threshold = 0.01;
+    nms_config.max_detections = 256;
+    let proposals = extract_proposals(&response, &nms_config, Polarity::Dark);
 
     suppress_proposals_by_distance(
         &proposals,
@@ -315,32 +307,32 @@ fn ringgrid_local_ellipse_refinement_recovers_outer_and_inner_geometry() {
     let inner_ratio = inner_ratio_hint(&fixture);
 
     let proposals = detect_outer_rsd_candidates(&fixture, &gradient);
-    let outer_config = EllipseRefineConfig {
-        max_iterations: 5,
-        convergence_tol: 0.05,
-        annulus_margin: 0.12,
-        ray_count: 96,
-        radial_search_inner: 0.60,
-        radial_search_outer: 1.45,
-        normal_search_half_width: 6.0,
-        min_inlier_coverage: 0.60,
-        max_center_shift_fraction: 0.40,
-        max_axis_ratio: 1.80,
-        ..EllipseRefineConfig::default()
-    };
-    let inner_config = EllipseRefineConfig {
-        max_iterations: 5,
-        convergence_tol: 0.05,
-        annulus_margin: 0.10,
-        ray_count: 96,
-        radial_search_inner: 0.75,
-        radial_search_outer: 1.20,
-        normal_search_half_width: 4.0,
-        min_inlier_coverage: 0.55,
-        max_center_shift_fraction: 0.25,
-        max_axis_ratio: 1.80,
-        ..EllipseRefineConfig::default()
-    };
+    let mut outer_advanced = EllipseRefineAdvanced::default();
+    outer_advanced.annulus_margin = 0.12;
+    outer_advanced.ray_count = 96;
+    outer_advanced.radial_search_inner = 0.60;
+    outer_advanced.radial_search_outer = 1.45;
+    outer_advanced.normal_search_half_width = 6.0;
+    outer_advanced.min_inlier_coverage = 0.60;
+    let mut outer_config = EllipseRefineConfig::default();
+    outer_config.max_iterations = 5;
+    outer_config.convergence_tol = 0.05;
+    outer_config.max_center_shift_fraction = 0.40;
+    outer_config.max_axis_ratio = 1.80;
+    outer_config.advanced = outer_advanced;
+    let mut inner_advanced = EllipseRefineAdvanced::default();
+    inner_advanced.annulus_margin = 0.10;
+    inner_advanced.ray_count = 96;
+    inner_advanced.radial_search_inner = 0.75;
+    inner_advanced.radial_search_outer = 1.20;
+    inner_advanced.normal_search_half_width = 4.0;
+    inner_advanced.min_inlier_coverage = 0.55;
+    let mut inner_config = EllipseRefineConfig::default();
+    inner_config.max_iterations = 5;
+    inner_config.convergence_tol = 0.05;
+    inner_config.max_center_shift_fraction = 0.25;
+    inner_config.max_axis_ratio = 1.80;
+    inner_config.advanced = inner_advanced;
 
     let refined_outer = proposals
         .iter()

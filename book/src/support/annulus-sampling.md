@@ -7,6 +7,13 @@ around a hypothesis center. This evidence feeds into the
 [support scoring](scoring.md) stage, which determines how strongly the image
 supports the hypothesis.
 
+Annulus sampling is an *internal stage* of support scoring: the sampling
+routines themselves are crate-private. Callers invoke it indirectly through
+`score_circle_support` / `score_ellipse_support`, which is configured via the
+`AnnulusSamplingConfig` carried by `ScoringConfig`. The resulting
+`SupportEvidence` is a diagnostic type, available under
+`radsym::support::evidence`.
+
 ## Sampling strategy
 
 The annulus is defined by an inner radius and an outer radius (typically
@@ -38,18 +45,24 @@ the center. A perfect ring gives $a = 1$ at every sample.
 
 ## Circular and elliptical variants
 
-Two sampling functions are provided:
+Two sampling strategies back the scoring functions:
 
-- `sample_annulus` -- circular annulus, parameterized by center and inner/outer
-  radii.
-- `sample_elliptical_annulus` -- elliptical annulus, parameterized by an
-  `Ellipse` and margin. The radial direction at each angle is computed from the
-  ellipse geometry, stretching sample placement along the appropriate axes.
+- A **circular annulus** -- parameterized by center and inner/outer radii.
+  Used by `score_circle_support`.
+- An **elliptical annulus** -- parameterized by an `Ellipse` and margin. The
+  radial direction at each angle is computed from the ellipse geometry,
+  stretching sample placement along the appropriate axes. Used by
+  `score_ellipse_support`.
 
-Both return a `SupportEvidence` struct containing the individual gradient
-samples, the total sample count, and the mean gradient alignment.
+Both produce a `SupportEvidence` struct containing the individual gradient
+samples (`GradientSample`), the total sample count, and the mean gradient
+alignment. `SupportEvidence` and `GradientSample` are diagnostic types exposed
+under `radsym::support::evidence`.
 
 ## Configuration
+
+`AnnulusSamplingConfig` is `#[non_exhaustive]`; construct it from
+`AnnulusSamplingConfig::default()` and assign fields. Its fields are:
 
 ```rust
 pub struct AnnulusSamplingConfig {

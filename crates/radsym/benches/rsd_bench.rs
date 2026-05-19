@@ -22,10 +22,8 @@ fn make_disk_image(size: usize) -> OwnedImage<u8> {
 }
 
 fn bench_rsd(c: &mut Criterion) {
-    let config = RsdConfig {
-        radii: vec![5, 7, 9, 11, 13],
-        ..RsdConfig::default()
-    };
+    let mut config = RsdConfig::default();
+    config.radii = vec![5, 7, 9, 11, 13];
 
     let mut group = c.benchmark_group("rsd");
 
@@ -43,10 +41,8 @@ fn bench_rsd(c: &mut Criterion) {
 }
 
 fn bench_rsd_fused(c: &mut Criterion) {
-    let config = RsdConfig {
-        radii: vec![5, 7, 9, 11, 13],
-        ..RsdConfig::default()
-    };
+    let mut config = RsdConfig::default();
+    config.radii = vec![5, 7, 9, 11, 13];
 
     let mut group = c.benchmark_group("rsd_fused");
 

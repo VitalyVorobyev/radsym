@@ -18,22 +18,60 @@ use super::result::{RefinementResult, RefinementStatus};
 /// Configuration for iterative circle refinement.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct CircleRefineConfig {
     /// Maximum number of refinement iterations.
     pub max_iterations: usize,
     /// Convergence tolerance: stop when center shift < this (pixels).
     pub convergence_tol: Scalar,
-    /// Fractional annulus margin around the hypothesized radius.
-    pub annulus_margin: Scalar,
     /// Maximum allowed total center drift as a fraction of the initial radius.
     ///
     /// If the refined center moves farther than `max_center_drift * radius`
     /// from the initial center, refinement stops with [`RefinementStatus::OutOfBounds`].
     pub max_center_drift: Scalar,
+    /// Advanced acquisition and sampling knobs.
+    pub advanced: CircleRefineAdvanced,
+}
+
+/// Advanced tuning knobs for [`CircleRefineConfig`].
+///
+/// These fields control annulus sampling and the radial-center sub-step. Most
+/// callers should leave them at their defaults; they are split out of the
+/// stable [`CircleRefineConfig`] surface so the common config reads as user
+/// intent rather than algorithm internals.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub struct CircleRefineAdvanced {
+    /// Fractional annulus margin around the hypothesized radius.
+    pub annulus_margin: Scalar,
     /// Radial center config for center refinement sub-step.
     pub radial_center: RadialCenterConfig,
     /// Annulus sampling config for radius estimation.
     pub sampling: AnnulusSamplingConfig,
+}
+
+impl CircleRefineAdvanced {
+    /// Validate advanced configuration parameters.
+    pub fn validate(&self) -> crate::core::error::Result<()> {
+        use crate::core::error::RadSymError;
+        if self.annulus_margin <= 0.0 {
+            return Err(RadSymError::InvalidConfig {
+                reason: "annulus_margin must be > 0.0",
+            });
+        }
+        Ok(())
+    }
+}
+
+impl Default for CircleRefineAdvanced {
+    fn default() -> Self {
+        Self {
+            annulus_margin: 0.3,
+            radial_center: RadialCenterConfig::default(),
+            sampling: AnnulusSamplingConfig::default(),
+        }
+    }
 }
 
 impl CircleRefineConfig {
@@ -50,16 +88,12 @@ impl CircleRefineConfig {
                 reason: "convergence_tol must be > 0.0",
             });
         }
-        if self.annulus_margin <= 0.0 {
-            return Err(RadSymError::InvalidConfig {
-                reason: "annulus_margin must be > 0.0",
-            });
-        }
         if self.max_center_drift <= 0.0 {
             return Err(RadSymError::InvalidConfig {
                 reason: "max_center_drift must be > 0.0",
             });
         }
+        self.advanced.validate()?;
         Ok(())
     }
 }
@@ -69,10 +103,8 @@ impl Default for CircleRefineConfig {
         Self {
             max_iterations: 10,
             convergence_tol: 0.1,
-            annulus_margin: 0.3,
             max_center_drift: 0.5,
-            radial_center: RadialCenterConfig::default(),
-            sampling: AnnulusSamplingConfig::default(),
+            advanced: CircleRefineAdvanced::default(),
         }
     }
 }
@@ -120,7 +152,7 @@ pub fn refine_circle(
     for iter in 0..config.max_iterations {
         // Step 1: Refine center
         let center_result =
-            radial_center_refine_from_gradient(gradient, center, &config.radial_center)?;
+            radial_center_refine_from_gradient(gradient, center, &config.advanced.radial_center)?;
 
         match center_result.status {
             RefinementStatus::Converged => {}
@@ -159,9 +191,15 @@ pub fn refine_circle(
         }
 
         // Step 2: Re-estimate radius from gradient evidence
-        let inner_r = (radius * (1.0 - config.annulus_margin)).max(1.0);
-        let outer_r = radius * (1.0 + config.annulus_margin);
-        let evidence = sample_annulus(gradient, new_center, inner_r, outer_r, &config.sampling);
+        let inner_r = (radius * (1.0 - config.advanced.annulus_margin)).max(1.0);
+        let outer_r = radius * (1.0 + config.advanced.annulus_margin);
+        let evidence = sample_annulus(
+            gradient,
+            new_center,
+            inner_r,
+            outer_r,
+            &config.advanced.sampling,
+        );
 
         if evidence.sample_count > 4 {
             // Estimate radius as the mean distance of well-aligned gradient samples
@@ -237,9 +275,12 @@ mod tests {
         // Start with a noisy estimate; use large patch to cover ring radius
         let initial = Circle::new(PixelCoord::new(52.0, 48.0), 18.0);
         let config = CircleRefineConfig {
-            radial_center: RadialCenterConfig {
-                patch_radius: 25,
-                ..RadialCenterConfig::default()
+            advanced: CircleRefineAdvanced {
+                radial_center: RadialCenterConfig {
+                    patch_radius: 25,
+                    ..RadialCenterConfig::default()
+                },
+                ..CircleRefineAdvanced::default()
             },
             ..CircleRefineConfig::default()
         };

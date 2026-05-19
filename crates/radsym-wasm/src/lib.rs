@@ -6,10 +6,11 @@
 
 use wasm_bindgen::prelude::*;
 
+use radsym::diagnostics::{Colormap, response_heatmap};
 use radsym::{
-    Colormap, DetectCirclesConfig, GradientOperator, ImageView, Polarity, RefinementStatus,
-    RsdConfig, compute_gradient, detect_circles, extract_proposals, frst_response,
-    multiradius_response, response_heatmap, rsd_response, rsd_response_fused,
+    DetectCirclesConfig, GradientOperator, ImageView, Polarity, RefinementStatus, RsdConfig,
+    compute_gradient, detect_circles, detect_circles_with_diagnostics, extract_proposals,
+    frst_response, frst_response_fused, rsd_response, rsd_response_fused,
 };
 
 // ---------------------------------------------------------------------------
@@ -71,7 +72,7 @@ fn parse_colormap(name: &str) -> Result<Colormap, JsValue> {
 /// | Method | Algorithm | Description |
 /// |--------|-----------|-------------|
 /// | `frst_response` | FRST | Multi-radius with orientation accumulator |
-/// | `multiradius_response` | FRST (fused) | Single-pass fused FRST (~faster) |
+/// | `frst_response_fused` | FRST (fused) | Single-pass fused FRST (~faster) |
 /// | `rsd_response` | RSD | Magnitude-only voting (~2× faster than FRST) |
 /// | `rsd_response_fused` | RSD (fused) | Single-pass fused RSD |
 ///
@@ -145,6 +146,11 @@ impl RadSymProcessor {
     /// - `is_degenerate`: `0.0` = false, `1.0` = true.
     /// - `status`: `0.0` = Converged, `1.0` = MaxIterations, `2.0` = Degenerate,
     ///   `3.0` = OutOfBounds.
+    ///
+    /// The per-detection `ringness`, `angular_coverage`, and `is_degenerate`
+    /// fields are sourced from the diagnostics channel
+    /// (`detect_circles_with_diagnostics`), whose `score_breakdowns` vec is
+    /// index-aligned with the detections.
     pub fn detect_circles_detailed(
         &mut self,
         pixels: &[u8],
@@ -153,17 +159,18 @@ impl RadSymProcessor {
     ) -> Result<js_sys::Float32Array, JsValue> {
         rgba_to_gray(pixels, width, height, &mut self.gray_buf)?;
         let view = ImageView::from_slice(&self.gray_buf, width, height).map_err(to_js_err)?;
-        let detections = detect_circles(&view, &self.config).map_err(to_js_err)?;
+        let (detections, diagnostics) =
+            detect_circles_with_diagnostics(&view, &self.config).map_err(to_js_err)?;
 
         let mut flat = Vec::with_capacity(detections.len() * 8);
-        for d in &detections {
+        for (d, breakdown) in detections.iter().zip(&diagnostics.score_breakdowns) {
             flat.push(d.hypothesis.center.x);
             flat.push(d.hypothesis.center.y);
             flat.push(d.hypothesis.radius);
             flat.push(d.score.total);
-            flat.push(d.score.ringness);
-            flat.push(d.score.angular_coverage);
-            flat.push(if d.score.is_degenerate { 1.0 } else { 0.0 });
+            flat.push(breakdown.ringness);
+            flat.push(breakdown.angular_coverage);
+            flat.push(if breakdown.is_degenerate { 1.0 } else { 0.0 });
             flat.push(match d.status {
                 RefinementStatus::Converged => 0.0,
                 RefinementStatus::MaxIterations => 1.0,
@@ -190,7 +197,7 @@ impl RadSymProcessor {
         let view = ImageView::from_slice(&self.gray_buf, width, height).map_err(to_js_err)?;
         let gradient = compute_gradient(&view, self.config.gradient_operator).map_err(to_js_err)?;
 
-        let mut frst_cfg = self.config.frst.clone();
+        let mut frst_cfg = self.config.advanced.frst.clone();
         frst_cfg.polarity = self.config.polarity;
         let response = frst_response(&gradient, &frst_cfg).map_err(to_js_err)?;
 
@@ -202,7 +209,7 @@ impl RadSymProcessor {
     ///
     /// Faster than `frst_response` for large radius sets. Returns a
     /// `Float32Array` of length `width * height` (row-major).
-    pub fn multiradius_response(
+    pub fn frst_response_fused(
         &mut self,
         pixels: &[u8],
         width: usize,
@@ -212,9 +219,9 @@ impl RadSymProcessor {
         let view = ImageView::from_slice(&self.gray_buf, width, height).map_err(to_js_err)?;
         let gradient = compute_gradient(&view, self.config.gradient_operator).map_err(to_js_err)?;
 
-        let mut frst_cfg = self.config.frst.clone();
+        let mut frst_cfg = self.config.advanced.frst.clone();
         frst_cfg.polarity = self.config.polarity;
-        let response = multiradius_response(&gradient, &frst_cfg).map_err(to_js_err)?;
+        let response = frst_response_fused(&gradient, &frst_cfg).map_err(to_js_err)?;
 
         let data = response.response().data();
         Ok(js_sys::Float32Array::from(data))
@@ -286,14 +293,14 @@ impl RadSymProcessor {
 
         let response = match algorithm {
             "frst" => {
-                let mut cfg = self.config.frst.clone();
+                let mut cfg = self.config.advanced.frst.clone();
                 cfg.polarity = self.config.polarity;
                 frst_response(&gradient, &cfg).map_err(to_js_err)?
             }
             "frst_fused" => {
-                let mut cfg = self.config.frst.clone();
+                let mut cfg = self.config.advanced.frst.clone();
                 cfg.polarity = self.config.polarity;
-                multiradius_response(&gradient, &cfg).map_err(to_js_err)?
+                frst_response_fused(&gradient, &cfg).map_err(to_js_err)?
             }
             "rsd" => rsd_response(&gradient, &self.rsd_config()).map_err(to_js_err)?,
             "rsd_fused" => rsd_response_fused(&gradient, &self.rsd_config()).map_err(to_js_err)?,
@@ -330,14 +337,14 @@ impl RadSymProcessor {
 
         let response = match algorithm {
             "frst" => {
-                let mut cfg = self.config.frst.clone();
+                let mut cfg = self.config.advanced.frst.clone();
                 cfg.polarity = self.config.polarity;
                 frst_response(&gradient, &cfg).map_err(to_js_err)?
             }
             "frst_fused" => {
-                let mut cfg = self.config.frst.clone();
+                let mut cfg = self.config.advanced.frst.clone();
                 cfg.polarity = self.config.polarity;
-                multiradius_response(&gradient, &cfg).map_err(to_js_err)?
+                frst_response_fused(&gradient, &cfg).map_err(to_js_err)?
             }
             "rsd" => rsd_response(&gradient, &self.rsd_config()).map_err(to_js_err)?,
             "rsd_fused" => rsd_response_fused(&gradient, &self.rsd_config()).map_err(to_js_err)?,
@@ -348,7 +355,8 @@ impl RadSymProcessor {
             }
         };
 
-        let proposals = extract_proposals(&response, &self.config.nms, self.config.polarity);
+        let proposals =
+            extract_proposals(&response, &self.config.advanced.nms, self.config.polarity);
 
         let mut flat = Vec::with_capacity(proposals.len() * 3);
         for p in &proposals {
@@ -392,85 +400,89 @@ impl RadSymProcessor {
 
     /// Set the radii to test (in pixels).
     pub fn set_radii(&mut self, radii: &[u32]) {
-        self.config.frst.radii = radii.to_vec();
+        // `detect_circles` reads the top-level `radii`, while the stage methods
+        // (`frst_response`, `extract_proposals`, ...) read `advanced.frst.radii`;
+        // keep both in sync so every method sees the requested radii.
+        self.config.radii = radii.to_vec();
+        self.config.advanced.frst.radii = radii.to_vec();
     }
 
     /// Set the radial strictness exponent (alpha). Default: 2.0.
     ///
     /// Only affects FRST; RSD does not use alpha.
     pub fn set_alpha(&mut self, alpha: f32) {
-        self.config.frst.alpha = alpha;
+        self.config.advanced.frst.alpha = alpha;
     }
 
     /// Set the minimum gradient magnitude for voting. Default: 0.0.
     pub fn set_gradient_threshold(&mut self, threshold: f32) {
-        self.config.frst.gradient_threshold = threshold;
+        self.config.advanced.frst.gradient_threshold = threshold;
     }
 
     /// Set the Gaussian smoothing factor (kn). Default: 0.5.
     pub fn set_smoothing_factor(&mut self, factor: f32) {
-        self.config.frst.smoothing_factor = factor;
+        self.config.advanced.frst.smoothing_factor = factor;
     }
 
     // -- NmsConfig setters --------------------------------------------------
 
     /// Set the NMS suppression radius in pixels. Default: 5.
     pub fn set_nms_radius(&mut self, radius: usize) {
-        self.config.nms.radius = radius;
+        self.config.advanced.nms.radius = radius;
     }
 
     /// Set the NMS minimum response threshold. Default: 0.0.
     pub fn set_nms_threshold(&mut self, threshold: f32) {
-        self.config.nms.threshold = threshold;
+        self.config.advanced.nms.threshold = threshold;
     }
 
     /// Set the maximum number of detections. Default: 50.
     pub fn set_max_detections(&mut self, max: usize) {
-        self.config.nms.max_detections = max;
+        self.config.advanced.nms.max_detections = max;
     }
 
     // -- ScoringConfig setters ----------------------------------------------
 
     /// Set the number of angular samples around the annulus.
     pub fn set_num_angular_samples(&mut self, n: usize) {
-        self.config.scoring.sampling.num_angular_samples = n;
+        self.config.advanced.scoring.sampling.num_angular_samples = n;
     }
 
     /// Set the number of radial samples across the annulus width.
     pub fn set_num_radial_samples(&mut self, n: usize) {
-        self.config.scoring.sampling.num_radial_samples = n;
+        self.config.advanced.scoring.sampling.num_radial_samples = n;
     }
 
     /// Set the annulus margin as a fraction of radius. Default: 0.3.
     pub fn set_annulus_margin(&mut self, margin: f32) {
-        self.config.scoring.annulus_margin = margin;
+        self.config.advanced.scoring.annulus_margin = margin;
     }
 
     /// Set the minimum number of gradient samples. Default: 8.
     pub fn set_min_samples(&mut self, n: usize) {
-        self.config.scoring.min_samples = n;
+        self.config.advanced.scoring.min_samples = n;
     }
 
-    /// Set the weight of ringness in total score. Default: 0.7.
+    /// Set the weight of ringness in total score. Default: 0.6.
     pub fn set_weight_ringness(&mut self, w: f32) {
-        self.config.scoring.weight_ringness = w;
+        self.config.advanced.scoring.weight_ringness = w;
     }
 
-    /// Set the weight of angular coverage in total score. Default: 0.3.
+    /// Set the weight of angular coverage in total score. Default: 0.4.
     pub fn set_weight_coverage(&mut self, w: f32) {
-        self.config.scoring.weight_coverage = w;
+        self.config.advanced.scoring.weight_coverage = w;
     }
 
     // -- CircleRefineConfig setters -----------------------------------------
 
     /// Set the maximum refinement iterations. Default: 10.
     pub fn set_max_iterations(&mut self, n: usize) {
-        self.config.refinement.max_iterations = n;
+        self.config.advanced.refinement.max_iterations = n;
     }
 
     /// Set the convergence tolerance in pixels. Default: 0.1.
     pub fn set_convergence_tol(&mut self, tol: f32) {
-        self.config.refinement.convergence_tol = tol;
+        self.config.advanced.refinement.convergence_tol = tol;
     }
 
     /// Set the maximum center drift as a fraction of radius. Default: 0.5.
@@ -478,7 +490,7 @@ impl RadSymProcessor {
     /// Refinement stops if the center moves farther than
     /// `max_center_drift * radius` from the initial position.
     pub fn set_max_center_drift(&mut self, drift: f32) {
-        self.config.refinement.max_center_drift = drift;
+        self.config.advanced.refinement.max_center_drift = drift;
     }
 
     // -- Top-level config setters -------------------------------------------
@@ -533,11 +545,11 @@ impl RadSymProcessor {
     /// RSD uses the same radii, gradient threshold, polarity, and smoothing
     /// factor as FRST; it simply omits the alpha exponent.
     fn rsd_config(&self) -> RsdConfig {
-        RsdConfig {
-            radii: self.config.frst.radii.clone(),
-            gradient_threshold: self.config.frst.gradient_threshold,
-            polarity: self.config.polarity,
-            smoothing_factor: self.config.frst.smoothing_factor,
-        }
+        let mut config = RsdConfig::default();
+        config.radii = self.config.advanced.frst.radii.clone();
+        config.gradient_threshold = self.config.advanced.frst.gradient_threshold;
+        config.polarity = self.config.polarity;
+        config.smoothing_factor = self.config.advanced.frst.smoothing_factor;
+        config
     }
 }

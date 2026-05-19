@@ -64,9 +64,13 @@ impl ResponseMap {
 /// }
 /// let image = ImageView::from_slice(&data, size, size).unwrap();
 /// let grad = sobel_gradient(&image).unwrap();
-/// let config = FrstConfig { radii: vec![9, 10, 11], ..FrstConfig::default() };
+/// let mut config = FrstConfig::default();
+/// config.radii = vec![9, 10, 11];
 /// let response = frst_response(&grad, &config).unwrap();
-/// let nms = NmsConfig { radius: 5, threshold: 0.0, max_detections: 10 };
+/// let mut nms = NmsConfig::default();
+/// nms.radius = 5;
+/// nms.threshold = 0.0;
+/// nms.max_detections = 10;
 /// let proposals = extract_proposals(&response, &nms, Polarity::Bright);
 /// assert!(!proposals.is_empty());
 /// // Proposals are sorted by descending score

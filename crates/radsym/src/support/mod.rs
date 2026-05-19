@@ -1,19 +1,14 @@
 //! Local support extraction and scoring.
 //!
-//! This module provides tools for sampling local image evidence around a
-//! hypothesis (circle, ellipse, annulus) and scoring how strongly that
-//! evidence supports the hypothesis.
-//!
-//! ## Workflow
-//!
-//! 1. Create a hypothesis: [`hypothesis::CircleHypothesis`] or [`hypothesis::EllipseHypothesis`]
-//! 2. Sample evidence: [`annulus::sample_annulus`] or [`annulus::sample_elliptical_annulus`]
-//! 3. Score support: [`score::score_circle_support`] or [`score::score_ellipse_support`]
-//! 4. Inspect profiles: [`profile::compute_radial_profile`]
-//! 5. Check coverage: [`coverage::angular_coverage`]
+//! This module scores how strongly local image evidence supports a geometric
+//! hypothesis. The public entry points are [`score::score_circle_support`] and
+//! [`score::score_ellipse_support`]: they sample gradient evidence around a
+//! [`Circle`](crate::Circle) or [`Ellipse`](crate::Ellipse) and return a
+//! [`score::SupportScore`]. Annulus sampling and angular-coverage estimation
+//! are internal stages of that computation.
 
 pub mod annulus;
-pub mod coverage;
+pub(crate) mod coverage;
 pub mod evidence;
 pub mod hypothesis;
 pub mod profile;

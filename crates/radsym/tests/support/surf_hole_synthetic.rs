@@ -3,12 +3,13 @@
 use radsym::core::gradient::sobel_gradient;
 use radsym::core::nms::NmsConfig;
 use radsym::core::polarity::Polarity;
+use radsym::core::pyramid::pyramid_level_owned;
 use radsym::propose::extract::extract_proposals;
 use radsym::propose::seed::Proposal;
-use radsym::support::score::{score_circle_support, score_ellipse_support};
+use radsym::support::score::{SupportScoreBreakdown, score_circle_support, score_ellipse_support};
 use radsym::{
-    Circle, Ellipse, EllipseRefineConfig, FrstConfig, OwnedImage, PixelCoord, RadSymError, Result,
-    ScoringConfig, SupportScore, pyramid_level_owned, refine_ellipse,
+    Circle, Ellipse, EllipseRefineAdvanced, EllipseRefineConfig, FrstConfig, OwnedImage,
+    PixelCoord, RadSymError, Result, ScoringConfig, refine_ellipse,
 };
 
 pub const DEFAULT_PYRAMID_LEVEL: u8 = 3;
@@ -39,7 +40,7 @@ pub struct SyntheticSurfCandidate {
     pub image_ellipse: Ellipse,
     pub combined_score: f32,
     pub radius_sweep_radius: f32,
-    pub final_support: SupportScore,
+    pub final_support: SupportScoreBreakdown,
 }
 
 #[derive(Clone, Debug)]
@@ -178,25 +179,18 @@ pub fn detect_case_image(image: &OwnedImage<u8>, level: u8) -> Result<SyntheticS
     let radii = build_radius_band(radius_hint, 5);
 
     let gradient = sobel_gradient(&working_image)?;
-    let response = radsym::frst_response(
-        &gradient,
-        &FrstConfig {
-            radii: radii.clone(),
-            alpha: 2.0,
-            gradient_threshold: 1.5,
-            polarity: Polarity::Bright,
-            smoothing_factor: 0.5,
-        },
-    )?;
-    let proposals = extract_proposals(
-        &response,
-        &NmsConfig {
-            radius: (radius_hint * 0.8).round().max(10.0) as usize,
-            threshold: 0.01,
-            max_detections: 12,
-        },
-        Polarity::Bright,
-    );
+    let mut frst_config = FrstConfig::default();
+    frst_config.radii = radii.clone();
+    frst_config.alpha = 2.0;
+    frst_config.gradient_threshold = 1.5;
+    frst_config.polarity = Polarity::Bright;
+    frst_config.smoothing_factor = 0.5;
+    let response = radsym::frst_response(&gradient, &frst_config)?;
+    let mut nms_config = NmsConfig::default();
+    nms_config.radius = (radius_hint * 0.8).round().max(10.0) as usize;
+    nms_config.threshold = 0.01;
+    nms_config.max_detections = 12;
+    let proposals = extract_proposals(&response, &nms_config, Polarity::Bright);
 
     if proposals.is_empty() {
         return Err(RadSymError::DegenerateHypothesis {
@@ -286,31 +280,29 @@ fn rank_candidates(
     gradient: &radsym::core::gradient::GradientField,
     width: usize,
     height: usize,
-    pyramid: &radsym::OwnedPyramidLevel,
+    pyramid: &radsym::core::pyramid::OwnedPyramidLevel,
     proposals: &[Proposal],
     radius_hint: f32,
 ) -> Vec<SyntheticSurfCandidate> {
     let center_x = width as f32 * 0.5;
     let center_y = height as f32 * 0.5;
     let max_center_distance = center_x.hypot(center_y);
-    let scoring_config = ScoringConfig {
-        annulus_margin: 0.12,
-        min_samples: 32,
-        ..ScoringConfig::default()
-    };
-    let refine_config = EllipseRefineConfig {
-        max_iterations: 5,
-        convergence_tol: 0.05,
-        annulus_margin: 0.12,
-        ray_count: 96,
-        radial_search_inner: 0.60,
-        radial_search_outer: 1.45,
-        normal_search_half_width: 6.0,
-        min_inlier_coverage: 0.60,
-        max_center_shift_fraction: 0.40,
-        max_axis_ratio: 1.80,
-        ..EllipseRefineConfig::default()
-    };
+    let mut scoring_config = ScoringConfig::default();
+    scoring_config.annulus_margin = 0.12;
+    scoring_config.min_samples = 32;
+    let mut refine_advanced = EllipseRefineAdvanced::default();
+    refine_advanced.annulus_margin = 0.12;
+    refine_advanced.ray_count = 96;
+    refine_advanced.radial_search_inner = 0.60;
+    refine_advanced.radial_search_outer = 1.45;
+    refine_advanced.normal_search_half_width = 6.0;
+    refine_advanced.min_inlier_coverage = 0.60;
+    let mut refine_config = EllipseRefineConfig::default();
+    refine_config.max_iterations = 5;
+    refine_config.convergence_tol = 0.05;
+    refine_config.max_center_shift_fraction = 0.40;
+    refine_config.max_axis_ratio = 1.80;
+    refine_config.advanced = refine_advanced;
 
     let mut ranked = Vec::new();
     for proposal in proposals.iter().take(12) {
@@ -355,19 +347,17 @@ fn sweep_radius_at_center(
     gradient: &radsym::core::gradient::GradientField,
     center: PixelCoord,
     radius_hint: f32,
-) -> (f32, SupportScore) {
-    let scoring_config = ScoringConfig {
-        annulus_margin: 0.10,
-        min_samples: 24,
-        weight_ringness: 0.75,
-        weight_coverage: 0.25,
-        ..ScoringConfig::default()
-    };
+) -> (f32, SupportScoreBreakdown) {
+    let mut scoring_config = ScoringConfig::default();
+    scoring_config.annulus_margin = 0.10;
+    scoring_config.min_samples = 24;
+    scoring_config.weight_ringness = 0.75;
+    scoring_config.weight_coverage = 0.25;
     let radius_min = (radius_hint * 0.35).max(6.0);
     let radius_max = (radius_hint * 1.05).max(radius_min + 6.0);
 
     let mut radius = radius_min;
-    let mut best: Option<(f32, SupportScore)> = None;
+    let mut best: Option<(f32, SupportScoreBreakdown)> = None;
     while radius <= radius_max + 0.5 {
         let circle = Circle::new(center, radius);
         let score = score_circle_support(gradient, &circle, &scoring_config);

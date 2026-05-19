@@ -54,21 +54,28 @@ for (let i = 0; i < result.length; i += 4) {
 }
 ```
 
-### Visualize FRST response heatmap
+### Visualize a response heatmap
 
 ```js
-const heatmap = processor.response_heatmap(imageData.data, w, h, 'hot');
+// algorithm: 'frst' | 'frst_fused' | 'rsd' | 'rsd_fused'
+// colormap:  'jet' | 'hot' | 'magma'
+const heatmap = processor.response_heatmap(imageData.data, w, h, 'frst', 'hot');
 // heatmap is Uint8Array of RGBA pixels (length w * h * 4)
 const img = ctx.createImageData(w, h);
 img.data.set(new Uint8ClampedArray(heatmap));
 ctx.putImageData(img, 0, 0);
 ```
 
-### Raw FRST response
+### Raw response maps
 
 ```js
-const response = processor.frst_response(imageData.data, w, h);
+const frst = processor.frst_response(imageData.data, w, h);
 // Float32Array of length w * h, row-major
+
+// Fused single-pass variants and RSD share the same output shape:
+const frstFused = processor.frst_response_fused(imageData.data, w, h);
+const rsd = processor.rsd_response(imageData.data, w, h);
+const rsdFused = processor.rsd_response_fused(imageData.data, w, h);
 ```
 
 ### Gradient field
@@ -95,10 +102,11 @@ All `DetectCirclesConfig` fields are exposed as flat setters:
 | `set_num_radial_samples(usize)` | `3` | Radial samples in annulus |
 | `set_annulus_margin(f32)` | `0.3` | Annulus width fraction |
 | `set_min_samples(usize)` | `8` | Min gradient samples |
-| `set_weight_ringness(f32)` | `0.7` | Ringness weight in score |
-| `set_weight_coverage(f32)` | `0.3` | Coverage weight in score |
+| `set_weight_ringness(f32)` | `0.6` | Ringness weight in score |
+| `set_weight_coverage(f32)` | `0.4` | Coverage weight in score |
 | `set_max_iterations(usize)` | `10` | Max refinement iterations |
 | `set_convergence_tol(f32)` | `0.1` | Refinement convergence (px) |
+| `set_max_center_drift(f32)` | `0.5` | Max center drift as fraction of radius |
 | `set_polarity(str)` | `"both"` | `"bright"`, `"dark"`, `"both"` |
 | `set_radius_hint(f32)` | `10.0` | Initial radius hypothesis |
 | `set_min_score(f32)` | `0.0` | Minimum score threshold |
@@ -109,9 +117,14 @@ All `DetectCirclesConfig` fields are exposed as flat setters:
 | Method | Return type | Stride | Fields |
 |--------|------------|--------|--------|
 | `detect_circles` | `Float32Array` | 4 | `x, y, radius, score` |
+| `detect_circles_detailed` | `Float32Array` | 8 | `x, y, radius, score, ringness, coverage, degenerate, status` |
 | `frst_response` | `Float32Array` | 1 | response value |
+| `frst_response_fused` | `Float32Array` | 1 | response value |
+| `rsd_response` | `Float32Array` | 1 | response value |
+| `rsd_response_fused` | `Float32Array` | 1 | response value |
 | `response_heatmap` | `Uint8Array` | 4 | R, G, B, A |
 | `gradient_field` | `Float32Array` | 2 | gx, gy |
+| `extract_proposals` | `Float32Array` | 3 | `x, y, score` |
 
 ## Interactive demo
 
@@ -153,7 +166,7 @@ sudo safaridriver --enable
 wasm-pack test --safari --headless --release crates/radsym-wasm
 ```
 
-The test suite includes 15 tests: basic functionality, error handling, and
+The test suite includes 25 tests: basic functionality, error handling, and
 WASM-vs-native output comparison on a synthetic ring grid image. The comparison
 tests verify bitwise equality between the WASM `RadSymProcessor` API and direct
 native `radsym` function calls.

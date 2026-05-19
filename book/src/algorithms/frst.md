@@ -122,6 +122,8 @@ Which affected pixels participate depends on the target polarity:
 
 ## Configuration
 
+`FrstConfig` is `#[non_exhaustive]`; its fields are:
+
 ```rust
 pub struct FrstConfig {
     /// Discrete radii to test (pixels). Default: [3, 5, 7, 9, 11].
@@ -145,6 +147,9 @@ pub struct FrstConfig {
 
 ## API usage
 
+Because `FrstConfig` is `#[non_exhaustive]`, construct it from
+`FrstConfig::default()` and assign the fields you want to change:
+
 ```rust
 use radsym::core::gradient::sobel_gradient;
 use radsym::core::image_view::ImageView;
@@ -154,17 +159,17 @@ use radsym::core::polarity::Polarity;
 let image = ImageView::from_slice(&pixels, width, height)?;
 let gradient = sobel_gradient(&image)?;
 
-let config = FrstConfig {
-    radii: vec![8, 10, 12],
-    alpha: 2.0,
-    gradient_threshold: 2.0,
-    polarity: Polarity::Bright,
-    smoothing_factor: 0.5,
-};
+let mut config = FrstConfig::default();
+config.radii = vec![8, 10, 12];
+config.gradient_threshold = 2.0;
+config.polarity = Polarity::Bright;
 
 let response_map = frst_response(&gradient, &config)?;
 // response_map.response() is an OwnedImage<f32> — apply NMS to extract peaks
 ```
+
+For a fast magnitude-only proposal pass (no orientation accumulator or
+`alpha`), `frst_response_fused` evaluates all radii in a single pass.
 
 ## Reference
 

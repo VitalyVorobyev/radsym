@@ -45,6 +45,6 @@ open http://localhost:8080/demo/
 | Algorithm | Method | Description |
 |-----------|--------|-------------|
 | **FRST** | `frst_response` | Multi-radius voting with orientation accumulator |
-| **FRST (fused)** | `multiradius_response` | Single-pass fused variant, faster |
+| **FRST (fused)** | `frst_response_fused` | Single-pass fused variant, faster |
 | **RSD** | `rsd_response` | Magnitude-only voting, ~2x faster than FRST |
 | **RSD (fused)** | `rsd_response_fused` | Single-pass fused RSD |

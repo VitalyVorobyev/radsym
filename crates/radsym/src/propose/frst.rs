@@ -41,6 +41,7 @@ use rayon::prelude::*;
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(default))]
+#[non_exhaustive]
 pub struct FrstConfig {
     /// Set of discrete radii to test (in pixels).
     pub radii: Vec<u32>,
@@ -236,7 +237,8 @@ pub fn frst_response_single(
 /// }
 /// let image = ImageView::from_slice(&data, size, size).unwrap();
 /// let grad = sobel_gradient(&image).unwrap();
-/// let config = FrstConfig { radii: vec![9, 10, 11], ..FrstConfig::default() };
+/// let mut config = FrstConfig::default();
+/// config.radii = vec![9, 10, 11];
 /// let response = frst_response(&grad, &config).unwrap();
 /// assert_eq!(response.response().width(), size);
 /// assert!(response.response().data().iter().any(|&v| v > 0.0));
@@ -300,7 +302,7 @@ pub fn frst_response(
 ///
 /// ```rust
 /// use radsym::{ImageView, FrstConfig, sobel_gradient};
-/// use radsym::propose::frst::multiradius_response;
+/// use radsym::propose::frst::frst_response_fused;
 ///
 /// let size = 64usize;
 /// let mut data = vec![0u8; size * size];
@@ -313,12 +315,13 @@ pub fn frst_response(
 /// }
 /// let image = ImageView::from_slice(&data, size, size).unwrap();
 /// let grad = sobel_gradient(&image).unwrap();
-/// let config = FrstConfig { radii: vec![9, 10, 11], ..FrstConfig::default() };
-/// let response = multiradius_response(&grad, &config).unwrap();
+/// let mut config = FrstConfig::default();
+/// config.radii = vec![9, 10, 11];
+/// let response = frst_response_fused(&grad, &config).unwrap();
 /// assert_eq!(response.response().width(), size);
 /// assert!(response.response().data().iter().any(|&v| v > 0.0));
 /// ```
-pub fn multiradius_response(
+pub fn frst_response_fused(
     gradient: &GradientField,
     config: &FrstConfig,
 ) -> Result<super::extract::ResponseMap> {
@@ -625,10 +628,10 @@ mod tests {
         );
     }
 
-    // --- multiradius_response tests ---
+    // --- frst_response_fused tests ---
 
     #[test]
-    fn multiradius_detects_bright_disk_center() {
+    fn frst_fused_detects_bright_disk_center() {
         let size = 80;
         let data = make_bright_disk(size, 40, 40, 12.0);
         let image = ImageView::from_slice(&data, size, size).unwrap();
@@ -641,7 +644,7 @@ mod tests {
             ..FrstConfig::default()
         };
 
-        let response = multiradius_response(&grad, &config).unwrap();
+        let response = frst_response_fused(&grad, &config).unwrap();
         let resp_data = response.response().data();
         let (max_idx, _) = resp_data
             .iter()
@@ -659,7 +662,7 @@ mod tests {
     }
 
     #[test]
-    fn multiradius_detects_dark_disk() {
+    fn frst_fused_detects_dark_disk() {
         let size = 80;
         let mut data = make_bright_disk(size, 40, 40, 12.0);
         for v in &mut data {
@@ -675,7 +678,7 @@ mod tests {
             ..FrstConfig::default()
         };
 
-        let response = multiradius_response(&grad, &config).unwrap();
+        let response = frst_response_fused(&grad, &config).unwrap();
         let resp_data = response.response().data();
         let (max_idx, _) = resp_data
             .iter()
@@ -693,17 +696,17 @@ mod tests {
     }
 
     #[test]
-    fn multiradius_dimensions_match_input() {
+    fn frst_fused_dimensions_match_input() {
         let data = vec![128u8; 40 * 30];
         let image = ImageView::from_slice(&data, 40, 30).unwrap();
         let grad = sobel_gradient(&image).unwrap();
-        let response = multiradius_response(&grad, &FrstConfig::default()).unwrap();
+        let response = frst_response_fused(&grad, &FrstConfig::default()).unwrap();
         assert_eq!(response.response().width(), 40);
         assert_eq!(response.response().height(), 30);
     }
 
     #[test]
-    fn multiradius_gradient_threshold_suppresses_uniform() {
+    fn frst_fused_gradient_threshold_suppresses_uniform() {
         let data = vec![128u8; 32 * 32];
         let image = ImageView::from_slice(&data, 32, 32).unwrap();
         let grad = sobel_gradient(&image).unwrap();
@@ -714,7 +717,7 @@ mod tests {
             ..FrstConfig::default()
         };
 
-        let response = multiradius_response(&grad, &config).unwrap();
+        let response = frst_response_fused(&grad, &config).unwrap();
         assert!(
             response.response().data().iter().all(|&v| v == 0.0),
             "high threshold on uniform image should produce zero response"
@@ -722,7 +725,7 @@ mod tests {
     }
 
     #[test]
-    fn multiradius_matches_frst_peak_location() {
+    fn frst_fused_matches_frst_peak_location() {
         let size = 100;
         let data = make_bright_disk(size, 50, 50, 16.0);
         let image = ImageView::from_slice(&data, size, size).unwrap();
@@ -736,7 +739,7 @@ mod tests {
         };
 
         let frst = frst_response(&grad, &config).unwrap();
-        let multi = multiradius_response(&grad, &config).unwrap();
+        let multi = frst_response_fused(&grad, &config).unwrap();
 
         let find_peak = |data: &[f32], w: usize| -> (usize, usize) {
             let (idx, _) = data

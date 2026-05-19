@@ -1,8 +1,8 @@
 //! End-to-end pipeline integration tests.
 
 use radsym::{
-    CircleRefineConfig, DetectCirclesConfig, FrstConfig, ImageView, Polarity, RadialCenterConfig,
-    detect_circles,
+    CircleRefineAdvanced, CircleRefineConfig, DetectCirclesAdvanced, DetectCirclesConfig,
+    FrstConfig, ImageView, Polarity, RadialCenterConfig, detect_circles,
 };
 
 /// Create a bright disk (white circle on black background).
@@ -44,23 +44,22 @@ fn detect_bright_circles() {
     let data = make_bright_disk(size, cx, cy, radius);
     let image = ImageView::from_slice(&data, size, size).unwrap();
 
-    let config = DetectCirclesConfig {
-        frst: FrstConfig {
-            radii: vec![14, 15, 16, 17, 18],
-            gradient_threshold: 1.0,
-            ..FrstConfig::default()
-        },
-        polarity: Polarity::Bright,
-        radius_hint: radius,
-        refinement: CircleRefineConfig {
-            radial_center: RadialCenterConfig {
-                patch_radius: 20,
-                ..RadialCenterConfig::default()
-            },
-            ..CircleRefineConfig::default()
-        },
-        ..DetectCirclesConfig::default()
-    };
+    let mut radial_center = RadialCenterConfig::default();
+    radial_center.patch_radius = 20;
+    let mut refine_advanced = CircleRefineAdvanced::default();
+    refine_advanced.radial_center = radial_center;
+    let mut refinement = CircleRefineConfig::default();
+    refinement.advanced = refine_advanced;
+    let mut frst = FrstConfig::default();
+    frst.gradient_threshold = 1.0;
+    let mut advanced = DetectCirclesAdvanced::default();
+    advanced.frst = frst;
+    advanced.refinement = refinement;
+    let mut config = DetectCirclesConfig::default();
+    config.radii = vec![14, 15, 16, 17, 18];
+    config.polarity = Polarity::Bright;
+    config.radius_hint = radius;
+    config.advanced = advanced;
 
     let detections = detect_circles(&image, &config).unwrap();
     assert!(
@@ -92,23 +91,22 @@ fn detect_dark_circles() {
     let data = make_dark_disk(size, cx, cy, radius);
     let image = ImageView::from_slice(&data, size, size).unwrap();
 
-    let config = DetectCirclesConfig {
-        frst: FrstConfig {
-            radii: vec![14, 15, 16, 17, 18],
-            gradient_threshold: 1.0,
-            ..FrstConfig::default()
-        },
-        polarity: Polarity::Dark,
-        radius_hint: radius,
-        refinement: CircleRefineConfig {
-            radial_center: RadialCenterConfig {
-                patch_radius: 20,
-                ..RadialCenterConfig::default()
-            },
-            ..CircleRefineConfig::default()
-        },
-        ..DetectCirclesConfig::default()
-    };
+    let mut radial_center = RadialCenterConfig::default();
+    radial_center.patch_radius = 20;
+    let mut refine_advanced = CircleRefineAdvanced::default();
+    refine_advanced.radial_center = radial_center;
+    let mut refinement = CircleRefineConfig::default();
+    refinement.advanced = refine_advanced;
+    let mut frst = FrstConfig::default();
+    frst.gradient_threshold = 1.0;
+    let mut advanced = DetectCirclesAdvanced::default();
+    advanced.frst = frst;
+    advanced.refinement = refinement;
+    let mut config = DetectCirclesConfig::default();
+    config.radii = vec![14, 15, 16, 17, 18];
+    config.polarity = Polarity::Dark;
+    config.radius_hint = radius;
+    config.advanced = advanced;
 
     let detections = detect_circles(&image, &config).unwrap();
     assert!(

@@ -7,6 +7,7 @@ use super::scalar::Scalar;
 /// Configuration for non-maximum suppression.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct NmsConfig {
     /// Suppression radius in pixels (half-window size).
     pub radius: usize,

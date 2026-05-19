@@ -90,18 +90,26 @@ When no homography is available, use standard [FRST](frst.md) or
 
 ## Configuration
 
+Both homography configs are split into a small stable config plus an `advanced`
+sub-config carrying the edge-acquisition and prior knobs. Each is
+`#[non_exhaustive]` — construct them from `default()` and assign fields.
+
 ```rust
 pub struct HomographyEllipseRefineConfig {
     pub max_iterations: usize,           // 5
     pub convergence_tol: f32,            // 0.1
+    pub max_center_shift_fraction: f32,  // 0.4
+    pub max_radius_change_fraction: f32, // 0.6
+    pub advanced: HomographyEllipseRefineAdvanced,
+}
+
+pub struct HomographyEllipseRefineAdvanced {
     pub radial_center: RadialCenterConfig,
-    pub ray_count: usize,               // 96
+    pub ray_count: usize,                // 96
     pub radial_search_inner: f32,        // 0.6
     pub radial_search_outer: f32,        // 1.45
     pub normal_search_half_width: f32,   // 6.0
     pub min_inlier_coverage: f32,        // 0.45
-    pub max_center_shift_fraction: f32,  // 0.4
-    pub max_radius_change_fraction: f32, // 0.6
 }
 ```
 
@@ -110,7 +118,11 @@ pub struct HomographyRerankConfig {
     pub min_radius: f32,                  // 6.0
     pub max_radius: f32,                  // 0.0 (auto)
     pub radius_step: f32,                 // 2.0
-    pub ray_count: usize,                // 64
+    pub advanced: HomographyRerankAdvanced,
+}
+
+pub struct HomographyRerankAdvanced {
+    pub ray_count: usize,                 // 64
     pub radial_search_inner: f32,         // 0.6
     pub radial_search_outer: f32,         // 1.45
     pub size_prior_sigma: f32,            // 0.22

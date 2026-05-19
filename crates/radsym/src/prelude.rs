@@ -7,7 +7,7 @@
 //! This imports the types and functions needed for the standard
 //! propose-score-refine pipeline without requiring individual imports.
 //!
-//! ## Smoke test: detect-score-refine via prelude
+//! ## Smoke test: one-call detection via prelude
 //!
 //! ```rust
 //! use radsym::prelude::*;
@@ -26,26 +26,22 @@
 //! }
 //! let image = ImageView::from_slice(&data, size, size).unwrap();
 //!
-//! // Propose
-//! let gradient = sobel_gradient(&image).unwrap();
-//! let frst_cfg = FrstConfig { radii: vec![9, 10, 11], ..FrstConfig::default() };
-//! let response = frst_response(&gradient, &frst_cfg).unwrap();
-//! let nms = NmsConfig { radius: 5, threshold: 0.0, max_detections: 5 };
-//! let proposals = extract_proposals(&response, &nms, Polarity::Bright);
-//! assert!(!proposals.is_empty(), "should find at least one proposal");
+//! // Detect circles with the one-call pipeline.
+//! let config = DetectCirclesConfig::for_radii([9, 10, 11]).polarity(Polarity::Bright);
+//! let detections = detect_circles(&image, &config).unwrap();
+//! assert!(!detections.is_empty(), "should detect the synthetic disk");
 //!
-//! // Score
-//! let best = &proposals[0];
-//! let circle = Circle::new(best.seed.position, 10.0);
-//! let score = score_circle_support(&gradient, &circle, &ScoringConfig::default());
-//! assert!(score.total > 0.0, "support score should be positive");
-//!
-//! // Refine
-//! let result = refine_circle(&gradient, &circle, &CircleRefineConfig::default()).unwrap();
-//! let c = result.hypothesis.center;
+//! // The best detection's refined center sits near (32, 32).
+//! let best = &detections[0];
+//! let c = best.hypothesis.center;
 //! let err = ((c.x - 32.0).powi(2) + (c.y - 32.0).powi(2)).sqrt();
 //! assert!(err < 5.0, "refined center should be near (32, 32)");
+//! assert!(best.score.total > 0.0, "support score should be positive");
 //! ```
+//!
+//! The prelude also re-exports the individual stage entry points
+//! ([`sobel_gradient`], [`frst_response`], [`extract_proposals`],
+//! [`score_circle_support`], [`refine_circle`]) for the composable workflow.
 
 // Core types
 pub use crate::core::coords::PixelCoord;
@@ -60,7 +56,7 @@ pub use crate::core::polarity::Polarity;
 
 // Proposal generation
 pub use crate::propose::extract::{ResponseMap, extract_proposals};
-pub use crate::propose::frst::{FrstConfig, frst_response, multiradius_response};
+pub use crate::propose::frst::{FrstConfig, frst_response, frst_response_fused};
 pub use crate::propose::rsd::{RsdConfig, rsd_response, rsd_response_fused};
 pub use crate::propose::seed::Proposal;
 
@@ -70,9 +66,11 @@ pub use crate::support::score::{
 };
 
 // Refinement
-pub use crate::refine::circle::{CircleRefineConfig, refine_circle};
-pub use crate::refine::ellipse::{EllipseRefineConfig, refine_ellipse};
+pub use crate::refine::circle::{CircleRefineAdvanced, CircleRefineConfig, refine_circle};
+pub use crate::refine::ellipse::{EllipseRefineAdvanced, EllipseRefineConfig, refine_ellipse};
 pub use crate::refine::result::{RefinementResult, RefinementStatus};
 
 // Pipeline
-pub use crate::pipeline::{DetectCirclesConfig, Detection, detect_circles};
+pub use crate::pipeline::{
+    CircleDetection, DetectCirclesAdvanced, DetectCirclesConfig, Detection, detect_circles,
+};

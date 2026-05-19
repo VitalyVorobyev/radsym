@@ -62,19 +62,27 @@ Two complementary signals are extracted:
   contain at least one supporting gradient sample. Full coverage means evidence
   is spread around the entire circumference, not concentrated in one arc.
 
-These are combined into a single `SupportScore`:
+These are combined into a single total score:
 
 $$\text{total} = w_r \cdot \text{ringness} + w_c \cdot \text{coverage}$$
 
 where the weights $w_r$ and $w_c$ are set in `ScoringConfig`. Proposals whose
 `total` falls below a threshold are discarded.
 
+`score_circle_support` and `score_ellipse_support` return a
+`SupportScoreBreakdown`, which carries the headline `total` alongside the
+`ringness`, `angular_coverage`, and `is_degenerate` components. The compact
+`SupportScore` — just `{ total }` — is the result-tier score stored on each
+`CircleDetection`; obtain it from a breakdown via `SupportScoreBreakdown::score`
+or the `From` impl. The full breakdowns for a `detect_circles` run are exposed
+through the diagnostics channel (see below).
+
 ### Key types
 
 | Input | Output |
 |-------|--------|
-| `GradientField` + `Circle` + `ScoringConfig` | `SupportScore` |
-| `GradientField` + `Ellipse` + `ScoringConfig` | `SupportScore` |
+| `GradientField` + `Circle` + `ScoringConfig` | `SupportScoreBreakdown` |
+| `GradientField` + `Ellipse` + `ScoringConfig` | `SupportScoreBreakdown` |
 
 ## Stage 3: Refine
 
@@ -105,6 +113,16 @@ the iteration count, and a `RefinementStatus` flag (`Converged`,
 |-------|--------|
 | `GradientField` + `Circle` + `CircleRefineConfig` | `RefinementResult<Circle>` |
 | `GradientField` + `Ellipse` + `EllipseRefineConfig` | `RefinementResult<Ellipse>` |
+
+## One-Call Detection and Diagnostics
+
+The three stages above are wrapped by `detect_circles`, which takes a
+`DetectCirclesConfig` and returns a `Vec<CircleDetection>`. The companion
+`detect_circles_with_diagnostics` returns the same result plus a
+`CircleDetectionDiagnostics` carrying the response map, the raw proposals, the
+rejected candidates (each with a `RejectionReason`), and a per-detection
+`SupportScoreBreakdown`. The diagnostic types live under `radsym::diagnostics`
+and carry a deliberately looser stability promise than the primary result.
 
 ## Using Stages Independently
 

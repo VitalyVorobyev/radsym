@@ -91,6 +91,7 @@ pub struct HomographyProposal {
 /// Output of homography-aware proposal reranking.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct RerankedProposal {
     /// Original image-space proposal.
     pub proposal: Proposal,
@@ -113,6 +114,7 @@ pub struct RerankedProposal {
 /// Configuration for homography-aware proposal reranking.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct HomographyRerankConfig {
     /// Minimum image-space radius to evaluate when no scale hint is available.
     pub min_radius: Scalar,
@@ -120,6 +122,21 @@ pub struct HomographyRerankConfig {
     pub max_radius: Scalar,
     /// Step size for the coarse radius sweep in pixels.
     pub radius_step: Scalar,
+    /// Advanced edge-acquisition and prior knobs.
+    pub advanced: HomographyRerankAdvanced,
+}
+
+/// Advanced tuning knobs for [`HomographyRerankConfig`].
+///
+/// These fields control image-space edge acquisition (ray count, radial search
+/// window) and the size/center priors used in the rerank score. Most callers
+/// should leave them at their defaults; they are split out of the stable
+/// [`HomographyRerankConfig`] surface so the common config reads as user intent
+/// rather than algorithm internals.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub struct HomographyRerankAdvanced {
     /// Number of image-space rays used during the edge acquisition pass.
     pub ray_count: usize,
     /// Inner radius factor for the initial radial search.
@@ -132,17 +149,25 @@ pub struct HomographyRerankConfig {
     pub center_prior_sigma_fraction: Scalar,
 }
 
+impl Default for HomographyRerankAdvanced {
+    fn default() -> Self {
+        Self {
+            ray_count: 64,
+            radial_search_inner: 0.6,
+            radial_search_outer: 1.45,
+            size_prior_sigma: 0.22,
+            center_prior_sigma_fraction: 0.45,
+        }
+    }
+}
+
 impl Default for HomographyRerankConfig {
     fn default() -> Self {
         Self {
             min_radius: 6.0,
             max_radius: 0.0,
             radius_step: 2.0,
-            ray_count: 64,
-            radial_search_inner: 0.6,
-            radial_search_outer: 1.45,
-            size_prior_sigma: 0.22,
-            center_prior_sigma_fraction: 0.45,
+            advanced: HomographyRerankAdvanced::default(),
         }
     }
 }
@@ -239,9 +264,9 @@ fn collect_radial_observations(
     radius: Scalar,
     config: &HomographyRerankConfig,
 ) -> Vec<EdgeObservation> {
-    let ray_count = config.ray_count.max(16);
-    let start = config.radial_search_inner * radius;
-    let stop = config.radial_search_outer * radius;
+    let ray_count = config.advanced.ray_count.max(16);
+    let start = config.advanced.radial_search_inner * radius;
+    let stop = config.advanced.radial_search_outer * radius;
     let sigma = 0.35 * radius.max(1.0);
     let mut observations = Vec::with_capacity(ray_count);
 
@@ -366,7 +391,8 @@ fn sweep_radius(
     let mut best_score = -1.0;
     let mut radius = start;
     while radius <= stop + 1e-6 {
-        let score = circle_support_score(gradient, center, radius, config.ray_count.max(16));
+        let score =
+            circle_support_score(gradient, center, radius, config.advanced.ray_count.max(16));
         if score > best_score {
             best_score = score;
             best = Circle::new(center, radius);
@@ -572,7 +598,7 @@ pub fn rerank_proposals_homography(
 ) -> Vec<RerankedProposal> {
     let gx_view = gradient.gx();
     let gy_view = gradient.gy();
-    let ray_count = config.ray_count.max(16);
+    let ray_count = config.advanced.ray_count.max(16);
     let mut reranked = Vec::with_capacity(proposals.len());
 
     for proposal in proposals {
@@ -601,7 +627,7 @@ pub fn rerank_proposals_homography(
 
         let size_prior = if let Some(ellipse) = image_ellipse_hint.as_ref() {
             let ratio = ellipse.mean_radius() / swept_circle.radius.max(1e-3);
-            let z = (ratio - 1.0) / config.size_prior_sigma.max(1e-3);
+            let z = (ratio - 1.0) / config.advanced.size_prior_sigma.max(1e-3);
             (-0.5 * z * z).exp()
         } else {
             0.0
@@ -611,7 +637,7 @@ pub fn rerank_proposals_homography(
             proposal.seed.position,
             gradient.width(),
             gradient.height(),
-            config.center_prior_sigma_fraction,
+            config.advanced.center_prior_sigma_fraction,
         );
         let total_score = (edge_score * coverage * size_prior * center_prior).clamp(0.0, 1.0);
 

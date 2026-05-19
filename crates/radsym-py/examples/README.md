@@ -122,6 +122,22 @@ python crates/radsym-py/examples/detect_ringgrid.py \
   --heatmap-output output/ringgrid_heatmap.png
 ```
 
+### Ring-grid detector variants
+
+Three focused variants run a single proposal generator over a ring grid:
+
+- `detect_ringgrid_frst.py` — per-radius `radsym.frst_response`.
+- `detect_ringgrid_frst_fused.py` — fused single-pass `radsym.frst_response_fused`
+  (faster when many radii are tested; the `alpha` config field is ignored).
+- `detect_ringgrid_rsd_fused.py` — fused single-pass `radsym.rsd_response_fused`.
+
+Each takes the same `image` path and optional `--output` / `--heatmap-output`
+flags, for example:
+
+```bash
+python crates/radsym-py/examples/detect_ringgrid_frst_fused.py testdata/ringgrid.png
+```
+
 ## Notes
 
 - The scripts do not hard-code input images; the image path is always a CLI argument.

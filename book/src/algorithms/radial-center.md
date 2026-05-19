@@ -116,6 +116,9 @@ available from proposal generation.
 
 ## Configuration
 
+`RadialCenterConfig` is `#[non_exhaustive]`; construct it from
+`RadialCenterConfig::default()` and assign fields. Its fields are:
+
 ```rust
 pub struct RadialCenterConfig {
     pub patch_radius: usize,       // default: 12
@@ -125,8 +128,11 @@ pub struct RadialCenterConfig {
 
 ## API usage
 
+`RadialCenterConfig` and `radial_center_refine_from_gradient` are re-exported
+at the crate root (also reachable as `radsym::refine::radial_center::*`):
+
 ```rust
-use radsym::refine::{radial_center_refine_from_gradient, RadialCenterConfig};
+use radsym::{radial_center_refine_from_gradient, RadialCenterConfig};
 
 let config = RadialCenterConfig::default();
 let result = radial_center_refine_from_gradient(&gradient_field, seed, &config)?;

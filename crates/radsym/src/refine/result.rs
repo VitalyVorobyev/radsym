@@ -30,6 +30,7 @@ pub enum RefinementStatus {
         deserialize = "H: serde::de::DeserializeOwned"
     ))
 )]
+#[non_exhaustive]
 pub struct RefinementResult<H> {
     /// The refined hypothesis.
     pub hypothesis: H,

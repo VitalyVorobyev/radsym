@@ -5,6 +5,143 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-05-18
+
+A coordinated public-API revision (see the migration notes in each entry).
+Breaking for the `radsym` crate and both binding packages.
+
+### Added
+
+- **`DetectCirclesConfig` builder**: new `DetectCirclesConfig::for_radii(radii)`
+  constructor plus chainable `polarity`, `radius_hint`, `min_score`, and
+  `gradient_operator` setters, so the common detection case can be expressed
+  without assembling the nested stage configs by hand. Purely additive —
+  existing struct-literal construction keeps working.
+- **`CircleDetection` type alias**: `pub type CircleDetection = Detection<Circle>;`
+  for the circle-detection result produced by `detect_circles`, re-exported at
+  the crate root and from the prelude. Purely additive — it is the same type as
+  `Detection<Circle>`, which continues to work identically.
+- **Diagnostics channel**: new `detect_circles_with_diagnostics` returns the
+  `Vec<CircleDetection>` result plus a `CircleDetectionDiagnostics` carrying the
+  response map, the raw proposals, the rejected candidates (`RejectedProposal` /
+  `RejectionReason`), and a per-detection `SupportScoreBreakdown`. The new
+  diagnostic types live under `radsym::diagnostics`. Purely additive.
+
+### Changed
+
+- **`multiradius_response` renamed to `frst_response_fused` (breaking)**: the
+  fused single-pass FRST variant now uses a `_fused` suffix, matching
+  `rsd_response_fused`. Re-exported at the crate root and in the prelude. The
+  Python `radsym` package and the WASM `RadSymProcessor` class now also expose
+  this as `frst_response_fused` (see below).
+- **Python bindings — `multiradius_response` renamed to `frst_response_fused`
+  (breaking)**: the Python `radsym.multiradius_response` function is renamed to
+  `radsym.frst_response_fused`, matching the Rust crate. Migration: replace
+  `radsym.multiradius_response(...)` with `radsym.frst_response_fused(...)`.
+- **WASM bindings — `RadSymProcessor.multiradius_response` renamed to
+  `frst_response_fused` (breaking)**: the WASM `RadSymProcessor` method for the
+  fused single-pass FRST response is renamed to `frst_response_fused`, matching
+  the Rust crate and the Python package. The method signature and the
+  `Float32Array` output format are unchanged. Migration: replace
+  `processor.multiradius_response(...)` with `processor.frst_response_fused(...)`.
+- **Python bindings — `Detection.score` is now a `float` (breaking)**:
+  `detect_circles` returns `Detection` objects whose `.score` attribute is the
+  headline support total as a plain `float` rather than a structured score
+  object. Migration: read `detection.score` directly; the per-component
+  breakdown (`ringness`, `angular_coverage`, `is_degenerate`) is no longer on
+  the detection. The standalone `SupportScore` returned by
+  `score_circle_support` / `score_ellipse_support` is unchanged and still
+  exposes `total`, `ringness`, `angular_coverage`, and `is_degenerate`.
+- **Config split: stable core + `advanced` sub-config (breaking)**: the five
+  tuning-heavy config structs now keep only their stable, user-intent fields
+  and move their algorithm-acquisition knobs into a dedicated `advanced`
+  sub-config:
+  - `CircleRefineConfig` keeps `max_iterations`, `convergence_tol`,
+    `max_center_drift`; the rest moves to `CircleRefineAdvanced`.
+  - `EllipseRefineConfig` keeps `max_iterations`, `convergence_tol`,
+    `max_center_shift_fraction`, `max_axis_ratio`; the rest moves to
+    `EllipseRefineAdvanced`.
+  - `HomographyRerankConfig` keeps `min_radius`, `max_radius`, `radius_step`;
+    the rest moves to `HomographyRerankAdvanced`.
+  - `HomographyEllipseRefineConfig` keeps `max_iterations`, `convergence_tol`,
+    `max_center_shift_fraction`, `max_radius_change_fraction`; the rest moves to
+    `HomographyEllipseRefineAdvanced`.
+  - `DetectCirclesConfig` keeps `polarity`, `radius_hint`, `min_score`,
+    `gradient_operator`, and a new top-level `radii: Vec<u32>` field (the source
+    of truth for FRST voting radii); the `frst`, `nms`, `scoring`, and
+    `refinement` stage configs move to `DetectCirclesAdvanced`.
+
+  Each config gains a `pub advanced: <Name>Advanced` field; `<Config>::default()`
+  is unchanged in effect, and pipeline/refinement results are identical.
+  Migration: struct literals that set a moved field must nest it under
+  `advanced: <Name>Advanced { .. }`. The new advanced structs are re-exported at
+  the crate root and in the prelude.
+- **Growth-prone config and result structs are now `#[non_exhaustive]`
+  (breaking)**: the public configuration, advanced sub-config, result, and
+  detection-diagnostics structs are now `#[non_exhaustive]`, so fields can be
+  added in future releases without breaking downstream code. External crates can
+  no longer construct these types with a struct literal (including the
+  `..Default::default()` functional-update form) or exhaustively pattern-match
+  them without `..`. Affected types:
+  - Configs: `DetectCirclesConfig`, `DetectCirclesAdvanced`, `FrstConfig`,
+    `RsdConfig`, `NmsConfig`, `ScoringConfig`, `AnnulusSamplingConfig`,
+    `CircleRefineConfig`, `CircleRefineAdvanced`, `EllipseRefineConfig`,
+    `EllipseRefineAdvanced`, `HomographyRerankConfig`, `HomographyRerankAdvanced`,
+    `HomographyEllipseRefineConfig`, `HomographyEllipseRefineAdvanced`,
+    `RadialCenterConfig`.
+  - Results: `Detection<T>` (and its alias `CircleDetection`),
+    `RefinementResult<H>`, `RerankedProposal`, `HomographyRefinementResult`.
+  - Detection diagnostics: `CircleDetectionDiagnostics`, `RejectedProposal`,
+    `SupportScoreBreakdown`.
+
+  Migration: construct configs via `Config::default()` followed by field
+  assignment instead of a struct literal, e.g.
+  `let mut cfg = FrstConfig::default(); cfg.radii = vec![9, 10, 11];`. The
+  builders and chainable setters on `DetectCirclesConfig` (`for_radii`,
+  `polarity`, …) are unaffected and remain the recommended entry point. Result
+  and diagnostics structs are produced by the library, so most consumers need no
+  change beyond adding `..` to any exhaustive pattern match.
+- **`SupportScore` split into a compact result score and a diagnostic
+  breakdown (breaking)**: `SupportScore` is now `{ total }` only — the compact,
+  headline result-tier score. The `ringness`, `angular_coverage`, and
+  `is_degenerate` evidence components moved to a dedicated
+  `SupportScoreBreakdown` type (also `#[non_exhaustive]`). The scoring functions
+  `score_circle_support`, `score_ellipse_support`, and
+  `score_rectified_circle_support` now return `SupportScoreBreakdown` instead of
+  `SupportScore`; `SupportScoreBreakdown::score()` and
+  `From<SupportScoreBreakdown> for SupportScore` reduce it to the compact form.
+  `Detection::score` stays typed `SupportScore` and now carries only `total`;
+  the per-detection breakdown is available through the diagnostics channel
+  (`CircleDetectionDiagnostics::score_breakdowns`), and `RejectedProposal::score`
+  is now a `SupportScoreBreakdown`. `SupportScore` remains re-exported at the
+  crate root and in the prelude; `SupportScoreBreakdown` is reachable via
+  `radsym::support::score` and `radsym::diagnostics`. Migration: direct callers
+  of the `score_*_support` functions keep `ringness`/`angular_coverage`/
+  `is_degenerate` (the functions return the breakdown); code reading those
+  components off a `Detection`'s `score` must instead read them from the
+  diagnostics' `score_breakdowns` vec, which is index-aligned with the
+  detections.
+
+### Removed
+
+- **Root-facade trim (breaking)**: these items are no longer re-exported at the
+  crate root — use the module path instead:
+  - `radsym::fit_circle`, `radsym::fit_circle_weighted` →
+    `radsym::core::circle_fit::*`
+  - `radsym::PyramidWorkspace`, `PyramidLevelView`, `OwnedPyramidLevel`,
+    `pyramid_level_owned` → `radsym::core::pyramid::*`
+  - `radsym::SupportEvidence` → `radsym::support::evidence::SupportEvidence`
+  - `radsym::AnnulusHypothesis`, `CircleHypothesis`, `ConcentricPairHypothesis`,
+    `EllipseHypothesis` → `radsym::support::hypothesis::*`
+  - `radsym::frst_response_single` →
+    `radsym::propose::frst::frst_response_single`
+  - `radsym::Colormap`, `radsym::DiagnosticImage`, `radsym::response_heatmap`,
+    `radsym::overlay_circle`, `radsym::overlay_ellipse` → `radsym::diagnostics::*`
+- **Support stage internals narrowed (breaking)**: `support::score::score_at` is
+  removed (use `score_circle_support`); `support::coverage` is now a crate-private
+  module; `support::annulus::{sample_annulus, sample_elliptical_annulus}` are now
+  crate-private. `support::annulus::AnnulusSamplingConfig` remains public.
+
 ## [0.1.4] - 2026-04-09
 
 ### Added
@@ -132,6 +269,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Zero unsafe code; zero clippy warnings; 138 unit and integration tests.
 - mdBook documentation with full mathematical derivations.
 
+[0.2.0]: https://github.com/VitalyVorobyev/radsym/compare/v0.1.4...v0.2.0
+[0.1.4]: https://github.com/VitalyVorobyev/radsym/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/VitalyVorobyev/radsym/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/VitalyVorobyev/radsym/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/VitalyVorobyev/radsym/compare/v0.1.0...v0.1.1
