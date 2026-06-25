@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Production-hardening pass. All changes are backward compatible for existing
+`u8` call sites.
+
+### Added
+
+- **Multi-bit-depth input (`SourcePixel`)**: `detect_circles`, `compute_gradient`,
+  `sobel_gradient`, and `scharr_gradient` are now generic over a `SourcePixel`
+  trait implemented for `u8`, `u16`, and `f32`. 10/12/16-bit industrial imagery
+  is read at full precision instead of requiring a lossy down-conversion to 8-bit.
+  Existing `u8` calls are unchanged (the type parameter is inferred). The Python
+  bindings accept `uint8`/`uint16`/`float32` numpy arrays.
+- **Region of interest**: `DetectCirclesConfig::roi` / the `.roi(Rect)` builder
+  restrict the whole pipeline to a rectangle; detection centers are translated
+  back to full-frame coordinates. New `Rect` type at the crate root. Exposed in
+  Python via `DetectCirclesConfig(roi=(x, y, w, h))`.
+- **Per-proposal scale**: new `frst_response_scaled` returns the summed FRST
+  response plus a per-pixel winning-radius map. `detect_circles` now scores and
+  refines each proposal at its own winning radius (populating
+  `Proposal::scale_hint`) instead of a single global `radius_hint`, so one call
+  recovers circles across a wider range of sizes.
+- **Python ergonomics**: `detect_circles` is drivable with a top-level
+  `radii=[...]` keyword (no nested `FrstConfig` required); the GIL is released
+  (`Python::detach`) during the native compute so frames can be parallelised
+  across threads; unsupported dtypes / non-contiguous arrays raise a clear
+  `ValueError`.
+
+### Changed
+
+- **`detect_circles` validates all stage configs up front**: the NMS and scoring
+  configs are now validated alongside refinement, so an invalid config (e.g.
+  `nms.max_detections == 0`, `scoring.annulus_margin == 0`) returns an
+  actionable `InvalidConfig` error instead of silently producing zero or
+  wrong-scored detections.
+- **`radsym-py` upgraded to PyO3 0.29 / numpy 0.29** (from 0.28).
+
 ## [0.2.0] - 2026-05-18
 
 A coordinated public-API revision (see the migration notes in each entry).

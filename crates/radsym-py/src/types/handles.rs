@@ -267,13 +267,21 @@ impl PyDiagnosticImage {
 // Numpy -> ImageView helper
 // ---------------------------------------------------------------------------
 
-/// Convert a 2D uint8 numpy array (H x W) to an OwnedImage<u8>.
-pub fn numpy_to_owned_u8(array: &PyReadonlyArray2<u8>) -> PyResult<radsym::OwnedImage<u8>> {
+/// Convert a 2D numpy array (H x W) of any supported element type to an
+/// `OwnedImage`. The copy lets the caller release the GIL during compute.
+pub fn numpy_to_owned<T: numpy::Element + Copy>(
+    array: &PyReadonlyArray2<T>,
+) -> PyResult<radsym::OwnedImage<T>> {
     let shape = array.shape();
     let h = shape[0];
     let w = shape[1];
-    let data: Vec<u8> = array.as_slice()?.to_vec();
+    let data: Vec<T> = array.as_slice()?.to_vec();
     radsym::OwnedImage::from_vec(data, w, h).map_err(to_pyerr)
+}
+
+/// Convert a 2D uint8 numpy array (H x W) to an OwnedImage<u8>.
+pub fn numpy_to_owned_u8(array: &PyReadonlyArray2<u8>) -> PyResult<radsym::OwnedImage<u8>> {
+    numpy_to_owned(array)
 }
 use numpy::ndarray::Array2;
 use numpy::{PyArray2, PyReadonlyArray2, PyUntypedArrayMethods};

@@ -1,8 +1,9 @@
 //! Python bindings for the radsym radial symmetry detection library.
 
 use numpy::PyReadonlyArray2;
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use radsym::core::gradient::sobel_gradient;
+use radsym::GradientOperator;
 use radsym::propose::extract::extract_proposals;
 
 mod convert;
@@ -13,6 +14,67 @@ use convert::{colormap_from_str, polarity_from_str};
 use error::to_pyerr;
 use types::*;
 
+const DTYPE_ERR: &str =
+    "image must be a 2-D C-contiguous numpy array of dtype uint8, uint16, or float32";
+
+/// Compute a gradient from a numpy array of dtype uint8/uint16/float32,
+/// releasing the GIL during the compute.
+fn gradient_from_any(
+    py: Python<'_>,
+    image: &Bound<'_, PyAny>,
+    operator: GradientOperator,
+) -> PyResult<PyGradientField> {
+    fn run<T: numpy::Element + radsym::SourcePixel>(
+        py: Python<'_>,
+        arr: &PyReadonlyArray2<T>,
+        operator: GradientOperator,
+    ) -> PyResult<PyGradientField> {
+        let owned = numpy_to_owned(arr)?;
+        let grad = py
+            .detach(|| radsym::compute_gradient(&owned.view(), operator))
+            .map_err(to_pyerr)?;
+        Ok(PyGradientField { inner: grad })
+    }
+    if let Ok(arr) = image.extract::<PyReadonlyArray2<u8>>() {
+        run(py, &arr, operator)
+    } else if let Ok(arr) = image.extract::<PyReadonlyArray2<u16>>() {
+        run(py, &arr, operator)
+    } else if let Ok(arr) = image.extract::<PyReadonlyArray2<f32>>() {
+        run(py, &arr, operator)
+    } else {
+        Err(PyValueError::new_err(DTYPE_ERR))
+    }
+}
+
+/// Run the full detection pipeline on a numpy array of dtype uint8/uint16/float32,
+/// releasing the GIL during the compute.
+fn detect_circles_from_any(
+    py: Python<'_>,
+    image: &Bound<'_, PyAny>,
+    cfg: &radsym::DetectCirclesConfig,
+) -> PyResult<Vec<PyDetection>> {
+    fn run<T: numpy::Element + radsym::SourcePixel>(
+        py: Python<'_>,
+        arr: &PyReadonlyArray2<T>,
+        cfg: &radsym::DetectCirclesConfig,
+    ) -> PyResult<Vec<PyDetection>> {
+        let owned = numpy_to_owned(arr)?;
+        let dets = py
+            .detach(|| radsym::detect_circles(&owned.view(), cfg))
+            .map_err(to_pyerr)?;
+        Ok(dets.into_iter().map(|d| PyDetection { inner: d }).collect())
+    }
+    if let Ok(arr) = image.extract::<PyReadonlyArray2<u8>>() {
+        run(py, &arr, cfg)
+    } else if let Ok(arr) = image.extract::<PyReadonlyArray2<u16>>() {
+        run(py, &arr, cfg)
+    } else if let Ok(arr) = image.extract::<PyReadonlyArray2<f32>>() {
+        run(py, &arr, cfg)
+    } else {
+        Err(PyValueError::new_err(DTYPE_ERR))
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Gradient
 // ---------------------------------------------------------------------------
@@ -20,19 +82,19 @@ use types::*;
 /// Compute Sobel gradient from a grayscale image.
 ///
 /// Args:
-///     image: 2D numpy array (uint8, H x W) representing a grayscale image.
+///     image: 2D numpy array (uint8/uint16/float32, H x W) representing a
+///         grayscale image. 16-bit and float inputs are read at full precision.
 ///
 /// Returns:
 ///     GradientField: opaque gradient object used by all downstream functions.
 ///
 /// Raises:
-///     ValueError: if the image is empty or has invalid dimensions.
+///     ValueError: if the image is empty, not 2-D C-contiguous, or an
+///         unsupported dtype.
 #[pyfunction]
 #[pyo3(name = "sobel_gradient")]
-fn sobel_gradient_py(image: PyReadonlyArray2<u8>) -> PyResult<PyGradientField> {
-    let owned = numpy_to_owned_u8(&image)?;
-    let grad = sobel_gradient(&owned.view()).map_err(to_pyerr)?;
-    Ok(PyGradientField { inner: grad })
+fn sobel_gradient_py(py: Python<'_>, image: &Bound<'_, PyAny>) -> PyResult<PyGradientField> {
+    gradient_from_any(py, image, GradientOperator::Sobel)
 }
 
 /// Compute Scharr gradient from a grayscale image.
@@ -41,16 +103,15 @@ fn sobel_gradient_py(image: PyReadonlyArray2<u8>) -> PyResult<PyGradientField> {
 /// which can improve detection quality for circular structures.
 ///
 /// Args:
-///     image: 2D numpy array (uint8, H x W) representing a grayscale image.
+///     image: 2D numpy array (uint8/uint16/float32, H x W) representing a
+///         grayscale image.
 ///
 /// Returns:
 ///     GradientField: opaque gradient object used by all downstream functions.
 #[pyfunction]
 #[pyo3(name = "scharr_gradient")]
-fn scharr_gradient_py(image: PyReadonlyArray2<u8>) -> PyResult<PyGradientField> {
-    let owned = numpy_to_owned_u8(&image)?;
-    let grad = radsym::scharr_gradient(&owned.view()).map_err(to_pyerr)?;
-    Ok(PyGradientField { inner: grad })
+fn scharr_gradient_py(py: Python<'_>, image: &Bound<'_, PyAny>) -> PyResult<PyGradientField> {
+    gradient_from_any(py, image, GradientOperator::Scharr)
 }
 
 /// Extract a one-shot pyramid level from a grayscale image.
@@ -432,27 +493,25 @@ fn radial_center_refine_py(
 /// 4. Iterative circle refinement
 ///
 /// Args:
-///     image: 2D numpy array (uint8, H x W) representing a grayscale image.
+///     image: 2D numpy array (uint8/uint16/float32, H x W) representing a
+///         grayscale image. 16-bit and float inputs are read at full precision.
 ///     config: Optional DetectCirclesConfig. Uses defaults if None.
 ///
 /// Returns:
 ///     list[Detection]: Detections sorted by descending support score.
 ///
 /// Raises:
-///     ValueError: if the image is empty or has invalid dimensions.
+///     ValueError: if the image is empty, not 2-D C-contiguous, an unsupported
+///         dtype, or the config is invalid.
 #[pyfunction]
 #[pyo3(name = "detect_circles", signature = (image, config=None))]
 fn detect_circles_py(
-    image: PyReadonlyArray2<u8>,
+    py: Python<'_>,
+    image: &Bound<'_, PyAny>,
     config: Option<&PyDetectCirclesConfig>,
 ) -> PyResult<Vec<PyDetection>> {
-    let owned = numpy_to_owned_u8(&image)?;
     let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
-    let detections = radsym::detect_circles(&owned.view(), &cfg).map_err(to_pyerr)?;
-    Ok(detections
-        .into_iter()
-        .map(|d| PyDetection { inner: d })
-        .collect())
+    detect_circles_from_any(py, image, &cfg)
 }
 
 /// Greedily suppress proposals that are closer than `min_distance`.

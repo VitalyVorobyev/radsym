@@ -249,37 +249,66 @@ pub fn frst_response(
     gradient: &GradientField,
     config: &FrstConfig,
 ) -> Result<super::extract::ResponseMap> {
+    frst_response_scaled(gradient, config).map(|(response, _scale)| response)
+}
+
+/// FRST response together with a per-pixel "winning radius" map.
+///
+/// The second return value records, for each pixel, the candidate radius whose
+/// *single-radius* response was largest there (`0.0` where no radius voted). It
+/// lets the pipeline score and refine each proposal at its own scale instead of
+/// a single global radius hint — widening the range of circle sizes a single
+/// [`detect_circles`](crate::detect_circles) call can recover.
+///
+/// The summed response is bit-for-bit identical to [`frst_response`].
+pub fn frst_response_scaled(
+    gradient: &GradientField,
+    config: &FrstConfig,
+) -> Result<(super::extract::ResponseMap, OwnedImage<Scalar>)> {
     config.validate()?;
     let w = gradient.width();
     let h = gradient.height();
     let mut response = OwnedImage::<Scalar>::zeros(w, h)?;
+    let mut best = OwnedImage::<Scalar>::zeros(w, h)?;
+    let mut scale = OwnedImage::<Scalar>::zeros(w, h)?;
 
     #[cfg(feature = "rayon")]
     let per_radius = config
         .radii
         .par_iter()
-        .map(|&radius| frst_response_single(gradient, radius, config))
+        .map(|&radius| (radius, frst_response_single(gradient, radius, config)))
         .collect::<Vec<_>>();
 
     #[cfg(not(feature = "rayon"))]
     let per_radius = config
         .radii
         .iter()
-        .map(|&radius| frst_response_single(gradient, radius, config))
+        .map(|&radius| (radius, frst_response_single(gradient, radius, config)))
         .collect::<Vec<_>>();
 
-    for s_n in per_radius {
-        let s_n = s_n?;
+    {
         let resp_data = response.data_mut();
-        let s_data = s_n.data();
-        for i in 0..w * h {
-            resp_data[i] += s_data[i];
+        let best_data = best.data_mut();
+        let scale_data = scale.data_mut();
+        // Sum responses (in fixed radii order) and track the per-pixel argmax
+        // radius. The summation order matches `frst_response` exactly.
+        for (radius, s_n) in per_radius {
+            let s_n = s_n?;
+            let s_data = s_n.data();
+            for i in 0..w * h {
+                let v = s_data[i];
+                resp_data[i] += v;
+                if v > best_data[i] {
+                    best_data[i] = v;
+                    scale_data[i] = radius as Scalar;
+                }
+            }
         }
     }
 
-    Ok(super::extract::ResponseMap::new(
-        response,
-        super::seed::ProposalSource::Frst,
+    Ok((
+        super::extract::ResponseMap::new(response, super::seed::ProposalSource::Frst),
+        scale,
     ))
 }
 

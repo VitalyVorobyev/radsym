@@ -16,9 +16,9 @@ name = "radsym_py"
 crate-type = ["cdylib"]
 
 [build-dependencies]
-pyo3-build-config = "0.28"
+pyo3-build-config = "0.29"
 
 [dependencies]
-pyo3 = { version = "0.28", features = ["extension-module"] }
-numpy = "0.28"
+pyo3 = { version = "0.29", features = ["extension-module"] }
+numpy = "0.29"
 radsym = { path = "../radsym", version = "0.2.0", features = ["image-io", "serde", "rayon"] }
