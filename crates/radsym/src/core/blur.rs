@@ -19,21 +19,55 @@ use super::scalar::Scalar;
 /// stacked box blur approximation (O(1) per pixel).
 ///
 /// No-op if `sigma <= 0.5` (kernel radius would be zero).
+///
+/// Allocates a `w * h` scratch buffer per call. Hot paths that blur repeatedly
+/// (e.g. per-radius FRST) should call [`gaussian_blur_inplace_buf`] with a
+/// reused buffer instead.
 pub(crate) fn gaussian_blur_inplace(image: &mut OwnedImage<Scalar>, sigma: Scalar) {
+    let mut scratch = Vec::new();
+    gaussian_blur_inplace_buf(image, sigma, &mut scratch);
+}
+
+/// Gaussian blur, in-place, reusing a caller-owned scratch buffer.
+///
+/// Identical result to [`gaussian_blur_inplace`]; the only difference is that
+/// the `w * h` temporary is taken from `scratch` (resized as needed) instead of
+/// freshly allocated, so repeated calls at the same resolution allocate and
+/// fault those pages once rather than every call. `scratch` contents are fully
+/// overwritten before being read, so its incoming value is irrelevant.
+pub(crate) fn gaussian_blur_inplace_buf(
+    image: &mut OwnedImage<Scalar>,
+    sigma: Scalar,
+    scratch: &mut Vec<Scalar>,
+) {
     if sigma <= 0.5 {
         return;
     }
     if sigma <= 2.0 {
-        direct_gaussian_blur_inplace(image, sigma);
+        direct_gaussian_blur_inplace(image, sigma, scratch);
     } else {
-        stacked_box_blur_inplace(image, sigma);
+        stacked_box_blur_inplace(image, sigma, scratch);
+    }
+}
+
+/// Resize `buf` to exactly `len` elements (the fill value is irrelevant because
+/// every blur pass overwrites the buffer before reading it).
+#[inline]
+fn ensure_buf(buf: &mut Vec<Scalar>, len: usize) {
+    if buf.len() != len {
+        buf.clear();
+        buf.resize(len, 0.0);
     }
 }
 
 /// Direct separable Gaussian convolution (original implementation).
 ///
 /// Cost: O(w * h * ceil(3*sigma)) per pass.
-fn direct_gaussian_blur_inplace(image: &mut OwnedImage<Scalar>, sigma: Scalar) {
+fn direct_gaussian_blur_inplace(
+    image: &mut OwnedImage<Scalar>,
+    sigma: Scalar,
+    buf: &mut Vec<Scalar>,
+) {
     let w = image.width();
     let h = image.height();
 
@@ -57,7 +91,7 @@ fn direct_gaussian_blur_inplace(image: &mut OwnedImage<Scalar>, sigma: Scalar) {
     }
 
     // Horizontal pass
-    let mut buf = vec![0.0f32; w * h];
+    ensure_buf(buf, w * h);
     let data = image.data();
     for y in 0..h {
         for x in 0..w {
@@ -127,18 +161,18 @@ fn box_radii_for_sigma(sigma: Scalar) -> [usize; 3] {
 ///
 /// Each box blur pass is O(1) per pixel using running sums, making the total
 /// cost independent of sigma. Mirror-clamp boundary handling.
-fn stacked_box_blur_inplace(image: &mut OwnedImage<Scalar>, sigma: Scalar) {
+fn stacked_box_blur_inplace(image: &mut OwnedImage<Scalar>, sigma: Scalar, buf: &mut Vec<Scalar>) {
     let w = image.width();
     let h = image.height();
-    let mut buf = vec![0.0f32; w * h];
+    ensure_buf(buf, w * h);
 
     let radii = box_radii_for_sigma(sigma);
     for &r in &radii {
         if r == 0 {
             continue;
         }
-        box_blur_horizontal(image.data(), &mut buf, w, h, r);
-        box_blur_vertical(&buf, image.data_mut(), w, h, r);
+        box_blur_horizontal(image.data(), buf, w, h, r);
+        box_blur_vertical(buf, image.data_mut(), w, h, r);
     }
 }
 
@@ -223,8 +257,8 @@ mod tests {
         let mut img_direct = OwnedImage::from_vec(data.clone(), size, size).unwrap();
         let mut img_box = OwnedImage::from_vec(data, size, size).unwrap();
 
-        direct_gaussian_blur_inplace(&mut img_direct, sigma);
-        stacked_box_blur_inplace(&mut img_box, sigma);
+        direct_gaussian_blur_inplace(&mut img_direct, sigma, &mut Vec::new());
+        stacked_box_blur_inplace(&mut img_box, sigma, &mut Vec::new());
 
         let d = img_direct.data();
         let b = img_box.data();
