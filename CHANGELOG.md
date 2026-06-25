@@ -42,6 +42,22 @@ Production-hardening pass. All changes are backward compatible for existing
   wrong-scored detections.
 - **`radsym-py` upgraded to PyO3 0.29 / numpy 0.29** (from 0.28).
 
+### Performance
+
+- **FRST-unfused voting reuses per-radius scratch**: the unfused path
+  (`frst_response` / `frst_response_scaled`, used by `detect_circles`) no longer
+  allocates fresh `O_n`/`M_n`/`S_n`/blur buffers for every radius, nor collects
+  all per-radius response images before summing. A single reused `FrstScratch`
+  set is folded into the running accumulators in place, and the blur temporary is
+  reused via a new internal `gaussian_blur_inplace_buf`. Output is **bit-for-bit
+  identical** (covered by a new equivalence test against the previous algorithm).
+  Criterion single-thread: −15 % at 512², −8 % at 1024². See
+  [`docs/development/voting-performance.md`](docs/development/voting-performance.md)
+  for the profiling, plus the two production throughput levers it documents:
+  `rayon` (≈3–4× on real images, bit-identical) and the existing
+  `frst_response_fused` (4–6×, but it drops the orientation term and diverges on
+  cluttered real imagery — opt-in only).
+
 ## [0.2.0] - 2026-05-18
 
 A coordinated public-API revision (see the migration notes in each entry).

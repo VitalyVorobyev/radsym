@@ -653,10 +653,12 @@ fn refinement_rows() -> Refinement {
 // ---------------------------------------------------------------------------
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Force deterministic single-threaded timing. radsym's FRST parallelizes
-    // multi-radius voting over the global rayon pool when the `rayon` feature is
-    // active — and it leaks in here via the `criterion` dev-dependency. One
-    // thread gives reproducible numbers on the default-build (sequential) path.
+    // Force deterministic single-threaded timing *if* this example is built with
+    // the `rayon` feature (`--features rayon`), in which case FRST parallelizes
+    // multi-radius voting over the global rayon pool. With the default feature
+    // set this is a harmless no-op: radsym's `rayon` feature is `dep:rayon`-gated
+    // and is NOT pulled in by the `criterion` dev-dependency, so the sequential
+    // `.iter()` path is what runs and what the page documents.
     // SAFETY: set at the very top of main, before any work or threads start.
     unsafe { std::env::set_var("RAYON_NUM_THREADS", "1") };
 
