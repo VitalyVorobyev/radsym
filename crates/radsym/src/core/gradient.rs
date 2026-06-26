@@ -9,6 +9,48 @@ use super::error::Result;
 use super::image_view::{ImageView, OwnedImage};
 use super::scalar::Scalar;
 
+/// A pixel type that can be read as a scalar intensity for gradient computation.
+///
+/// Implemented for `u8`, `u16`, and `f32` so the detection pipeline can ingest
+/// 8-bit, 10/12/16-bit, and floating-point imagery without a lossy
+/// pre-conversion. The gradient hot loops cast each pixel through
+/// [`SourcePixel::to_scalar`].
+///
+/// **Threshold note:** gradient magnitudes scale with the input's value range,
+/// so *absolute* thresholds such as [`FrstConfig::gradient_threshold`] and
+/// [`RadialCenterConfig::gradient_threshold`] are bit-depth dependent — a
+/// threshold tuned for `u8` is ~256× too small for raw `u16`. Scale such
+/// thresholds to the input range, or normalize against
+/// [`GradientField::max_magnitude`].
+///
+/// [`FrstConfig::gradient_threshold`]: crate::FrstConfig
+/// [`RadialCenterConfig::gradient_threshold`]: crate::RadialCenterConfig
+pub trait SourcePixel: Copy {
+    /// Convert this pixel to a scalar intensity.
+    fn to_scalar(self) -> Scalar;
+}
+
+impl SourcePixel for u8 {
+    #[inline]
+    fn to_scalar(self) -> Scalar {
+        self as Scalar
+    }
+}
+
+impl SourcePixel for u16 {
+    #[inline]
+    fn to_scalar(self) -> Scalar {
+        self as Scalar
+    }
+}
+
+impl SourcePixel for f32 {
+    #[inline]
+    fn to_scalar(self) -> Scalar {
+        self
+    }
+}
+
 /// Per-pixel gradient field storing separate x and y gradient components.
 pub struct GradientField {
     /// Horizontal gradient (dI/dx). Positive = intensity increases rightward.
@@ -94,7 +136,7 @@ impl GradientField {
 /// let (gx, _) = grad.get(8, size / 2).unwrap();
 /// assert!(gx > 20.0, "expected strong gx at step edge, got {gx}");
 /// ```
-pub fn sobel_gradient(image: &ImageView<'_, u8>) -> Result<GradientField> {
+pub fn sobel_gradient<P: SourcePixel>(image: &ImageView<'_, P>) -> Result<GradientField> {
     let w = image.width();
     let h = image.height();
     let stride = image.stride();
@@ -111,14 +153,14 @@ pub fn sobel_gradient(image: &ImageView<'_, u8>) -> Result<GradientField> {
         let row_next = (y + 1) * stride;
         for x in 1..w - 1 {
             // Direct slice access — loop bounds guarantee all neighbors are in-bounds.
-            let p00 = src[row_prev + x - 1] as Scalar;
-            let p10 = src[row_prev + x] as Scalar;
-            let p20 = src[row_prev + x + 1] as Scalar;
-            let p01 = src[row_curr + x - 1] as Scalar;
-            let p21 = src[row_curr + x + 1] as Scalar;
-            let p02 = src[row_next + x - 1] as Scalar;
-            let p12 = src[row_next + x] as Scalar;
-            let p22 = src[row_next + x + 1] as Scalar;
+            let p00 = src[row_prev + x - 1].to_scalar();
+            let p10 = src[row_prev + x].to_scalar();
+            let p20 = src[row_prev + x + 1].to_scalar();
+            let p01 = src[row_curr + x - 1].to_scalar();
+            let p21 = src[row_curr + x + 1].to_scalar();
+            let p02 = src[row_next + x - 1].to_scalar();
+            let p12 = src[row_next + x].to_scalar();
+            let p22 = src[row_next + x + 1].to_scalar();
 
             let dx = (-p00 + p20 - 2.0 * p01 + 2.0 * p21 - p02 + p22) / 8.0;
             let dy = (-p00 - 2.0 * p10 - p20 + p02 + 2.0 * p12 + p22) / 8.0;
@@ -133,41 +175,11 @@ pub fn sobel_gradient(image: &ImageView<'_, u8>) -> Result<GradientField> {
 }
 
 /// Compute the gradient field of a float image using a 3x3 Sobel operator.
+///
+/// Thin wrapper over the generic [`sobel_gradient`]; kept for explicit `f32`
+/// call sites.
 pub fn sobel_gradient_f32(image: &ImageView<'_, f32>) -> Result<GradientField> {
-    let w = image.width();
-    let h = image.height();
-    let stride = image.stride();
-    let src = image.as_slice();
-    let mut gx = OwnedImage::<Scalar>::zeros(w, h)?;
-    let mut gy = OwnedImage::<Scalar>::zeros(w, h)?;
-
-    let gx_data = gx.data_mut();
-    let gy_data = gy.data_mut();
-
-    for y in 1..h - 1 {
-        let row_prev = (y - 1) * stride;
-        let row_curr = y * stride;
-        let row_next = (y + 1) * stride;
-        for x in 1..w - 1 {
-            let p00 = src[row_prev + x - 1];
-            let p10 = src[row_prev + x];
-            let p20 = src[row_prev + x + 1];
-            let p01 = src[row_curr + x - 1];
-            let p21 = src[row_curr + x + 1];
-            let p02 = src[row_next + x - 1];
-            let p12 = src[row_next + x];
-            let p22 = src[row_next + x + 1];
-
-            let dx = (-p00 + p20 - 2.0 * p01 + 2.0 * p21 - p02 + p22) / 8.0;
-            let dy = (-p00 - 2.0 * p10 - p20 + p02 + 2.0 * p12 + p22) / 8.0;
-
-            let idx = y * w + x;
-            gx_data[idx] = dx;
-            gy_data[idx] = dy;
-        }
-    }
-
-    Ok(GradientField { gx, gy })
+    sobel_gradient(image)
 }
 
 /// Compute gradient magnitude image from a gradient field.
@@ -227,7 +239,7 @@ pub enum GradientOperator {
 /// let (gx, _) = grad.get(8, size / 2).unwrap();
 /// assert!(gx > 20.0, "expected strong gx at step edge, got {gx}");
 /// ```
-pub fn scharr_gradient(image: &ImageView<'_, u8>) -> Result<GradientField> {
+pub fn scharr_gradient<P: SourcePixel>(image: &ImageView<'_, P>) -> Result<GradientField> {
     let w = image.width();
     let h = image.height();
     let stride = image.stride();
@@ -243,14 +255,14 @@ pub fn scharr_gradient(image: &ImageView<'_, u8>) -> Result<GradientField> {
         let row_curr = y * stride;
         let row_next = (y + 1) * stride;
         for x in 1..w - 1 {
-            let p00 = src[row_prev + x - 1] as Scalar;
-            let p10 = src[row_prev + x] as Scalar;
-            let p20 = src[row_prev + x + 1] as Scalar;
-            let p01 = src[row_curr + x - 1] as Scalar;
-            let p21 = src[row_curr + x + 1] as Scalar;
-            let p02 = src[row_next + x - 1] as Scalar;
-            let p12 = src[row_next + x] as Scalar;
-            let p22 = src[row_next + x + 1] as Scalar;
+            let p00 = src[row_prev + x - 1].to_scalar();
+            let p10 = src[row_prev + x].to_scalar();
+            let p20 = src[row_prev + x + 1].to_scalar();
+            let p01 = src[row_curr + x - 1].to_scalar();
+            let p21 = src[row_curr + x + 1].to_scalar();
+            let p02 = src[row_next + x - 1].to_scalar();
+            let p12 = src[row_next + x].to_scalar();
+            let p22 = src[row_next + x + 1].to_scalar();
 
             let dx =
                 (-3.0 * p00 + 3.0 * p20 - 10.0 * p01 + 10.0 * p21 - 3.0 * p02 + 3.0 * p22) / 32.0;
@@ -267,43 +279,11 @@ pub fn scharr_gradient(image: &ImageView<'_, u8>) -> Result<GradientField> {
 }
 
 /// Compute the gradient field of a float image using a 3x3 Scharr operator.
+///
+/// Thin wrapper over the generic [`scharr_gradient`]; kept for explicit `f32`
+/// call sites.
 pub fn scharr_gradient_f32(image: &ImageView<'_, f32>) -> Result<GradientField> {
-    let w = image.width();
-    let h = image.height();
-    let stride = image.stride();
-    let src = image.as_slice();
-    let mut gx = OwnedImage::<Scalar>::zeros(w, h)?;
-    let mut gy = OwnedImage::<Scalar>::zeros(w, h)?;
-
-    let gx_data = gx.data_mut();
-    let gy_data = gy.data_mut();
-
-    for y in 1..h - 1 {
-        let row_prev = (y - 1) * stride;
-        let row_curr = y * stride;
-        let row_next = (y + 1) * stride;
-        for x in 1..w - 1 {
-            let p00 = src[row_prev + x - 1];
-            let p10 = src[row_prev + x];
-            let p20 = src[row_prev + x + 1];
-            let p01 = src[row_curr + x - 1];
-            let p21 = src[row_curr + x + 1];
-            let p02 = src[row_next + x - 1];
-            let p12 = src[row_next + x];
-            let p22 = src[row_next + x + 1];
-
-            let dx =
-                (-3.0 * p00 + 3.0 * p20 - 10.0 * p01 + 10.0 * p21 - 3.0 * p02 + 3.0 * p22) / 32.0;
-            let dy =
-                (-3.0 * p00 - 10.0 * p10 - 3.0 * p20 + 3.0 * p02 + 10.0 * p12 + 3.0 * p22) / 32.0;
-
-            let idx = y * w + x;
-            gx_data[idx] = dx;
-            gy_data[idx] = dy;
-        }
-    }
-
-    Ok(GradientField { gx, gy })
+    scharr_gradient(image)
 }
 
 /// Compute the gradient field using the specified operator.
@@ -331,8 +311,8 @@ pub fn scharr_gradient_f32(image: &ImageView<'_, f32>) -> Result<GradientField> 
 /// let (gx, _) = grad.get(8, size / 2).unwrap();
 /// assert!(gx > 20.0, "expected strong gx at step edge, got {gx}");
 /// ```
-pub fn compute_gradient(
-    image: &ImageView<'_, u8>,
+pub fn compute_gradient<P: SourcePixel>(
+    image: &ImageView<'_, P>,
     operator: GradientOperator,
 ) -> Result<GradientField> {
     match operator {
@@ -342,14 +322,14 @@ pub fn compute_gradient(
 }
 
 /// Compute the gradient field of a float image using the specified operator.
+///
+/// Thin wrapper over the generic [`compute_gradient`]; kept for explicit `f32`
+/// call sites.
 pub fn compute_gradient_f32(
     image: &ImageView<'_, f32>,
     operator: GradientOperator,
 ) -> Result<GradientField> {
-    match operator {
-        GradientOperator::Sobel => sobel_gradient_f32(image),
-        GradientOperator::Scharr => scharr_gradient_f32(image),
-    }
+    compute_gradient(image, operator)
 }
 
 #[cfg(test)]

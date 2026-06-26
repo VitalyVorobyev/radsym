@@ -21,6 +21,37 @@ impl Circle {
     }
 }
 
+/// An axis-aligned integer rectangle in image pixel coordinates.
+///
+/// Used as a detection region of interest (ROI): `(x, y)` is the top-left
+/// corner and `width`/`height` extend rightward/downward. The region covers
+/// columns `x..x+width` and rows `y..y+height`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Rect {
+    /// Left edge (column) in pixels.
+    pub x: usize,
+    /// Top edge (row) in pixels.
+    pub y: usize,
+    /// Width in pixels.
+    pub width: usize,
+    /// Height in pixels.
+    pub height: usize,
+}
+
+impl Rect {
+    /// Create a rectangle from its top-left corner and size.
+    #[inline]
+    pub fn new(x: usize, y: usize, width: usize, height: usize) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
+    }
+}
+
 /// An ellipse in image coordinates.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

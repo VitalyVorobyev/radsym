@@ -4,8 +4,8 @@
 //! workflow. Power users can still compose the individual stages manually.
 
 use crate::core::error::Result;
-use crate::core::geometry::Circle;
-use crate::core::gradient::{GradientOperator, compute_gradient};
+use crate::core::geometry::{Circle, Rect};
+use crate::core::gradient::{GradientOperator, SourcePixel, compute_gradient};
 use crate::core::image_view::ImageView;
 use crate::core::nms::NmsConfig;
 use crate::core::polarity::Polarity;
@@ -14,7 +14,7 @@ use crate::diagnostics::detection::{
     CircleDetectionDiagnostics, RejectedProposal, RejectionReason,
 };
 use crate::propose::extract::extract_proposals;
-use crate::propose::frst::{FrstConfig, frst_response};
+use crate::propose::frst::{FrstConfig, frst_response_scaled};
 use crate::refine::circle::{CircleRefineConfig, refine_circle};
 use crate::refine::result::RefinementStatus;
 use crate::support::score::{
@@ -40,6 +40,13 @@ pub struct DetectCirclesConfig {
     pub min_score: Scalar,
     /// Gradient operator to use (default: Sobel).
     pub gradient_operator: GradientOperator,
+    /// Optional rectangular region of interest.
+    ///
+    /// When set, the whole pipeline (gradient, voting, scoring, refinement) runs
+    /// only inside this rectangle, and the returned detection centers are
+    /// translated back to full-frame image coordinates. `None` (the default)
+    /// searches the entire image. An out-of-bounds rectangle is a hard error.
+    pub roi: Option<Rect>,
     /// Advanced per-stage configuration.
     pub advanced: DetectCirclesAdvanced,
 }
@@ -78,6 +85,7 @@ impl Default for DetectCirclesConfig {
             radius_hint: 10.0,
             min_score: 0.0,
             gradient_operator: GradientOperator::default(),
+            roi: None,
             advanced: DetectCirclesAdvanced::default(),
         }
     }
@@ -138,6 +146,17 @@ impl DetectCirclesConfig {
         self.gradient_operator = gradient_operator;
         self
     }
+
+    /// Restrict detection to a rectangular region of interest (chainable).
+    ///
+    /// The whole pipeline runs only inside `rect`; returned detection centers are
+    /// translated back to full-frame image coordinates. An out-of-bounds
+    /// rectangle makes [`detect_circles`] return an
+    /// [`InvalidDimensions`](crate::RadSymError::InvalidDimensions) error.
+    pub fn roi(mut self, rect: Rect) -> Self {
+        self.roi = Some(rect);
+        self
+    }
 }
 
 /// A detected circle with its support score and refinement status.
@@ -170,7 +189,8 @@ pub type CircleDetection = Detection<Circle>;
 /// Detect circles in a grayscale image using the full propose-score-refine pipeline.
 ///
 /// This is a convenience wrapper around the composable stages:
-/// 1. Sobel gradient computation
+/// 1. Gradient computation (Sobel by default; set via
+///    [`gradient_operator`](DetectCirclesConfig::gradient_operator))
 /// 2. FRST voting and NMS proposal extraction
 /// 3. Support scoring and filtering
 /// 4. Iterative circle refinement
@@ -203,8 +223,8 @@ pub type CircleDetection = Detection<Circle>;
 /// let detections = detect_circles(&image, &config).unwrap();
 /// assert!(!detections.is_empty());
 /// ```
-pub fn detect_circles(
-    image: &ImageView<'_, u8>,
+pub fn detect_circles<P: SourcePixel>(
+    image: &ImageView<'_, P>,
     config: &DetectCirclesConfig,
 ) -> Result<Vec<CircleDetection>> {
     run_detection(image, config).map(|(detections, _diagnostics)| detections)
@@ -244,8 +264,8 @@ pub fn detect_circles(
 /// let (detections, diagnostics) = detect_circles_with_diagnostics(&image, &config).unwrap();
 /// assert_eq!(detections.len(), diagnostics.score_breakdowns.len());
 /// ```
-pub fn detect_circles_with_diagnostics(
-    image: &ImageView<'_, u8>,
+pub fn detect_circles_with_diagnostics<P: SourcePixel>(
+    image: &ImageView<'_, P>,
     config: &DetectCirclesConfig,
 ) -> Result<(Vec<CircleDetection>, CircleDetectionDiagnostics)> {
     run_detection(image, config)
@@ -258,26 +278,52 @@ pub fn detect_circles_with_diagnostics(
 /// evidence; [`detect_circles`] simply discards it. The extra bookkeeping is
 /// negligible next to the gradient field and response map the pipeline
 /// allocates regardless.
-fn run_detection(
-    image: &ImageView<'_, u8>,
+fn run_detection<P: SourcePixel>(
+    image: &ImageView<'_, P>,
     config: &DetectCirclesConfig,
 ) -> Result<(Vec<CircleDetection>, CircleDetectionDiagnostics)> {
+    // Validate every stage config up front so a bad config produces an
+    // actionable error instead of silently-wrong output (e.g. nms
+    // max_detections = 0 would otherwise just return zero detections).
+    config.advanced.nms.validate()?;
+    config.advanced.scoring.validate()?;
+    config.advanced.scoring.sampling.validate()?;
     config.advanced.refinement.validate()?;
 
-    let gradient = compute_gradient(image, config.gradient_operator)?;
+    // Crop to the region of interest (the full frame when `roi` is None). The
+    // returned view is a zero-copy, stride-preserving window, so the gradient
+    // and every downstream stage operate only on the ROI.
+    let roi = config
+        .roi
+        .unwrap_or_else(|| Rect::new(0, 0, image.width(), image.height()));
+    let work = image.roi(roi.x, roi.y, roi.width, roi.height)?;
+
+    let gradient = compute_gradient(&work, config.gradient_operator)?;
 
     let mut frst_config = config.advanced.frst.clone();
     frst_config.radii = config.radii.clone();
     frst_config.polarity = config.polarity;
-    let response = frst_response(&gradient, &frst_config)?;
+    let (response, scale_map) = frst_response_scaled(&gradient, &frst_config)?;
 
-    let proposals = extract_proposals(&response, &config.advanced.nms, config.polarity);
+    let mut proposals = extract_proposals(&response, &config.advanced.nms, config.polarity);
+
+    // Propagate each proposal's winning radius (the radius whose single-radius
+    // FRST response peaked at that pixel) into its scale hint, so scoring and
+    // refinement use a per-proposal radius instead of one global `radius_hint`.
+    let scale_view = scale_map.view();
+    for proposal in &mut proposals {
+        let px = proposal.seed.position.x.round() as usize;
+        let py = proposal.seed.position.y.round() as usize;
+        proposal.scale_hint = scale_view.get(px, py).copied().filter(|&r| r > 0.0);
+    }
 
     let mut accepted: Vec<(CircleDetection, SupportScoreBreakdown)> = Vec::new();
     let mut rejected: Vec<RejectedProposal> = Vec::new();
 
     for proposal in &proposals {
-        let circle = Circle::new(proposal.seed.position, config.radius_hint);
+        // Use the proposal's winning radius when available, else the global hint.
+        let radius = proposal.scale_hint.unwrap_or(config.radius_hint);
+        let circle = Circle::new(proposal.seed.position, radius);
         let breakdown = score_circle_support(&gradient, &circle, &config.advanced.scoring);
 
         if breakdown.is_degenerate {
@@ -325,8 +371,19 @@ fn run_detection(
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    let (detections, score_breakdowns): (Vec<CircleDetection>, Vec<SupportScoreBreakdown>) =
+    let (mut detections, score_breakdowns): (Vec<CircleDetection>, Vec<SupportScoreBreakdown>) =
         accepted.into_iter().unzip();
+
+    // Translate ROI-local detection centers back to full-frame coordinates.
+    // Diagnostics (response map, proposals) stay in ROI-local space, consistent
+    // with the ROI-sized response map.
+    if roi.x != 0 || roi.y != 0 {
+        let (dx, dy) = (roi.x as Scalar, roi.y as Scalar);
+        for det in &mut detections {
+            det.hypothesis.center.x += dx;
+            det.hypothesis.center.y += dy;
+        }
+    }
 
     let diagnostics = CircleDetectionDiagnostics {
         response,

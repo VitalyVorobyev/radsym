@@ -88,10 +88,10 @@ pub mod affine;
 // Core types
 pub use crate::core::coords::PixelCoord;
 pub use crate::core::error::{RadSymError, Result};
-pub use crate::core::geometry::{Annulus, Circle, Ellipse};
+pub use crate::core::geometry::{Annulus, Circle, Ellipse, Rect};
 pub use crate::core::gradient::{
-    GradientField, GradientOperator, compute_gradient, compute_gradient_f32, scharr_gradient,
-    scharr_gradient_f32, sobel_gradient, sobel_gradient_f32,
+    GradientField, GradientOperator, SourcePixel, compute_gradient, compute_gradient_f32,
+    scharr_gradient, scharr_gradient_f32, sobel_gradient, sobel_gradient_f32,
 };
 pub use crate::core::homography::{Homography, RectifiedGrid, rectified_circle_to_image_ellipse};
 pub use crate::core::image_view::{ImageView, OwnedImage};
@@ -100,7 +100,9 @@ pub use crate::core::polarity::Polarity;
 
 // Proposal generation
 pub use crate::propose::extract::{ResponseMap, extract_proposals, suppress_proposals_by_distance};
-pub use crate::propose::frst::{FrstConfig, frst_response, frst_response_fused};
+pub use crate::propose::frst::{
+    FrstConfig, frst_response, frst_response_fused, frst_response_scaled,
+};
 pub use crate::propose::homography::{
     HomographyProposal, HomographyRerankAdvanced, HomographyRerankConfig, RectifiedResponseMap,
     RerankedProposal, extract_rectified_proposals, frst_response_homography,

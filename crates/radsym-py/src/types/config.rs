@@ -461,6 +461,13 @@ impl PyRadialCenterConfig {
 ///         circle hypothesis. Default: 10.0.
 ///     min_score: Minimum support score to keep a detection (in ``[0, 1]``).
 ///         Default: 0.0.
+///     gradient_operator: Gradient kernel — ``"sobel"`` or ``"scharr"``.
+///         Default: ``"sobel"``.
+///     roi: Optional region of interest as ``(x, y, width, height)``; ``None``
+///         processes the full frame. Default: ``None``.
+///     radii: Optional candidate FRST voting radii in pixels. Takes precedence
+///         over ``frst.radii`` when set; otherwise the radii of ``frst`` (or the
+///         defaults) are used. Keyword-only. Default: ``None``.
 #[pyclass(name = "DetectCirclesConfig", skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyDetectCirclesConfig {
@@ -478,7 +485,10 @@ impl PyDetectCirclesConfig {
         polarity="both",
         radius_hint=10.0,
         min_score=0.0,
-        gradient_operator="sobel"
+        gradient_operator="sobel",
+        roi=None,
+        *,
+        radii=None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -490,16 +500,18 @@ impl PyDetectCirclesConfig {
         radius_hint: f32,
         min_score: f32,
         gradient_operator: &str,
+        roi: Option<(usize, usize, usize, usize)>,
+        radii: Option<Vec<u32>>,
     ) -> PyResult<Self> {
         let defaults = radsym::DetectCirclesConfig::default();
         let frst_config = frst
             .map(|c| c.inner.clone())
             .unwrap_or(defaults.advanced.frst);
         let mut advanced = radsym::DetectCirclesAdvanced::default();
-        // `radii` (set below) is the top-level source of truth for FRST voting;
-        // keep it aligned with the FRST config so a caller-supplied `frst` still
-        // drives the radii the pipeline votes over.
-        let radii = frst_config.radii.clone();
+        // `radii` (set below) is the top-level source of truth for FRST voting.
+        // A top-level `radii=` argument wins; otherwise fall back to the radii of
+        // a caller-supplied `frst` config (or the defaults).
+        let radii = radii.unwrap_or_else(|| frst_config.radii.clone());
         advanced.frst = frst_config;
         advanced.nms = nms
             .map(|c| c.inner.clone())
@@ -516,8 +528,21 @@ impl PyDetectCirclesConfig {
         inner.radius_hint = radius_hint;
         inner.min_score = min_score;
         inner.gradient_operator = gradient_operator_from_str(gradient_operator)?;
+        inner.roi = roi.map(|(x, y, w, h)| radsym::Rect::new(x, y, w, h));
         inner.advanced = advanced;
         Ok(Self { inner })
+    }
+
+    /// Candidate FRST voting radii, in pixels.
+    #[getter]
+    fn radii(&self) -> Vec<u32> {
+        self.inner.radii.clone()
+    }
+
+    /// Region of interest as ``(x, y, width, height)``, or ``None`` for full frame.
+    #[getter]
+    fn roi(&self) -> Option<(usize, usize, usize, usize)> {
+        self.inner.roi.map(|r| (r.x, r.y, r.width, r.height))
     }
 
     /// Approximate expected radius hint in pixels.

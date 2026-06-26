@@ -98,36 +98,70 @@ impl Default for FrstConfig {
     }
 }
 
-/// Compute the FRST response map for a single radius.
+/// Reusable scratch buffers for a multi-radius FRST sweep.
 ///
-/// Returns the smoothed per-radius contribution `S_n`. This is the
-/// single-radius vote primitive; use [`frst_response`] to combine
-/// contributions across all radii in [`FrstConfig::radii`].
-pub fn frst_response_single(
+/// The orientation/magnitude accumulators, the per-radius response image, and
+/// the Gaussian blur temporary are allocated once and reused across radii. On
+/// the unfused path this is the dominant cost on large images: a five-radius
+/// response otherwise allocates (and first-touch page-faults) roughly twenty
+/// `w * h` buffers instead of four.
+struct FrstScratch {
+    /// Orientation accumulator `O_n` (signed vote count).
+    o: Vec<Scalar>,
+    /// Magnitude accumulator `M_n`.
+    m: Vec<Scalar>,
+    /// Per-radius response `S_n`; fully overwritten each radius, blurred in place.
+    s: OwnedImage<Scalar>,
+    /// Blur temporary, reused by [`gaussian_blur_inplace_buf`](crate::core::blur).
+    blur: Vec<Scalar>,
+}
+
+impl FrstScratch {
+    fn new(w: usize, h: usize) -> Result<Self> {
+        Ok(Self {
+            o: vec![0.0; w * h],
+            m: vec![0.0; w * h],
+            s: OwnedImage::<Scalar>::zeros(w, h)?,
+            blur: Vec::new(),
+        })
+    }
+}
+
+/// Compute the single-radius FRST response `S_n` into `scratch.s`, reusing the
+/// scratch accumulators and blur temporary.
+///
+/// Bit-for-bit identical to a fresh-allocation computation: the accumulators are
+/// zeroed up front, `S_n` is fully overwritten by the combine step (so it needs
+/// no clearing), and the blur reuses `scratch.blur`. The caller must have
+/// validated `config` (this skips revalidation since it runs in a per-radius
+/// loop).
+fn frst_single_into(
     gradient: &GradientField,
     radius: u32,
     config: &FrstConfig,
-) -> Result<OwnedImage<Scalar>> {
-    config.validate()?;
+    scratch: &mut FrstScratch,
+) {
     let w = gradient.width();
     let h = gradient.height();
     let n = radius as i32;
+    let n_f = n as Scalar;
 
-    // Accumulator images for this radius
-    let mut o_n = OwnedImage::<Scalar>::zeros(w, h)?;
-    let mut m_n = OwnedImage::<Scalar>::zeros(w, h)?;
+    // Disjoint mutable borrows of the scratch fields.
+    let FrstScratch { o, m, s, blur } = scratch;
+    let o_data = o.as_mut_slice();
+    let m_data = m.as_mut_slice();
+    // Accumulators must start at zero; `s` does not (the combine overwrites it).
+    o_data.fill(0.0);
+    m_data.fill(0.0);
 
-    let o_data = o_n.data_mut();
-    let m_data = m_n.data_mut();
     let gx_data = gradient.gx.data();
     let gy_data = gradient.gy.data();
 
     let thresh_sq = config.gradient_threshold * config.gradient_threshold;
     let vote_pos = config.polarity.votes_positive();
     let vote_neg = config.polarity.votes_negative();
-    let n_f = n as Scalar;
 
-    // Voting pass: each pixel casts votes to affected pixels
+    // Voting pass: each pixel casts votes to affected pixels.
     for y in 0..h {
         for x in 0..w {
             let idx = y * w + x;
@@ -169,21 +203,25 @@ pub fn frst_response_single(
         }
     }
 
-    // Combine: F_n = |O_n_tilde|^alpha * M_n_tilde
-    // Clamp O_n to [-k_n, k_n] where k_n is a normalization constant.
-    // Following the paper, k_n is typically the expected maximum vote count.
-    // We use a simple normalization: divide by max(|O_n|) to get [-1, 1].
-    let o_max = o_data
-        .iter()
-        .map(|v| v.abs())
-        .fold(0.0f32, Scalar::max)
-        .max(1.0); // avoid division by zero
+    // Normalization constants. One fused pass over both accumulators; the
+    // left-to-right `max`-fold is identical to two separate `fold(0.0, max)`
+    // reductions, so the result is bit-for-bit unchanged.
+    //
+    // Following the paper, O_n is clamped by a normalization constant k_n; we
+    // use max(|O_n|) so the orientation term lands in [-1, 1].
+    let mut o_acc = 0.0f32;
+    let mut m_acc = 0.0f32;
+    for i in 0..w * h {
+        o_acc = Scalar::max(o_acc, o_data[i].abs());
+        m_acc = Scalar::max(m_acc, m_data[i]);
+    }
+    let o_max = o_acc.max(1.0); // avoid division by zero
+    let m_max = m_acc.max(1.0);
 
-    let m_max = m_data.iter().copied().fold(0.0f32, Scalar::max).max(1.0);
-
+    // Combine: F_n = |O_n_tilde|^alpha * M_n_tilde. Overwrites every pixel of
+    // `s`, so `s` needs no pre-clearing.
     let alpha = config.alpha;
-    let mut f_n = OwnedImage::<Scalar>::zeros(w, h)?;
-    let f_data = f_n.data_mut();
+    let f_data = s.data_mut();
 
     // Special-case common alpha values to avoid expensive powf.
     // Alpha=2 is the paper's default; alpha=1 skips the exponent entirely.
@@ -208,13 +246,27 @@ pub fn frst_response_single(
         }
     }
 
-    // Gaussian smoothing
+    // Gaussian smoothing, reusing the blur scratch.
     let sigma = config.smoothing_factor * radius as Scalar;
     if sigma > 0.5 {
-        crate::core::blur::gaussian_blur_inplace(&mut f_n, sigma);
+        crate::core::blur::gaussian_blur_inplace_buf(s, sigma, blur);
     }
+}
 
-    Ok(f_n)
+/// Compute the FRST response map for a single radius.
+///
+/// Returns the smoothed per-radius contribution `S_n`. This is the
+/// single-radius vote primitive; use [`frst_response`] to combine
+/// contributions across all radii in [`FrstConfig::radii`].
+pub fn frst_response_single(
+    gradient: &GradientField,
+    radius: u32,
+    config: &FrstConfig,
+) -> Result<OwnedImage<Scalar>> {
+    config.validate()?;
+    let mut scratch = FrstScratch::new(gradient.width(), gradient.height())?;
+    frst_single_into(gradient, radius, config, &mut scratch);
+    Ok(scratch.s)
 }
 
 /// Compute the full multi-radius FRST response map.
@@ -254,32 +306,121 @@ pub fn frst_response(
     let h = gradient.height();
     let mut response = OwnedImage::<Scalar>::zeros(w, h)?;
 
+    // Response-only summation: unlike `frst_response_scaled`, this keeps no
+    // per-pixel "winning radius" map, so the hot path skips the extra full-frame
+    // `best`/`scale` buffers and the per-pixel argmax tracking. Radii are summed
+    // in fixed `config.radii` order, so the result is identical to the summed
+    // response returned by `frst_response_scaled`.
     #[cfg(feature = "rayon")]
-    let per_radius = config
-        .radii
-        .par_iter()
-        .map(|&radius| frst_response_single(gradient, radius, config))
-        .collect::<Vec<_>>();
+    {
+        let per_radius = config
+            .radii
+            .par_iter()
+            .map(|&radius| frst_response_single(gradient, radius, config))
+            .collect::<Vec<_>>();
+
+        let resp_data = response.data_mut();
+        for s_n in per_radius {
+            let s_n = s_n?;
+            let s_data = s_n.data();
+            for i in 0..w * h {
+                resp_data[i] += s_data[i];
+            }
+        }
+    }
 
     #[cfg(not(feature = "rayon"))]
-    let per_radius = config
-        .radii
-        .iter()
-        .map(|&radius| frst_response_single(gradient, radius, config))
-        .collect::<Vec<_>>();
-
-    for s_n in per_radius {
-        let s_n = s_n?;
+    {
+        let mut scratch = FrstScratch::new(w, h)?;
         let resp_data = response.data_mut();
-        let s_data = s_n.data();
-        for i in 0..w * h {
-            resp_data[i] += s_data[i];
+        for &radius in &config.radii {
+            frst_single_into(gradient, radius, config, &mut scratch);
+            let s_data = scratch.s.data();
+            for i in 0..w * h {
+                resp_data[i] += s_data[i];
+            }
         }
     }
 
     Ok(super::extract::ResponseMap::new(
         response,
         super::seed::ProposalSource::Frst,
+    ))
+}
+
+/// FRST response together with a per-pixel "winning radius" map.
+///
+/// The second return value records, for each pixel, the candidate radius whose
+/// *single-radius* response was largest there (`0.0` where no radius voted). It
+/// lets the pipeline score and refine each proposal at its own scale instead of
+/// a single global radius hint — widening the range of circle sizes a single
+/// [`detect_circles`](crate::detect_circles) call can recover.
+///
+/// The summed response is bit-for-bit identical to [`frst_response`].
+pub fn frst_response_scaled(
+    gradient: &GradientField,
+    config: &FrstConfig,
+) -> Result<(super::extract::ResponseMap, OwnedImage<Scalar>)> {
+    config.validate()?;
+    let w = gradient.width();
+    let h = gradient.height();
+    let mut response = OwnedImage::<Scalar>::zeros(w, h)?;
+    let mut best = OwnedImage::<Scalar>::zeros(w, h)?;
+    let mut scale = OwnedImage::<Scalar>::zeros(w, h)?;
+
+    // With rayon, radii are computed in parallel (each into its own response
+    // image) then summed serially in fixed radii order. Without rayon, a single
+    // reused scratch set computes each radius and is folded into the running
+    // accumulators immediately — no per-radius response images are allocated or
+    // collected. Both produce a bit-for-bit identical sum.
+    #[cfg(feature = "rayon")]
+    {
+        let per_radius = config
+            .radii
+            .par_iter()
+            .map(|&radius| (radius, frst_response_single(gradient, radius, config)))
+            .collect::<Vec<_>>();
+
+        let resp_data = response.data_mut();
+        let best_data = best.data_mut();
+        let scale_data = scale.data_mut();
+        for (radius, s_n) in per_radius {
+            let s_n = s_n?;
+            let s_data = s_n.data();
+            for i in 0..w * h {
+                let v = s_data[i];
+                resp_data[i] += v;
+                if v > best_data[i] {
+                    best_data[i] = v;
+                    scale_data[i] = radius as Scalar;
+                }
+            }
+        }
+    }
+
+    #[cfg(not(feature = "rayon"))]
+    {
+        let mut scratch = FrstScratch::new(w, h)?;
+        let resp_data = response.data_mut();
+        let best_data = best.data_mut();
+        let scale_data = scale.data_mut();
+        for &radius in &config.radii {
+            frst_single_into(gradient, radius, config, &mut scratch);
+            let s_data = scratch.s.data();
+            for i in 0..w * h {
+                let v = s_data[i];
+                resp_data[i] += v;
+                if v > best_data[i] {
+                    best_data[i] = v;
+                    scale_data[i] = radius as Scalar;
+                }
+            }
+        }
+    }
+
+    Ok((
+        super::extract::ResponseMap::new(response, super::seed::ProposalSource::Frst),
+        scale,
     ))
 }
 
@@ -425,6 +566,34 @@ mod tests {
         assert!(
             (peak_y as f32 - cy as f32).abs() < 5.0,
             "peak y={peak_y} should be near center y={cy}"
+        );
+    }
+
+    #[test]
+    fn frst_response_matches_scaled_sum() {
+        // `frst_response` runs a dedicated response-only summation while
+        // `frst_response_scaled` also tracks a per-pixel winning-radius map.
+        // Both must produce a bit-for-bit identical summed response.
+        let size = 64;
+        let data = make_bright_disk(size, 32, 32, 10.0);
+        let image = ImageView::from_slice(&data, size, size).unwrap();
+        let grad = sobel_gradient(&image).unwrap();
+
+        let config = FrstConfig {
+            radii: vec![8, 9, 10, 11, 12],
+            alpha: 2.0,
+            gradient_threshold: 1.0,
+            polarity: Polarity::Bright,
+            smoothing_factor: 0.5,
+        };
+
+        let response = frst_response(&grad, &config).unwrap();
+        let (scaled, _scale) = frst_response_scaled(&grad, &config).unwrap();
+
+        assert_eq!(
+            response.response().data(),
+            scaled.response().data(),
+            "response-only path must equal the scaled variant's summed response bit-for-bit"
         );
     }
 
@@ -628,6 +797,199 @@ mod tests {
             response.response().data().iter().all(|&v| v == 0.0),
             "high threshold on uniform image should produce zero response"
         );
+    }
+
+    /// Verbatim copy of the pre-optimization `frst_response_single` body
+    /// (fresh `o_n`/`m_n`/`f_n` allocations, two separate `fold(0.0, max)`
+    /// reductions, an allocating blur). The optimized path must reproduce this
+    /// bit-for-bit; this is the golden reference for that claim.
+    fn frst_single_reference(
+        gradient: &GradientField,
+        radius: u32,
+        config: &FrstConfig,
+    ) -> OwnedImage<Scalar> {
+        let w = gradient.width();
+        let h = gradient.height();
+        let n = radius as i32;
+        let mut o_n = OwnedImage::<Scalar>::zeros(w, h).unwrap();
+        let mut m_n = OwnedImage::<Scalar>::zeros(w, h).unwrap();
+        let o_data = o_n.data_mut();
+        let m_data = m_n.data_mut();
+        let gx_data = gradient.gx.data();
+        let gy_data = gradient.gy.data();
+        let thresh_sq = config.gradient_threshold * config.gradient_threshold;
+        let vote_pos = config.polarity.votes_positive();
+        let vote_neg = config.polarity.votes_negative();
+        let n_f = n as Scalar;
+        for y in 0..h {
+            for x in 0..w {
+                let idx = y * w + x;
+                let gx = gx_data[idx];
+                let gy = gy_data[idx];
+                let mag_sq = gx * gx + gy * gy;
+                if mag_sq < thresh_sq {
+                    continue;
+                }
+                let mag = mag_sq.sqrt();
+                let inv_mag = mag.recip();
+                let dx = gx * inv_mag;
+                let dy = gy * inv_mag;
+                let offset_x = (dx * n_f).round() as i32;
+                let offset_y = (dy * n_f).round() as i32;
+                if vote_pos {
+                    let px = x as i32 + offset_x;
+                    let py = y as i32 + offset_y;
+                    if px >= 0 && (px as usize) < w && py >= 0 && (py as usize) < h {
+                        let pidx = py as usize * w + px as usize;
+                        o_data[pidx] += 1.0;
+                        m_data[pidx] += mag;
+                    }
+                }
+                if vote_neg {
+                    let px = x as i32 - offset_x;
+                    let py = y as i32 - offset_y;
+                    if px >= 0 && (px as usize) < w && py >= 0 && (py as usize) < h {
+                        let pidx = py as usize * w + px as usize;
+                        o_data[pidx] -= 1.0;
+                        m_data[pidx] += mag;
+                    }
+                }
+            }
+        }
+        let o_max = o_data
+            .iter()
+            .map(|v| v.abs())
+            .fold(0.0f32, Scalar::max)
+            .max(1.0);
+        let m_max = m_data.iter().copied().fold(0.0f32, Scalar::max).max(1.0);
+        let alpha = config.alpha;
+        let mut f_n = OwnedImage::<Scalar>::zeros(w, h).unwrap();
+        let f_data = f_n.data_mut();
+        match alpha as u32 {
+            1 if (alpha - 1.0).abs() < 1e-6 => {
+                for i in 0..w * h {
+                    let o_abs = (o_data[i] / o_max).abs();
+                    f_data[i] = o_abs * (m_data[i] / m_max);
+                }
+            }
+            2 if (alpha - 2.0).abs() < 1e-6 => {
+                for i in 0..w * h {
+                    let o_abs = (o_data[i] / o_max).abs();
+                    f_data[i] = o_abs * o_abs * (m_data[i] / m_max);
+                }
+            }
+            _ => {
+                for i in 0..w * h {
+                    let o_abs = (o_data[i] / o_max).abs();
+                    f_data[i] = o_abs.powf(alpha) * (m_data[i] / m_max);
+                }
+            }
+        }
+        let sigma = config.smoothing_factor * radius as Scalar;
+        if sigma > 0.5 {
+            crate::core::blur::gaussian_blur_inplace(&mut f_n, sigma);
+        }
+        f_n
+    }
+
+    /// Bit-level equality over two f32 slices (treats NaN/`-0.0` strictly).
+    fn bits_equal(a: &[Scalar], b: &[Scalar]) -> Option<usize> {
+        assert_eq!(a.len(), b.len());
+        a.iter()
+            .zip(b.iter())
+            .position(|(x, y)| x.to_bits() != y.to_bits())
+    }
+
+    /// A non-square image with two off-center disks — catches any width/height
+    /// transposition the square test images would hide.
+    fn nonsquare_two_disks() -> (Vec<u8>, usize, usize) {
+        let (w, h) = (50usize, 36usize);
+        let mut data = vec![0u8; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                let near = |cx: f32, cy: f32, r: f32| {
+                    let (dx, dy) = (x as f32 - cx, y as f32 - cy);
+                    (dx * dx + dy * dy).sqrt() <= r
+                };
+                if near(14.0, 12.0, 6.0) || near(34.0, 24.0, 8.0) {
+                    data[y * w + x] = 255;
+                }
+            }
+        }
+        (data, w, h)
+    }
+
+    /// The optimized scratch-reusing path is bit-for-bit identical to the
+    /// pre-optimization reference across polarities, alpha branches, blur
+    /// regimes (no-blur / direct / box), and a non-square image — and the
+    /// summed multi-radius response matches the naive sum of per-radius
+    /// references.
+    #[test]
+    fn optimized_frst_is_bit_identical_to_reference() {
+        let square = make_bright_disk(64, 30, 34, 11.0);
+        let (ns_data, ns_w, ns_h) = nonsquare_two_disks();
+
+        let inputs = [
+            ("square", &square[..], 64usize, 64usize),
+            ("nonsquare", &ns_data[..], ns_w, ns_h),
+        ];
+
+        // alpha covers the 1 / 2 / powf match arms; polarity covers pos/neg/both;
+        // gradient_threshold exercises the skip branch; radii cover the three
+        // blur regimes: 1 -> sigma 0.5 (no blur), 2 -> 1.0 (direct), 9 -> 4.5 (box).
+        let radii = [1u32, 2, 5, 9];
+        let alphas = [1.0f32, 2.0, 3.0];
+        let polarities = [Polarity::Bright, Polarity::Dark, Polarity::Both];
+        let thresholds = [0.0f32, 1.0];
+
+        for (label, data, w, h) in inputs {
+            let image = ImageView::from_slice(data, w, h).unwrap();
+            let grad = sobel_gradient(&image).unwrap();
+
+            for &alpha in &alphas {
+                for &polarity in &polarities {
+                    for &threshold in &thresholds {
+                        let cfg = FrstConfig {
+                            radii: radii.to_vec(),
+                            alpha,
+                            gradient_threshold: threshold,
+                            polarity,
+                            smoothing_factor: 0.5,
+                        };
+
+                        // Per-radius single == reference (the core refactor).
+                        for &radius in &radii {
+                            let got = frst_response_single(&grad, radius, &cfg).unwrap();
+                            let want = frst_single_reference(&grad, radius, &cfg);
+                            assert!(
+                                bits_equal(got.data(), want.data()).is_none(),
+                                "{label}: single mismatch at radius {radius}, \
+                                 alpha {alpha}, {polarity:?}, thresh {threshold} \
+                                 (index {:?})",
+                                bits_equal(got.data(), want.data()),
+                            );
+                        }
+
+                        // Summed response == naive sum of references (the
+                        // summation refactor), in fixed radii order.
+                        let got = frst_response(&grad, &cfg).unwrap();
+                        let mut want = vec![0.0f32; w * h];
+                        for &radius in &radii {
+                            let s = frst_single_reference(&grad, radius, &cfg);
+                            for (acc, &v) in want.iter_mut().zip(s.data().iter()) {
+                                *acc += v;
+                            }
+                        }
+                        assert!(
+                            bits_equal(got.response().data(), &want).is_none(),
+                            "{label}: summed mismatch at alpha {alpha}, \
+                             {polarity:?}, thresh {threshold} (index {:?})",
+                            bits_equal(got.response().data(), &want),
+                        );
+                    }
+                }
+            }
+        }
     }
 
     // --- frst_response_fused tests ---

@@ -24,6 +24,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      # Install wasm-pack so book/build.sh can compile the interactive demo's
+      # WASM bundle (book/src/demo/pkg is gitignored and built on demand).
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
       # Install mdBook
       - name: Install mdBook
         run: |
@@ -33,9 +38,11 @@ jobs:
             | tar -xz -C "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      # Build mdBook (landing page)
+      # Build the WASM demo bundle (pkg/ + ringgrid.png) and the mdBook guide.
+      # book/build.sh runs `wasm-pack build`, copies the demo assets into
+      # book/src/demo/, then runs `mdbook build book` so /demo/ ships working.
       - name: Build book
-        run: mdbook build book
+        run: bash book/build.sh
 
       # Build rustdoc
       - name: Build rustdoc
@@ -43,14 +50,27 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings --default-theme ayu
 
-      # Assemble site: book at root, rustdoc at /api/
+      # Assemble site: custom landing page at root, guide at /book/, rustdoc at
+      # /api/, the WASM demo at /demo/, and the performance page (with its
+      # committed data.json) at /performance/.
       - name: Assemble site
         run: |
           mkdir -p _site
-          cp -r book/book/* _site/
-          cp -r target/doc _site/api
 
-          # Redirect /api/ -> /api/radsym/
+          # Landing page + shared assets (.github/pages is the static-site source)
+          cp .github/pages/index.html _site/index.html
+          cp -r .github/pages/img _site/img
+          cp -r .github/pages/performance _site/performance
+
+          # mdBook guide under /book/
+          mkdir -p _site/book
+          cp -r book/book/* _site/book/
+
+          # Standalone WASM demo under /demo/ (mdBook bundled it from book/src/demo)
+          cp -r book/book/demo _site/demo
+
+          # rustdoc under /api/, with a redirect to the crate root
+          cp -r target/doc _site/api
           cat > _site/api/index.html << 'REDIRECT'
           <!DOCTYPE html>
           <html>
