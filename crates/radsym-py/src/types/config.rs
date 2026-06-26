@@ -461,6 +461,13 @@ impl PyRadialCenterConfig {
 ///         circle hypothesis. Default: 10.0.
 ///     min_score: Minimum support score to keep a detection (in ``[0, 1]``).
 ///         Default: 0.0.
+///     gradient_operator: Gradient kernel — ``"sobel"`` or ``"scharr"``.
+///         Default: ``"sobel"``.
+///     roi: Optional region of interest as ``(x, y, width, height)``; ``None``
+///         processes the full frame. Default: ``None``.
+///     radii: Optional candidate FRST voting radii in pixels. Takes precedence
+///         over ``frst.radii`` when set; otherwise the radii of ``frst`` (or the
+///         defaults) are used. Keyword-only. Default: ``None``.
 #[pyclass(name = "DetectCirclesConfig", skip_from_py_object)]
 #[derive(Clone)]
 pub struct PyDetectCirclesConfig {
@@ -471,7 +478,6 @@ pub struct PyDetectCirclesConfig {
 impl PyDetectCirclesConfig {
     #[new]
     #[pyo3(signature = (
-        radii=None,
         frst=None,
         nms=None,
         scoring=None,
@@ -480,11 +486,12 @@ impl PyDetectCirclesConfig {
         radius_hint=10.0,
         min_score=0.0,
         gradient_operator="sobel",
-        roi=None
+        roi=None,
+        *,
+        radii=None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
-        radii: Option<Vec<u32>>,
         frst: Option<&PyFrstConfig>,
         nms: Option<&PyNmsConfig>,
         scoring: Option<&PyScoringConfig>,
@@ -494,6 +501,7 @@ impl PyDetectCirclesConfig {
         min_score: f32,
         gradient_operator: &str,
         roi: Option<(usize, usize, usize, usize)>,
+        radii: Option<Vec<u32>>,
     ) -> PyResult<Self> {
         let defaults = radsym::DetectCirclesConfig::default();
         let frst_config = frst

@@ -301,7 +301,51 @@ pub fn frst_response(
     gradient: &GradientField,
     config: &FrstConfig,
 ) -> Result<super::extract::ResponseMap> {
-    frst_response_scaled(gradient, config).map(|(response, _scale)| response)
+    config.validate()?;
+    let w = gradient.width();
+    let h = gradient.height();
+    let mut response = OwnedImage::<Scalar>::zeros(w, h)?;
+
+    // Response-only summation: unlike `frst_response_scaled`, this keeps no
+    // per-pixel "winning radius" map, so the hot path skips the extra full-frame
+    // `best`/`scale` buffers and the per-pixel argmax tracking. Radii are summed
+    // in fixed `config.radii` order, so the result is identical to the summed
+    // response returned by `frst_response_scaled`.
+    #[cfg(feature = "rayon")]
+    {
+        let per_radius = config
+            .radii
+            .par_iter()
+            .map(|&radius| frst_response_single(gradient, radius, config))
+            .collect::<Vec<_>>();
+
+        let resp_data = response.data_mut();
+        for s_n in per_radius {
+            let s_n = s_n?;
+            let s_data = s_n.data();
+            for i in 0..w * h {
+                resp_data[i] += s_data[i];
+            }
+        }
+    }
+
+    #[cfg(not(feature = "rayon"))]
+    {
+        let mut scratch = FrstScratch::new(w, h)?;
+        let resp_data = response.data_mut();
+        for &radius in &config.radii {
+            frst_single_into(gradient, radius, config, &mut scratch);
+            let s_data = scratch.s.data();
+            for i in 0..w * h {
+                resp_data[i] += s_data[i];
+            }
+        }
+    }
+
+    Ok(super::extract::ResponseMap::new(
+        response,
+        super::seed::ProposalSource::Frst,
+    ))
 }
 
 /// FRST response together with a per-pixel "winning radius" map.
@@ -522,6 +566,34 @@ mod tests {
         assert!(
             (peak_y as f32 - cy as f32).abs() < 5.0,
             "peak y={peak_y} should be near center y={cy}"
+        );
+    }
+
+    #[test]
+    fn frst_response_matches_scaled_sum() {
+        // `frst_response` runs a dedicated response-only summation while
+        // `frst_response_scaled` also tracks a per-pixel winning-radius map.
+        // Both must produce a bit-for-bit identical summed response.
+        let size = 64;
+        let data = make_bright_disk(size, 32, 32, 10.0);
+        let image = ImageView::from_slice(&data, size, size).unwrap();
+        let grad = sobel_gradient(&image).unwrap();
+
+        let config = FrstConfig {
+            radii: vec![8, 9, 10, 11, 12],
+            alpha: 2.0,
+            gradient_threshold: 1.0,
+            polarity: Polarity::Bright,
+            smoothing_factor: 0.5,
+        };
+
+        let response = frst_response(&grad, &config).unwrap();
+        let (scaled, _scale) = frst_response_scaled(&grad, &config).unwrap();
+
+        assert_eq!(
+            response.response().data(),
+            scaled.response().data(),
+            "response-only path must equal the scaled variant's summed response bit-for-bit"
         );
     }
 

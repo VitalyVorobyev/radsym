@@ -24,6 +24,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      # Install wasm-pack so book/build.sh can compile the interactive demo's
+      # WASM bundle (book/src/demo/pkg is gitignored and built on demand).
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
       # Install mdBook
       - name: Install mdBook
         run: |
@@ -33,9 +38,11 @@ jobs:
             | tar -xz -C "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      # Build mdBook guide (also bundles the committed WASM demo under demo/)
+      # Build the WASM demo bundle (pkg/ + ringgrid.png) and the mdBook guide.
+      # book/build.sh runs `wasm-pack build`, copies the demo assets into
+      # book/src/demo/, then runs `mdbook build book` so /demo/ ships working.
       - name: Build book
-        run: mdbook build book
+        run: bash book/build.sh
 
       # Build rustdoc
       - name: Build rustdoc
