@@ -11,6 +11,11 @@ __pycache__
 *.pyc
 .pytest_cache
 book/book
+# mdBook renders the "API Documentation (rustdoc)" SUMMARY entry (a relative
+# link to ../api/radsym/index.html) outside its build dir into book/api/. It is
+# regenerated on every build and never deployed — the Pages workflow serves
+# fresh `cargo doc` output at /api/ instead.
+book/api
 book/src/demo/pkg
 book/src/demo/ringgrid.png
 _site
