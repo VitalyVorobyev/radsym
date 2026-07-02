@@ -190,11 +190,12 @@ fn time_stages(image: &OwnedImage<u8>, cfg: &DetectCirclesConfig) -> StageTimes 
         let gradient = compute_gradient(black_box(&view), cfg.gradient_operator).unwrap();
         let g_ms = t.elapsed().as_secs_f64() * 1e3;
 
-        // Stage 2: FRST voting with radii/polarity overridden from the top-level
-        // config — mirrors pipeline.rs:269-272.
-        let mut frst_config = cfg.advanced.frst.clone();
-        frst_config.radii = cfg.radii.clone();
-        frst_config.polarity = cfg.polarity;
+        // Stage 2: FRST voting. radii/polarity come from the top-level config
+        // (their single source of truth) — mirrors detect_circles.
+        let frst_config = cfg
+            .advanced
+            .frst
+            .to_frst_config(cfg.radii.clone(), cfg.polarity);
         let t = Instant::now();
         let response = frst_response(black_box(&gradient), black_box(&frst_config)).unwrap();
         let v_ms = t.elapsed().as_secs_f64() * 1e3;

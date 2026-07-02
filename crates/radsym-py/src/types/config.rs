@@ -237,7 +237,6 @@ impl PyCircleRefineConfig {
 /// Args:
 ///     max_iterations: Maximum refinement iterations. Default: 5.
 ///     convergence_tol: Stop when center shift is below this (pixels). Default: 0.1.
-///     annulus_margin: Fractional annulus margin around the ellipse. Default: 0.3.
 ///     ray_count: Number of angular sectors used for edge acquisition. Default: 96.
 ///     radial_search_inner: Inner radial search factor for the initial seed. Default: 0.6.
 ///     radial_search_outer: Outer radial search factor for the initial seed. Default: 1.45.
@@ -258,7 +257,6 @@ impl PyEllipseRefineConfig {
     #[pyo3(signature = (
         max_iterations=5,
         convergence_tol=0.1,
-        annulus_margin=0.3,
         ray_count=96,
         radial_search_inner=0.6,
         radial_search_outer=1.45,
@@ -270,7 +268,6 @@ impl PyEllipseRefineConfig {
     fn new(
         max_iterations: usize,
         convergence_tol: f32,
-        annulus_margin: f32,
         ray_count: usize,
         radial_search_inner: f32,
         radial_search_outer: f32,
@@ -280,7 +277,6 @@ impl PyEllipseRefineConfig {
         max_axis_ratio: f32,
     ) -> PyResult<Self> {
         let mut advanced = radsym::EllipseRefineAdvanced::default();
-        advanced.annulus_margin = annulus_margin;
         advanced.ray_count = ray_count;
         advanced.radial_search_inner = radial_search_inner;
         advanced.radial_search_outer = radial_search_outer;
@@ -504,15 +500,16 @@ impl PyDetectCirclesConfig {
         radii: Option<Vec<u32>>,
     ) -> PyResult<Self> {
         let defaults = radsym::DetectCirclesConfig::default();
-        let frst_config = frst
-            .map(|c| c.inner.clone())
-            .unwrap_or(defaults.advanced.frst);
+        // A caller-supplied `frst` config may still carry `radii`/`polarity`, but
+        // those are no longer part of the advanced tuning: the top-level `radii`
+        // (and `polarity`) are the single source of truth. Source radii from the
+        // `frst` config only as a fallback, then keep just its tuning knobs.
+        let frst_source = frst.map(|c| c.inner.clone()).unwrap_or_default();
         let mut advanced = radsym::DetectCirclesAdvanced::default();
-        // `radii` (set below) is the top-level source of truth for FRST voting.
         // A top-level `radii=` argument wins; otherwise fall back to the radii of
         // a caller-supplied `frst` config (or the defaults).
-        let radii = radii.unwrap_or_else(|| frst_config.radii.clone());
-        advanced.frst = frst_config;
+        let radii = radii.unwrap_or_else(|| frst_source.radii.clone());
+        advanced.frst = radsym::FrstTuning::from(frst_source);
         advanced.nms = nms
             .map(|c| c.inner.clone())
             .unwrap_or(defaults.advanced.nms);

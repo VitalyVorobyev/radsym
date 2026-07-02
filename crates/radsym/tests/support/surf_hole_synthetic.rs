@@ -293,7 +293,6 @@ fn rank_candidates(
     scoring_config.annulus_margin = 0.12;
     scoring_config.min_samples = 32;
     let mut refine_advanced = EllipseRefineAdvanced::default();
-    refine_advanced.annulus_margin = 0.12;
     refine_advanced.ray_count = 96;
     refine_advanced.radial_search_inner = 0.60;
     refine_advanced.radial_search_outer = 1.45;

@@ -308,7 +308,6 @@ fn ringgrid_local_ellipse_refinement_recovers_outer_and_inner_geometry() {
 
     let proposals = detect_outer_rsd_candidates(&fixture, &gradient);
     let mut outer_advanced = EllipseRefineAdvanced::default();
-    outer_advanced.annulus_margin = 0.12;
     outer_advanced.ray_count = 96;
     outer_advanced.radial_search_inner = 0.60;
     outer_advanced.radial_search_outer = 1.45;
@@ -321,7 +320,6 @@ fn ringgrid_local_ellipse_refinement_recovers_outer_and_inner_geometry() {
     outer_config.max_axis_ratio = 1.80;
     outer_config.advanced = outer_advanced;
     let mut inner_advanced = EllipseRefineAdvanced::default();
-    inner_advanced.annulus_margin = 0.10;
     inner_advanced.ray_count = 96;
     inner_advanced.radial_search_inner = 0.75;
     inner_advanced.radial_search_outer = 1.20;

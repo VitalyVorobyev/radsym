@@ -2,7 +2,7 @@
 
 use radsym::{
     CircleRefineAdvanced, CircleRefineConfig, DetectCirclesAdvanced, DetectCirclesConfig,
-    FrstConfig, ImageView, Polarity, RadialCenterConfig, detect_circles,
+    ImageView, Polarity, RadialCenterConfig, detect_circles,
 };
 
 /// Create a bright disk (white circle on black background).
@@ -50,10 +50,8 @@ fn detect_bright_circles() {
     refine_advanced.radial_center = radial_center;
     let mut refinement = CircleRefineConfig::default();
     refinement.advanced = refine_advanced;
-    let mut frst = FrstConfig::default();
-    frst.gradient_threshold = 1.0;
     let mut advanced = DetectCirclesAdvanced::default();
-    advanced.frst = frst;
+    advanced.frst.gradient_threshold = 1.0;
     advanced.refinement = refinement;
     let mut config = DetectCirclesConfig::default();
     config.radii = vec![14, 15, 16, 17, 18];
@@ -97,10 +95,8 @@ fn detect_dark_circles() {
     refine_advanced.radial_center = radial_center;
     let mut refinement = CircleRefineConfig::default();
     refinement.advanced = refine_advanced;
-    let mut frst = FrstConfig::default();
-    frst.gradient_threshold = 1.0;
     let mut advanced = DetectCirclesAdvanced::default();
-    advanced.frst = frst;
+    advanced.frst.gradient_threshold = 1.0;
     advanced.refinement = refinement;
     let mut config = DetectCirclesConfig::default();
     config.radii = vec![14, 15, 16, 17, 18];
