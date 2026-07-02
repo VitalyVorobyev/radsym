@@ -7,13 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-07-02
+## [0.4.0] - 2026-07-02
 
-Public-API revision (Phase 2 config-surface cleanup): the detection config now
-has a single source of truth for `radii`/`polarity`, and dead "legacy" ellipse
-knobs are pruned before they freeze. Breaking for the `radsym` crate; the PyO3
-`EllipseRefineConfig` drops one no-op argument. The WASM/npm public API is
-unchanged (the binding internals were simplified but no JS method changed).
+Public-API revision: the public surface is narrowed to the intended contract,
+the scoring functions are split into Result and Diagnostic tiers, and the
+detection config gains a single source of truth for `radii`/`polarity` (with the
+dead "legacy" ellipse knobs pruned before they freeze). Breaking for the
+`radsym` crate; the PyO3 `EllipseRefineConfig` drops one no-op argument. The
+WASM/npm public API is unchanged.
 
 ### Changed
 
@@ -31,24 +32,6 @@ unchanged (the binding internals were simplified but no JS method changed).
   no longer double-writes a shadow field.
 - **`FrstTuning` is a new public type** (re-exported at the crate root),
   convertible to/from `FrstConfig`.
-
-### Removed
-
-- **`EllipseRefineAdvanced` loses its dead legacy fields `annulus_margin`,
-  `sampling`, and `min_alignment`.** They were documented "retained for
-  compatibility" but never read by ellipse refinement. *Migration:* drop these
-  fields from any `EllipseRefineAdvanced` you construct. The Python
-  `EllipseRefineConfig(...)` constructor drops its `annulus_margin` argument
-  (which previously set the dead field and had no effect).
-
-## [0.4.0] - 2026-07-02
-
-Public-API revision (iteration 3): the public surface is narrowed to the
-intended contract and the scoring functions are split into Result and
-Diagnostic tiers. Breaking for the `radsym` crate.
-
-### Changed
-
 - **Scoring functions re-tiered into Result + Diagnostic variants.**
   `score_circle_support`, `score_ellipse_support`, and
   `score_rectified_circle_support` now return the compact `SupportScore`
@@ -66,6 +49,12 @@ Diagnostic tiers. Breaking for the `radsym` crate.
 
 ### Removed
 
+- **`EllipseRefineAdvanced` loses its dead legacy fields `annulus_margin`,
+  `sampling`, and `min_alignment`.** They were documented "retained for
+  compatibility" but never read by ellipse refinement. *Migration:* drop these
+  fields from any `EllipseRefineAdvanced` you construct. The Python
+  `EllipseRefineConfig(...)` constructor drops its `annulus_margin` argument
+  (which previously set the dead field and had no effect).
 - **`core::circle_fit` (`fit_circle`, `fit_circle_weighted`) is now
   `pub(crate)`** — internal algebraic-fit plumbing with no external consumers.
 - **`propose::frst::frst_response_single` is now `pub(crate)`** — an internal
@@ -409,8 +398,7 @@ Breaking for the `radsym` crate and both binding packages.
 - Zero unsafe code; zero clippy warnings; 138 unit and integration tests.
 - mdBook documentation with full mathematical derivations.
 
-[Unreleased]: https://github.com/VitalyVorobyev/radsym/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/VitalyVorobyev/radsym/compare/v0.4.0...v0.5.0
+[Unreleased]: https://github.com/VitalyVorobyev/radsym/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/VitalyVorobyev/radsym/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/VitalyVorobyev/radsym/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/VitalyVorobyev/radsym/compare/v0.1.4...v0.2.0
