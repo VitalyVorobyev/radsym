@@ -1,0 +1,112 @@
+{
+  "samples": [
+    {
+      "id": "ringgrid",
+      "label": "Ring grid",
+      "file": "samples/ringgrid.png",
+      "caption": "Real calibration target: a grid of concentric rings. Try Both polarity.",
+      "params": {"algorithm":"frst","radii":[9,11,13,15,17],"polarity":"both","radiusHint":11,"minScore":0.0,"nmsRadius":8},
+      "groundTruth": null
+    },
+    {
+      "id": "concentric-rings",
+      "label": "Concentric rings",
+      "file": "samples/concentric-rings.png",
+      "caption": "Four rings sharing one center — pure radial symmetry. Every ring votes for the same point.",
+      "params": {"algorithm":"frst","radii":[22,42,62,82],"polarity":"both","radiusHint":42,"minScore":0.0,"nmsRadius":12},
+      "groundTruth": [
+        { "x": 160.0, "y": 128.0, "r": 42.0 }
+      ]
+    },
+    {
+      "id": "dense-field",
+      "label": "Dense field",
+      "file": "samples/dense-field.png",
+      "caption": "A regular grid of small bright disks. Lower the NMS radius to keep neighbours apart.",
+      "params": {"algorithm":"frst","radii":[6,7,8],"polarity":"bright","radiusHint":7,"minScore":0.0,"nmsRadius":14,"maxDetections":200},
+      "groundTruth": [
+        { "x": 28.0, "y": 28.0, "r": 7.0 },
+        { "x": 66.0, "y": 28.0, "r": 7.0 },
+        { "x": 104.0, "y": 28.0, "r": 7.0 },
+        { "x": 142.0, "y": 28.0, "r": 7.0 },
+        { "x": 180.0, "y": 28.0, "r": 7.0 },
+        { "x": 218.0, "y": 28.0, "r": 7.0 },
+        { "x": 256.0, "y": 28.0, "r": 7.0 },
+        { "x": 28.0, "y": 66.0, "r": 7.0 },
+        { "x": 66.0, "y": 66.0, "r": 7.0 },
+        { "x": 104.0, "y": 66.0, "r": 7.0 },
+        { "x": 142.0, "y": 66.0, "r": 7.0 },
+        { "x": 180.0, "y": 66.0, "r": 7.0 },
+        { "x": 218.0, "y": 66.0, "r": 7.0 },
+        { "x": 256.0, "y": 66.0, "r": 7.0 },
+        { "x": 28.0, "y": 104.0, "r": 7.0 },
+        { "x": 66.0, "y": 104.0, "r": 7.0 },
+        { "x": 104.0, "y": 104.0, "r": 7.0 },
+        { "x": 142.0, "y": 104.0, "r": 7.0 },
+        { "x": 180.0, "y": 104.0, "r": 7.0 },
+        { "x": 218.0, "y": 104.0, "r": 7.0 },
+        { "x": 256.0, "y": 104.0, "r": 7.0 },
+        { "x": 28.0, "y": 142.0, "r": 7.0 },
+        { "x": 66.0, "y": 142.0, "r": 7.0 },
+        { "x": 104.0, "y": 142.0, "r": 7.0 },
+        { "x": 142.0, "y": 142.0, "r": 7.0 },
+        { "x": 180.0, "y": 142.0, "r": 7.0 },
+        { "x": 218.0, "y": 142.0, "r": 7.0 },
+        { "x": 256.0, "y": 142.0, "r": 7.0 },
+        { "x": 28.0, "y": 180.0, "r": 7.0 },
+        { "x": 66.0, "y": 180.0, "r": 7.0 },
+        { "x": 104.0, "y": 180.0, "r": 7.0 },
+        { "x": 142.0, "y": 180.0, "r": 7.0 },
+        { "x": 180.0, "y": 180.0, "r": 7.0 },
+        { "x": 218.0, "y": 180.0, "r": 7.0 },
+        { "x": 256.0, "y": 180.0, "r": 7.0 },
+        { "x": 28.0, "y": 218.0, "r": 7.0 },
+        { "x": 66.0, "y": 218.0, "r": 7.0 },
+        { "x": 104.0, "y": 218.0, "r": 7.0 },
+        { "x": 142.0, "y": 218.0, "r": 7.0 },
+        { "x": 180.0, "y": 218.0, "r": 7.0 },
+        { "x": 218.0, "y": 218.0, "r": 7.0 },
+        { "x": 256.0, "y": 218.0, "r": 7.0 }
+      ]
+    },
+    {
+      "id": "perspective-ellipses",
+      "label": "Perspective ellipses",
+      "file": "samples/perspective-ellipses.png",
+      "caption": "Circles under perspective become ellipses. Circle refinement finds the centers but not the true shape — this is where ellipse/homography refinement helps.",
+      "params": {"algorithm":"frst","radii":[11,14,17,20],"polarity":"bright","radiusHint":15,"minScore":0.0,"nmsRadius":16},
+      "groundTruth": [
+        { "x": 70.0, "y": 90.0, "r": 20.0 },
+        { "x": 150.0, "y": 100.0, "r": 22.0 },
+        { "x": 225.0, "y": 120.0, "r": 24.0 },
+        { "x": 140.0, "y": 185.0, "r": 21.0 },
+        { "x": 235.0, "y": 195.0, "r": 26.0 }
+      ]
+    },
+    {
+      "id": "low-contrast-noisy",
+      "label": "Low contrast + noise",
+      "file": "samples/low-contrast-noisy.png",
+      "caption": "Faint disks buried in noise. Raise the gradient threshold and smoothing to suppress noise votes.",
+      "params": {"algorithm":"frst","radii":[14,16,18,20,22],"polarity":"bright","radiusHint":18,"minScore":0.0,"gradientThreshold":8.0,"smoothingFactor":1.0,"nmsRadius":16},
+      "groundTruth": [
+        { "x": 90.0, "y": 90.0, "r": 16.0 },
+        { "x": 210.0, "y": 95.0, "r": 20.0 },
+        { "x": 150.0, "y": 180.0, "r": 22.0 }
+      ]
+    },
+    {
+      "id": "mixed-radii",
+      "label": "Mixed radii",
+      "file": "samples/mixed-radii.png",
+      "caption": "Disks from 8px to 30px in one frame. The radii list must span every size you want detected.",
+      "params": {"algorithm":"frst","radii":[8,12,16,20,24,28,30],"polarity":"bright","radiusHint":16,"minScore":0.0,"nmsRadius":18},
+      "groundTruth": [
+        { "x": 64.0, "y": 72.0, "r": 8.0 },
+        { "x": 170.0, "y": 80.0, "r": 14.0 },
+        { "x": 110.0, "y": 175.0, "r": 22.0 },
+        { "x": 240.0, "y": 165.0, "r": 30.0 }
+      ]
+    }
+  ]
+}

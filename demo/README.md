@@ -1,125 +1,77 @@
-# radsym WASM Demo
+# radsym WASM demo
 
 Interactive browser demo for the [radsym](https://github.com/VitalyVorobyev/radsym)
-radial symmetry detection library. Runs FRST, RSD, and their fused variants
-entirely in the browser via WebAssembly. All configuration parameters are
-exposed in the UI.
+radial symmetry detection library. It runs FRST, RSD, and their fused variants
+entirely in the browser via WebAssembly — no image ever leaves the device.
 
-## Prerequisites
+`demo/` is the **single canonical source** for the demo. The GitHub Pages copy
+is staged from here into `book/src/demo/` by [`book/build.sh`](../book/build.sh);
+both use identical relative paths (`./pkg/…`, `./samples/…`).
 
-- Rust toolchain with the `wasm32-unknown-unknown` target
-- [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/)
-- A local HTTP server (e.g., `python3 -m http.server`)
+## Files
 
-## Build & Run
+| File | Role |
+|------|------|
+| `index.html` | Layout and controls |
+| `styles.css` | Visual system, matched to the vitavision landing/perf pages |
+| `app.js` | WASM driver + the pixel-accurate overlay engine |
+| `samples/`, `samples.json` | Predefined images + captions, suggested params, ground truth |
+| `vv-logo.svg` | Brand mark |
+| `pkg/` | Built WASM package (generated, git-ignored) |
+
+## Build & run locally
 
 ```bash
-# 1. Build the WASM package (from repository root)
+# 1. Build the WASM package (from the repository root)
 wasm-pack build crates/radsym-wasm --target web --release
 
-# 2. Serve the repository root
-python3 -m http.server 8080
+# 2. Place the built package next to the demo
+mkdir -p demo/pkg
+cp crates/radsym-wasm/pkg/radsym_wasm.js crates/radsym-wasm/pkg/radsym_wasm_bg.wasm demo/pkg/
 
-# 3. Open in your browser
+# 3. (Optional) regenerate the sample images + manifest
+cargo run -p radsym --example gen_demo_samples --features image-io
+
+# 4. Serve the repository root and open the demo
+python3 -m http.server 8080
 open http://localhost:8080/demo/
 ```
 
-The demo loads `testdata/ringgrid.png` by default. Use the file picker to try
-your own images.
+## What it shows
 
-## Output Panels
+- **Sample gallery** — six predefined scenes (calibration ring grid, concentric
+  rings, a dense field, perspective ellipses, a low-contrast/noisy scene, and a
+  mixed-radii scene) plus your own uploads. Each sample applies suggested
+  parameters and, for the synthetic ones, carries ground-truth centers.
+- **Comprehensive controls** with progressive disclosure — primary knobs
+  (algorithm, radii, polarity, min score) are always visible; voting, NMS,
+  scoring, refinement, and overlay options live in collapsible groups.
+- **Pipeline stages** — gradient magnitude, response heatmap, and pre-NMS
+  proposals for the selected algorithm.
+- **Detected circles** on a result-forward, zoomable canvas with a live
+  inspector (subpixel center, radius, ringness, coverage, status).
 
-| Panel | Description |
-|-------|-------------|
-| **Original** | Source image (loaded or uploaded) |
-| **Response Heatmap** | Response from the selected algorithm, colorized |
-| **Seed Proposals** | NMS-extracted proposal locations (cross markers) |
-| **Detected Circles** | Full pipeline output with overlay annotations |
+## Overlay correctness
 
-## Proposal Algorithms
+The library reports centers in a **pixel-center** convention (integer
+coordinate = pixel center; see
+[`docs/decisions/001-coordinate-convention.md`](../docs/decisions/001-coordinate-convention.md)).
+On a canvas, `drawImage(img, 0, 0)` puts that pixel's center at
+`(x + 0.5, y + 0.5)`, so every positional overlay maps an image coordinate `c`
+to display coordinate `(c + 0.5) · displayScale`. Overlays are drawn on a
+separate, device-pixel-ratio-aware canvas so vectors stay crisp while the image
+stays pixel-sharp. Enable **Ground truth** on a synthetic sample and zoom in to
+confirm the overlays sit dead-center on the features.
 
-| Algorithm | WASM Method | Description |
-|-----------|------------|-------------|
-| **FRST** | `frst_response` | Multi-radius with orientation accumulator (Loy & Zelinsky 2002) |
-| **FRST (fused)** | `frst_response_fused` | Single-pass fused variant, faster |
-| **RSD** | `rsd_response` | Magnitude-only voting, ~2x faster (Barnes et al. 2008) |
-| **RSD (fused)** | `rsd_response_fused` | Single-pass fused RSD |
+## Color modes
 
-## Configuration Reference
+Detections can be colored by **support score**, **ringness**, **angular
+coverage** (a blue→teal→green ramp), or **refinement status** (green =
+converged, amber = max iterations, rose = degenerate, muted = out of bounds).
 
-### Algorithm Config
+## Notes
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| Proposal method | FRST | Algorithm for heatmap and proposals |
-| Radii | 9,11,13,15,17 | Discrete radii (px) to test |
-| Alpha | 2.0 | Radial strictness exponent (FRST only) |
-| Gradient threshold | 0 | Minimum gradient magnitude for voting |
-| Smoothing factor | 0.5 | Gaussian smoothing sigma = factor x radius |
-
-### Detection Config
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| Polarity | both | Detect bright, dark, or both structures |
-| Gradient operator | sobel | Sobel or Scharr gradient kernel |
-| Radius hint | 13 | Initial radius hypothesis for refinement |
-| Min score | 0 | Minimum support score threshold |
-
-### NMS Config
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| NMS radius | 5 | Suppression radius in pixels |
-| NMS threshold | 0 | Minimum response for a peak |
-| Max detections | 200 | Maximum number of detections |
-
-### Support Scoring (collapsed)
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| Angular samples | 64 | Samples around the annulus circumference |
-| Radial samples | 9 | Samples across the annulus width |
-| Annulus margin | 0.3 | Annulus width as a fraction of radius |
-| Min samples | 8 | Minimum gradient samples for a valid score |
-| Weight: ringness | 0.6 | Weight of gradient alignment in the total score |
-| Weight: coverage | 0.4 | Weight of angular coverage in the total score |
-
-### Refinement (collapsed)
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| Max iterations | 10 | Iteration limit for circle refinement |
-| Convergence tolerance | 0.1 | Convergence threshold in pixels |
-| Max center drift | 0.5 | Maximum drift from initial center (x radius) |
-
-## Overlay Features
-
-### Color Modes
-
-| Mode | Description |
-|------|-------------|
-| **Total score** | Green (low) to red (high) combined score |
-| **Ringness** | Blue (low) to orange (high) gradient alignment |
-| **Angular coverage** | Purple (low) to cyan (high) annulus coverage |
-| **Refinement status** | Categorical: green=Converged, yellow=MaxIter, red=Degenerate, gray=OutOfBounds |
-
-### Toggleable Layers
-
-Score labels, annulus rings, status icons (C/M/D/O), legend.
-
-### Click to Inspect
-
-Click any detected circle to see its full detail: center coordinates, radius,
-score breakdown, and refinement status.
-
-## Browser Compatibility
-
-Tested in Safari, Chrome, and Firefox. Requires WebAssembly and ES modules.
-
-## Architecture
-
-- Single-page static app: `index.html` + `app.js`
-- No JS build step or bundler
-- WASM module loaded from `../crates/radsym-wasm/pkg/`
-- All processing happens client-side
+- The **algorithm selector drives the whole pipeline**, including the final
+  detection panel (via `detect_circles_detailed_with`). FRST uses per-proposal
+  scale selection; the other proposers score and refine at the radius hint.
+- Single-page static app — no JS build step or bundler.

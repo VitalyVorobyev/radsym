@@ -1,225 +1,287 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>radsym -- Radial Symmetry Detection</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; }
-    body { font-family: "SF Mono", "Menlo", "Consolas", monospace; background: #f8f8f8; color: #222; padding: 1.5em; display: flex; flex-direction: column; }
-    h1 { font-size: 1.3em; margin-bottom: 0.8em; flex-shrink: 0; }
-    h2 { font-size: 0.95em; margin-bottom: 0.4em; color: #555; }
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>radsym — interactive demo</title>
+    <meta
+      name="description"
+      content="Run the radsym radial symmetry detector in your browser via WebAssembly: pick a sample, tune FRST/RSD parameters live, and inspect pixel-accurate overlays."
+    />
+    <link rel="icon" type="image/svg+xml" href="./vv-logo.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <img src="./vv-logo.svg" alt="vitavision" />
+        <div>
+          <div class="title"><b>radsym</b> · interactive demo</div>
+          <div class="tag">Rust · Python · WebAssembly</div>
+        </div>
+        <span class="spacer"></span>
+        <a class="home" href="../">← back to overview</a>
+      </header>
 
-    .layout { display: flex; gap: 1.5em; flex: 1; min-height: 0; }
-    .sidebar { width: 280px; flex-shrink: 0; overflow-y: auto; }
-    .main { flex: 1; min-width: 0; overflow-y: auto; }
+      <div class="layout">
+        <!-- ============================ SIDEBAR ============================ -->
+        <aside class="sidebar">
+          <section class="card">
+            <div class="run-row">
+              <button class="btn primary" id="runBtn" disabled>Run detection</button>
+              <label class="check" style="margin: 0">
+                <input type="checkbox" id="autoRun" checked />
+                Re-run automatically on change
+              </label>
+              <div class="status" id="status">Loading WebAssembly…</div>
+              <div class="timings" id="timings"></div>
+            </div>
+          </section>
 
-    .panel { background: #fff; border: 1px solid #ddd; padding: 1em; margin-bottom: 1em; border-radius: 4px; }
-    label { display: block; font-size: 0.8em; margin-top: 0.6em; color: #444; }
-    label:first-child { margin-top: 0; }
-    label.inline { display: inline-flex; align-items: center; gap: 0.3em; margin-top: 0.5em; }
-    input[type="text"], input[type="number"], select {
-      width: 100%; padding: 4px 6px; font-family: inherit; font-size: 0.85em;
-      border: 1px solid #ccc; border-radius: 3px; margin-top: 2px;
-    }
-    input[type="checkbox"] { margin: 0; }
+          <section class="card">
+            <h2 class="section-title">Sample image</h2>
+            <div class="gallery" id="gallery"></div>
+            <input type="file" id="fileInput" accept="image/*" hidden />
+            <p class="gallery-caption" id="galleryCaption"></p>
+          </section>
 
-    details.panel > summary { cursor: pointer; list-style: none; }
-    details.panel > summary::-webkit-details-marker { display: none; }
-    details.panel > summary::before { content: "\25b6"; display: inline-block; width: 1em; font-size: 0.7em; transition: transform 0.15s; }
-    details.panel[open] > summary::before { transform: rotate(90deg); }
-    details.panel > summary h2 { display: inline; }
+          <section class="card">
+            <h2 class="section-title">Parameters</h2>
 
-    .btn-row { display: flex; gap: 0.5em; margin-bottom: 1em; }
-    button {
-      padding: 6px 14px; font-family: inherit; font-size: 0.85em;
-      border: 1px solid #888; border-radius: 3px; cursor: pointer; background: #fff;
-    }
-    button:hover { background: #eee; }
-    button.primary { background: #2a6; color: #fff; border-color: #2a6; }
-    button.primary:hover { background: #196; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
+            <div class="field">
+              <label for="algorithm">Proposal algorithm</label>
+              <select id="algorithm">
+                <option value="frst">FRST — oriented, multi-radius</option>
+                <option value="frst_fused">FRST (fused) — faster</option>
+                <option value="rsd">RSD — magnitude only</option>
+                <option value="rsd_fused">RSD (fused)</option>
+              </select>
+            </div>
 
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; }
-    .cell { background: #fff; border: 1px solid #ddd; padding: 0.6em; border-radius: 4px; position: relative; }
-    .cell h2 { margin-bottom: 0.3em; }
-    .cell canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+            <div class="field">
+              <label for="radii">Radii to test (px, comma-separated)</label>
+              <input type="text" id="radii" value="9,11,13,15,17" />
+            </div>
 
-    #timing { font-size: 0.8em; color: #666; margin-top: 0.8em; line-height: 1.6; }
-    #status { font-size: 0.8em; color: #888; margin-top: 0.5em; }
-    input[type="file"] { font-size: 0.8em; margin-top: 4px; }
+            <div class="field">
+              <label for="polarity">Polarity</label>
+              <select id="polarity">
+                <option value="both">Both (bright &amp; dark centers)</option>
+                <option value="bright">Bright center on dark</option>
+                <option value="dark">Dark center on bright</option>
+              </select>
+            </div>
 
-    #detailBox { display: none; margin-top: 1em; }
-    #detailBox pre { font-size: 0.78em; line-height: 1.5; white-space: pre-wrap; }
-  </style>
-</head>
-<body>
-  <h1>radsym -- Radial Symmetry Detection</h1>
+            <div class="field">
+              <label for="minScore">Min. support score <span class="val" id="minScore-val">0.00</span></label>
+              <input type="range" id="minScore" min="0" max="1" step="0.01" value="0" />
+            </div>
 
-  <div class="layout">
-    <div class="sidebar">
-      <div class="btn-row">
-        <button id="runBtn" class="primary" disabled>Run</button>
-        <span id="status" style="font-size:0.8em; color:#888; align-self:center;">Loading ringgrid.png...</span>
-      </div>
-      <div id="timing"></div>
+            <!-- Voting -->
+            <details class="group">
+              <summary>Voting</summary>
+              <div class="fields">
+                <div class="field">
+                  <label for="gradientOperator">Gradient operator</label>
+                  <select id="gradientOperator">
+                    <option value="sobel">Sobel</option>
+                    <option value="scharr">Scharr</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="radiusHint">Radius hint (px) <span class="val" id="radiusHint-val">10.0</span></label>
+                  <input type="range" id="radiusHint" min="2" max="48" step="0.5" value="10" />
+                </div>
+                <div class="field">
+                  <label for="alpha">Alpha — radial strictness <span class="val" id="alpha-val">2.0</span></label>
+                  <input type="range" id="alpha" min="0.5" max="5" step="0.1" value="2" />
+                </div>
+                <div class="field">
+                  <label for="gradientThreshold">Gradient threshold <span class="val" id="gradientThreshold-val">0.0</span></label>
+                  <input type="range" id="gradientThreshold" min="0" max="60" step="1" value="0" />
+                </div>
+                <div class="field">
+                  <label for="smoothingFactor">Smoothing factor <span class="val" id="smoothingFactor-val">0.5</span></label>
+                  <input type="range" id="smoothingFactor" min="0" max="3" step="0.1" value="0.5" />
+                </div>
+              </div>
+            </details>
 
-      <div class="panel">
-        <h2>Image</h2>
-        <label>Source
-          <input type="file" id="fileInput" accept="image/*">
-        </label>
-      </div>
+            <!-- NMS -->
+            <details class="group">
+              <summary>Non-max suppression</summary>
+              <div class="fields">
+                <div class="field">
+                  <label for="nmsRadius">NMS radius (px) <span class="val" id="nmsRadius-val">5</span></label>
+                  <input type="range" id="nmsRadius" min="1" max="40" step="1" value="5" />
+                </div>
+                <div class="field">
+                  <label for="nmsThreshold">NMS threshold <span class="val" id="nmsThreshold-val">0.00</span></label>
+                  <input type="range" id="nmsThreshold" min="0" max="1" step="0.01" value="0" />
+                </div>
+                <div class="field">
+                  <label for="maxDetections">Max detections</label>
+                  <input type="number" id="maxDetections" min="1" max="2000" step="1" value="1000" />
+                </div>
+              </div>
+            </details>
 
-      <div class="panel">
-        <h2>Algorithm</h2>
-        <label>Proposal method
-          <select id="algorithm">
-            <option value="frst" selected>FRST</option>
-            <option value="frst_fused">FRST (fused)</option>
-            <option value="rsd">RSD</option>
-            <option value="rsd_fused">RSD (fused)</option>
-          </select>
-        </label>
-        <label>Radii (comma-sep)
-          <input type="text" id="radii" value="9,11,13,15,17">
-        </label>
-        <label>Alpha (FRST only)
-          <input type="number" id="alpha" value="2.0" step="0.1" min="0.1">
-        </label>
-        <label>Gradient threshold
-          <input type="number" id="gradThreshold" value="0" step="0.5" min="0">
-        </label>
-        <label>Smoothing factor
-          <input type="number" id="smoothing" value="0.5" step="0.1" min="0">
-        </label>
-      </div>
+            <!-- Support scoring -->
+            <details class="group">
+              <summary>Support scoring</summary>
+              <div class="fields">
+                <div class="field">
+                  <label for="numAngular">Angular samples <span class="val" id="numAngular-val">64</span></label>
+                  <input type="range" id="numAngular" min="8" max="128" step="4" value="64" />
+                </div>
+                <div class="field">
+                  <label for="numRadial">Radial samples <span class="val" id="numRadial-val">9</span></label>
+                  <input type="range" id="numRadial" min="3" max="19" step="1" value="9" />
+                </div>
+                <div class="field">
+                  <label for="annulusMargin">Annulus margin <span class="val" id="annulusMargin-val">0.30</span></label>
+                  <input type="range" id="annulusMargin" min="0.05" max="0.6" step="0.01" value="0.3" />
+                </div>
+                <div class="field">
+                  <label for="minSamples">Min. samples <span class="val" id="minSamples-val">8</span></label>
+                  <input type="range" id="minSamples" min="4" max="32" step="1" value="8" />
+                </div>
+                <div class="field">
+                  <label for="weightRingness">Weight: ringness <span class="val" id="weightRingness-val">0.60</span></label>
+                  <input type="range" id="weightRingness" min="0" max="1" step="0.05" value="0.6" />
+                </div>
+                <div class="field">
+                  <label for="weightCoverage">Weight: coverage <span class="val" id="weightCoverage-val">0.40</span></label>
+                  <input type="range" id="weightCoverage" min="0" max="1" step="0.05" value="0.4" />
+                </div>
+              </div>
+            </details>
 
-      <div class="panel">
-        <h2>Detection Config</h2>
-        <label>Polarity
-          <select id="polarity">
-            <option value="dark">dark</option>
-            <option value="bright">bright</option>
-            <option value="both" selected>both</option>
-          </select>
-        </label>
-        <label>Gradient operator
-          <select id="gradOp">
-            <option value="sobel" selected>sobel</option>
-            <option value="scharr">scharr</option>
-          </select>
-        </label>
-        <label>Radius hint
-          <input type="number" id="radiusHint" value="13" step="1" min="1">
-        </label>
-        <label>Min score
-          <input type="number" id="minScore" value="0" step="0.01" min="0">
-        </label>
-      </div>
+            <!-- Refinement -->
+            <details class="group">
+              <summary>Refinement</summary>
+              <div class="fields">
+                <div class="field">
+                  <label for="maxIterations">Max iterations <span class="val" id="maxIterations-val">10</span></label>
+                  <input type="range" id="maxIterations" min="1" max="30" step="1" value="10" />
+                </div>
+                <div class="field">
+                  <label for="convergenceTol">Convergence tol (px) <span class="val" id="convergenceTol-val">0.10</span></label>
+                  <input type="range" id="convergenceTol" min="0.01" max="1" step="0.01" value="0.1" />
+                </div>
+                <div class="field">
+                  <label for="maxCenterDrift">Max center drift <span class="val" id="maxCenterDrift-val">0.50</span></label>
+                  <input type="range" id="maxCenterDrift" min="0.1" max="2" step="0.05" value="0.5" />
+                </div>
+              </div>
+            </details>
 
-      <div class="panel">
-        <h2>NMS Config</h2>
-        <label>NMS radius (px)
-          <input type="number" id="nmsRadius" value="5" step="1" min="1">
-        </label>
-        <label>NMS threshold
-          <input type="number" id="nmsThreshold" value="0" step="0.01" min="0">
-        </label>
-        <label>Max detections
-          <input type="number" id="maxDetections" value="200" step="10" min="1">
-        </label>
-      </div>
+            <!-- Overlays -->
+            <details class="group" open>
+              <summary>Overlay &amp; view</summary>
+              <div class="fields">
+                <div class="field">
+                  <label for="colorMode">Color detections by</label>
+                  <select id="colorMode">
+                    <option value="score">Support score</option>
+                    <option value="ringness">Ringness</option>
+                    <option value="coverage">Angular coverage</option>
+                    <option value="status">Refinement status</option>
+                    <option value="uniform">Uniform (amber)</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="zoom">Zoom <span class="val" id="zoom-val">1.0×</span></label>
+                  <input type="range" id="zoom" min="1" max="6" step="0.5" value="1" />
+                </div>
+                <label class="check"><input type="checkbox" id="showDetections" checked /> Detected circles</label>
+                <label class="check"><input type="checkbox" id="showProposals" /> Proposal markers (pre-NMS)</label>
+                <label class="check"><input type="checkbox" id="showAnnulus" /> Annulus sampling ring</label>
+                <label class="check"><input type="checkbox" id="showLabels" checked /> Score labels</label>
+                <label class="check"><input type="checkbox" id="showGroundTruth" /> Ground truth (synthetic)</label>
+              </div>
+            </details>
 
-      <details class="panel">
-        <summary><h2>Support Scoring</h2></summary>
-        <label>Angular samples
-          <input type="number" id="numAngularSamples" value="64" step="8" min="4">
-        </label>
-        <label>Radial samples
-          <input type="number" id="numRadialSamples" value="9" step="1" min="1">
-        </label>
-        <label>Annulus margin
-          <input type="number" id="annulusMargin" value="0.3" step="0.05" min="0.01">
-        </label>
-        <label>Min samples
-          <input type="number" id="minSamples" value="8" step="1" min="1">
-        </label>
-        <label>Weight: ringness
-          <input type="number" id="weightRingness" value="0.6" step="0.05" min="0" max="1">
-        </label>
-        <label>Weight: coverage
-          <input type="number" id="weightCoverage" value="0.4" step="0.05" min="0" max="1">
-        </label>
-      </details>
+            <div style="margin-top: 14px">
+              <button class="link-btn" id="resetBtn">Reset parameters to defaults</button>
+            </div>
+          </section>
+        </aside>
 
-      <details class="panel">
-        <summary><h2>Refinement</h2></summary>
-        <label>Max iterations
-          <input type="number" id="maxIterations" value="10" step="1" min="1">
-        </label>
-        <label>Convergence tolerance (px)
-          <input type="number" id="convergenceTol" value="0.1" step="0.01" min="0.001">
-        </label>
-        <label>Max center drift (x radius)
-          <input type="number" id="maxCenterDrift" value="0.5" step="0.1" min="0.1">
-        </label>
-      </details>
+        <!-- ============================= MAIN ============================= -->
+        <main class="main">
+          <section class="card">
+            <div class="stage-head">
+              <div>
+                <h2>Detected circles</h2>
+                <div class="sub" id="resultSub">propose → score → refine</div>
+              </div>
+              <div class="chips">
+                <span class="chip" id="chipCount"><b>0</b> detections</span>
+                <span class="chip" id="chipAlgo">FRST</span>
+              </div>
+            </div>
+            <div class="viewport-wrap" id="viewportWrap">
+              <div class="viewport" id="viewport">
+                <canvas id="cvImage" class="image"></canvas>
+                <canvas id="cvOverlay" class="overlay"></canvas>
+              </div>
+            </div>
+          </section>
 
-      <div class="panel">
-        <h2>Visualization</h2>
-        <label>Colormap
-          <select id="colormap">
-            <option value="hot" selected>hot</option>
-            <option value="jet">jet</option>
-            <option value="magma">magma</option>
-          </select>
-        </label>
-        <label>Overlay color mode
-          <select id="colorMode">
-            <option value="score" selected>Total score</option>
-            <option value="ringness">Ringness</option>
-            <option value="coverage">Angular coverage</option>
-            <option value="status">Refinement status</option>
-          </select>
-        </label>
-        <label class="inline"><input type="checkbox" id="showLabels"> Score labels</label>
-        <label class="inline"><input type="checkbox" id="showAnnulus"> Annulus rings</label>
-        <label class="inline"><input type="checkbox" id="showStatus"> Status icons</label>
-        <label class="inline"><input type="checkbox" id="showLegend" checked> Legend</label>
+          <section class="card">
+            <div class="stage-head"><h2>Inspector</h2><div class="sub" id="inspectorSub">hover a detection</div></div>
+            <div class="inspector" id="inspector">
+              <div class="inspector-hint">Run a detection, then hover or click a circle to see its subpixel center, radius, and score breakdown.</div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="stage-head"><h2>Legend</h2><div class="sub" id="legendMode">support score</div></div>
+            <div class="legend">
+              <div>
+                <div class="ramp" id="legendRamp"></div>
+                <div class="ramp-labels"><span>low</span><span id="legendMax">high</span></div>
+              </div>
+              <div class="items" id="legendItems"></div>
+              <p class="note" id="legendNote"></p>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="stage-head"><h2>Pipeline stages</h2><div class="sub">gradient → response → proposals</div></div>
+            <div class="stages">
+              <div class="stage-cell">
+                <h3>Original</h3>
+                <div class="frame"><canvas id="cvOriginal"></canvas></div>
+              </div>
+              <div class="stage-cell">
+                <h3>Gradient magnitude</h3>
+                <div class="frame"><canvas id="cvGradient"></canvas></div>
+              </div>
+              <div class="stage-cell">
+                <h3 id="heatmapTitle">Response heatmap</h3>
+                <div class="frame"><canvas id="cvHeatmap"></canvas></div>
+              </div>
+              <div class="stage-cell">
+                <h3>Proposals (pre-NMS)</h3>
+                <div class="frame">
+                  <canvas id="cvProposals"></canvas>
+                  <canvas id="cvProposalsOv" class="ov"></canvas>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <footer class="footer">
+            <span>radsym runs entirely in your browser via WebAssembly — no image leaves your device.</span>
+            <span>·</span>
+            <span><a href="https://github.com/VitalyVorobyev/radsym">Source on GitHub</a></span>
+          </footer>
+        </main>
       </div>
     </div>
 
-    <div class="main">
-      <div class="grid">
-        <div class="cell">
-          <h2>Original</h2>
-          <canvas id="cvOriginal"></canvas>
-        </div>
-        <div class="cell">
-          <h2 id="heatmapTitle">Response Heatmap</h2>
-          <canvas id="cvHeatmap"></canvas>
-        </div>
-        <div class="cell">
-          <h2>Gradient Magnitude</h2>
-          <canvas id="cvGradient"></canvas>
-        </div>
-        <div class="cell">
-          <h2>Seed Proposals</h2>
-          <canvas id="cvProposals"></canvas>
-        </div>
-        <div class="cell">
-          <h2>Detected Circles</h2>
-          <canvas id="cvCircles"></canvas>
-        </div>
-      </div>
-      <div id="detailBox" class="panel">
-        <h2>Detection Detail</h2>
-        <pre id="detailContent">Click a detection in the overlay to inspect it.</pre>
-      </div>
-    </div>
-  </div>
-
-  <script type="module" src="app.js"></script>
-</body>
+    <script type="module" src="./app.js"></script>
+  </body>
 </html>

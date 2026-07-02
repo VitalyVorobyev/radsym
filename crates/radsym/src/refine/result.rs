@@ -1,7 +1,7 @@
 //! Refinement result types.
 //!
-//! [`RefinementResult`] wraps a refined hypothesis with convergence status,
-//! residual information, and optional uncertainty estimate.
+//! [`RefinementResult`] wraps a refined hypothesis with convergence status
+//! and residual information.
 
 use crate::core::scalar::Scalar;
 

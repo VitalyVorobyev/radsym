@@ -8,9 +8,10 @@ use wasm_bindgen::prelude::*;
 
 use radsym::diagnostics::{Colormap, response_heatmap};
 use radsym::{
-    DetectCirclesConfig, GradientOperator, ImageView, Polarity, RefinementStatus, RsdConfig,
-    compute_gradient, detect_circles, detect_circles_with_diagnostics, extract_proposals,
-    frst_response, frst_response_fused, rsd_response, rsd_response_fused,
+    Circle, DetectCirclesConfig, GradientField, GradientOperator, ImageView, Polarity,
+    RefinementStatus, ResponseMap, RsdConfig, compute_gradient, detect_circles,
+    detect_circles_with_diagnostics, extract_proposals, frst_response, frst_response_fused,
+    refine_circle, rsd_response, rsd_response_fused, score_circle_support,
 };
 
 // ---------------------------------------------------------------------------
@@ -82,6 +83,7 @@ fn parse_colormap(name: &str) -> Result<Colormap, JsValue> {
 /// |--------|------|--------|--------|
 /// | `detect_circles` | `Float32Array` | 4 | `[x, y, radius, score, ...]` |
 /// | `detect_circles_detailed` | `Float32Array` | 8 | `[x, y, r, score, ringness, coverage, degen, status, ...]` |
+/// | `detect_circles_detailed_with` | `Float32Array` | 8 | same layout, for a chosen proposer |
 /// | `frst_response` | `Float32Array` | 1 | row-major response values |
 /// | `rsd_response` | `Float32Array` | 1 | row-major response values |
 /// | `response_heatmap` | `Uint8Array` | 4 | RGBA pixels, row-major |
@@ -179,6 +181,55 @@ impl RadSymProcessor {
                 _ => -1.0,
             });
         }
+        Ok(js_sys::Float32Array::from(&flat[..]))
+    }
+
+    /// Run detection using a specific proposal algorithm, returning detailed
+    /// per-detection info (stride 8, identical layout to
+    /// [`detect_circles_detailed`](Self::detect_circles_detailed)).
+    ///
+    /// `algorithm` is one of `"frst"`, `"frst_fused"`, `"rsd"`, or `"rsd_fused"`.
+    ///
+    /// - `"frst"` runs the canonical one-call pipeline
+    ///   (`detect_circles_with_diagnostics`), which selects a per-proposal
+    ///   radius from the multi-radius FRST scale map.
+    /// - the other proposers compute their response, extract proposals via NMS,
+    ///   then score and refine each proposal at the configured `radius_hint`
+    ///   using the same scoring and refinement stages as the pipeline.
+    ///
+    /// This lets an algorithm selector drive the final detection, not just the
+    /// response/proposal previews.
+    pub fn detect_circles_detailed_with(
+        &mut self,
+        pixels: &[u8],
+        width: usize,
+        height: usize,
+        algorithm: &str,
+    ) -> Result<js_sys::Float32Array, JsValue> {
+        if algorithm == "frst" {
+            return self.detect_circles_detailed(pixels, width, height);
+        }
+
+        rgba_to_gray(pixels, width, height, &mut self.gray_buf)?;
+        let view = ImageView::from_slice(&self.gray_buf, width, height).map_err(to_js_err)?;
+        let gradient = compute_gradient(&view, self.config.gradient_operator).map_err(to_js_err)?;
+
+        let response = match algorithm {
+            "frst_fused" => {
+                let mut cfg = self.config.advanced.frst.clone();
+                cfg.polarity = self.config.polarity;
+                frst_response_fused(&gradient, &cfg).map_err(to_js_err)?
+            }
+            "rsd" => rsd_response(&gradient, &self.rsd_config()).map_err(to_js_err)?,
+            "rsd_fused" => rsd_response_fused(&gradient, &self.rsd_config()).map_err(to_js_err)?,
+            _ => {
+                return Err(JsValue::from_str(&format!(
+                    "unknown algorithm \"{algorithm}\": expected \"frst\", \"frst_fused\", \"rsd\", or \"rsd_fused\""
+                )));
+            }
+        };
+
+        let flat = self.detect_from_response(&gradient, &response);
         Ok(js_sys::Float32Array::from(&flat[..]))
     }
 
@@ -436,7 +487,7 @@ impl RadSymProcessor {
         self.config.advanced.nms.threshold = threshold;
     }
 
-    /// Set the maximum number of detections. Default: 50.
+    /// Set the maximum number of detections. Default: 1000.
     pub fn set_max_detections(&mut self, max: usize) {
         self.config.advanced.nms.max_detections = max;
     }
@@ -540,6 +591,46 @@ impl RadSymProcessor {
 // ---------------------------------------------------------------------------
 
 impl RadSymProcessor {
+    /// Score and refine the proposals from a precomputed response map, packing
+    /// accepted detections into the stride-8 `detect_circles_detailed` layout.
+    ///
+    /// Mirrors the pipeline's score → filter → refine loop, but at the fixed
+    /// `radius_hint` (proposers other than unfused FRST expose no scale map).
+    fn detect_from_response(&self, gradient: &GradientField, response: &ResponseMap) -> Vec<f32> {
+        let proposals =
+            extract_proposals(response, &self.config.advanced.nms, self.config.polarity);
+        let mut rows: Vec<[f32; 8]> = Vec::new();
+        for p in &proposals {
+            let circle = Circle::new(p.seed.position, self.config.radius_hint);
+            let breakdown = score_circle_support(gradient, &circle, &self.config.advanced.scoring);
+            if breakdown.is_degenerate || breakdown.total < self.config.min_score {
+                continue;
+            }
+            if let Ok(refined) = refine_circle(gradient, &circle, &self.config.advanced.refinement)
+            {
+                let status = match refined.status {
+                    RefinementStatus::Converged => 0.0,
+                    RefinementStatus::MaxIterations => 1.0,
+                    RefinementStatus::Degenerate => 2.0,
+                    RefinementStatus::OutOfBounds => 3.0,
+                    _ => -1.0,
+                };
+                rows.push([
+                    refined.hypothesis.center.x,
+                    refined.hypothesis.center.y,
+                    refined.hypothesis.radius,
+                    breakdown.total,
+                    breakdown.ringness,
+                    breakdown.angular_coverage,
+                    if breakdown.is_degenerate { 1.0 } else { 0.0 },
+                    status,
+                ]);
+            }
+        }
+        rows.sort_by(|a, b| b[3].partial_cmp(&a[3]).unwrap_or(std::cmp::Ordering::Equal));
+        rows.into_iter().flatten().collect()
+    }
+
     /// Build an [`RsdConfig`] from the shared FRST config fields.
     ///
     /// RSD uses the same radii, gradient threshold, polarity, and smoothing

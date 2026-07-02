@@ -75,7 +75,7 @@ Literature: Loy & Zelinsky, ECCV 2002 / TPAMI 2003
 
 - [x] Gradient magnitude thresholding (beta parameter)
 - [x] Polarity-selective voting (bright-only, dark-only)
-- [ ] Optional rayon parallelism for multi-radius computation
+- [x] Optional rayon parallelism for multi-radius computation
 - [ ] Benchmarks: gradient threshold effect, rayon vs sequential
 
 ### Milestone 2.4: Examples
@@ -240,9 +240,9 @@ Literature: Ni, Singh, Bahlmann, CVPR 2012
 
 ### Milestone 8.4: crates.io preparation
 
-- [ ] Fill README.md with badges, overview, usage
-- [ ] Create CHANGELOG.md
-- [ ] License files (MIT + Apache-2.0)
+- [x] Fill README.md with badges, overview, usage
+- [x] Create CHANGELOG.md
+- [x] License files (MIT + Apache-2.0)
 
 ---
 
