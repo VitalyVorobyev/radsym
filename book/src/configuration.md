@@ -36,10 +36,12 @@ let config = DetectCirclesConfig::for_radii([9, 10, 11])
 | `advanced` | `DetectCirclesAdvanced` | (see below) | Advanced per-stage configuration |
 
 `DetectCirclesAdvanced` bundles the per-stage configs assembled by the
-pipeline: `frst: FrstConfig`, `nms: NmsConfig`, `scoring: ScoringConfig`, and
-`refinement: CircleRefineConfig`. The pipeline overrides `advanced.frst.radii`
-and `advanced.frst.polarity` with the top-level `radii` and `polarity`, so most
-callers only touch the stable top-level fields.
+pipeline: `frst: FrstTuning`, `nms: NmsConfig`, `scoring: ScoringConfig`, and
+`refinement: CircleRefineConfig`. `FrstTuning` carries only the voting knobs
+(`alpha`, `gradient_threshold`, `smoothing_factor`) — `radii` and `polarity` are
+the top-level fields' single source of truth, and the pipeline combines them with
+the tuning via `FrstTuning::to_frst_config`. Most callers only touch the stable
+top-level fields.
 
 ## Proposal stage
 
@@ -154,10 +156,7 @@ Stable fields:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `annulus_margin` | `f32` | `0.3` | Annulus margin for downstream diagnostics |
 | `radial_center` | `RadialCenterConfig` | (see above) | Seed stabilization config |
-| `sampling` | `AnnulusSamplingConfig` | (see above) | Legacy sampling config |
-| `min_alignment` | `f32` | `0.3` | Minimum alignment for legacy annulus diagnostics |
 | `ray_count` | `usize` | `96` | Angular sectors for edge acquisition |
 | `radial_search_inner` | `f32` | `0.6` | Inner radius factor for initial search |
 | `radial_search_outer` | `f32` | `1.45` | Outer radius factor for initial search |

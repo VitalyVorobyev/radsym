@@ -14,7 +14,7 @@ use crate::diagnostics::detection::{
     CircleDetectionDiagnostics, RejectedProposal, RejectionReason,
 };
 use crate::propose::extract::extract_proposals;
-use crate::propose::frst::{FrstConfig, ScaledResponse, frst_response_scaled};
+use crate::propose::frst::{FrstConfig, FrstTuning, ScaledResponse, frst_response_scaled};
 use crate::refine::circle::{CircleRefineConfig, refine_circle};
 use crate::refine::result::RefinementStatus;
 use crate::support::score::{
@@ -28,11 +28,14 @@ use crate::support::score::{
 pub struct DetectCirclesConfig {
     /// Candidate FRST voting radii, in pixels.
     ///
-    /// This is the source of truth for the radii the pipeline votes over:
-    /// [`detect_circles`] copies it into the working FRST config, overriding
-    /// [`DetectCirclesAdvanced::frst`]'s own `radii`.
+    /// The single source of truth for the radii the pipeline votes over:
+    /// [`detect_circles`] combines it with [`DetectCirclesAdvanced::frst`] (which
+    /// no longer carries its own `radii`) to build the working FRST config.
     pub radii: Vec<u32>,
     /// Which polarity to detect.
+    ///
+    /// The single source of truth for voting/extraction polarity; combined with
+    /// [`DetectCirclesAdvanced::frst`] to build the working FRST config.
     pub polarity: Polarity,
     /// Approximate expected radius used as the initial circle hypothesis.
     pub radius_hint: Scalar,
@@ -62,13 +65,13 @@ pub struct DetectCirclesConfig {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct DetectCirclesAdvanced {
-    /// FRST voting configuration.
+    /// FRST voting tuning (alpha, gradient threshold, smoothing).
     ///
-    /// Note: the pipeline overrides this config's `radii` and `polarity` with
-    /// the top-level [`DetectCirclesConfig::radii`] and
-    /// [`DetectCirclesConfig::polarity`] before voting, so setting them here
-    /// has no effect on [`detect_circles`].
-    pub frst: FrstConfig,
+    /// `radii` and `polarity` are *not* part of this tuning: the pipeline sources
+    /// them from the top-level [`DetectCirclesConfig::radii`] and
+    /// [`DetectCirclesConfig::polarity`] (their single source of truth) and
+    /// combines them with this tuning via [`FrstTuning::to_frst_config`].
+    pub frst: FrstTuning,
     /// Non-maximum suppression for proposal extraction.
     pub nms: NmsConfig,
     /// Support scoring configuration.
@@ -117,15 +120,11 @@ impl DetectCirclesConfig {
 
     /// Set the detection polarity (chainable).
     ///
-    /// This sets both the top-level `polarity` field and the nested
-    /// `advanced.frst.polarity` field. The [`detect_circles`] pipeline drives
-    /// FRST voting and proposal extraction from the top-level `polarity` (it
-    /// overwrites `advanced.frst.polarity` with it before voting), so updating
-    /// both keeps the configuration internally consistent for code that
-    /// inspects `advanced.frst.polarity` directly.
+    /// This is the single source of truth for polarity: [`detect_circles`] drives
+    /// FRST voting and proposal extraction from it (combining it with
+    /// [`DetectCirclesAdvanced::frst`] to build the working FRST config).
     pub fn polarity(mut self, polarity: Polarity) -> Self {
         self.polarity = polarity;
-        self.advanced.frst.polarity = polarity;
         self
     }
 
@@ -300,9 +299,12 @@ fn run_detection<P: SourcePixel>(
 
     let gradient = compute_gradient(&work, config.gradient_operator)?;
 
-    let mut frst_config = config.advanced.frst.clone();
-    frst_config.radii = config.radii.clone();
-    frst_config.polarity = config.polarity;
+    // Build the working FRST config from the single-source-of-truth radii +
+    // polarity and the advanced voting tuning.
+    let frst_config = config
+        .advanced
+        .frst
+        .to_frst_config(config.radii.clone(), config.polarity);
     let ScaledResponse {
         response,
         scale_map,
@@ -425,9 +427,9 @@ mod tests {
             polarity: Polarity::Bright,
             radius_hint: radius,
             advanced: DetectCirclesAdvanced {
-                frst: FrstConfig {
+                frst: FrstTuning {
                     gradient_threshold: 1.0,
-                    ..FrstConfig::default()
+                    ..FrstTuning::default()
                 },
                 ..DetectCirclesAdvanced::default()
             },
@@ -458,9 +460,8 @@ mod tests {
 
         // for_radii sets the top-level voting radii.
         assert_eq!(config.radii, vec![9, 10, 11]);
-        // polarity sets both the top-level and the nested FRST field.
+        // polarity sets the top-level field — the single source of truth.
         assert_eq!(config.polarity, Polarity::Bright);
-        assert_eq!(config.advanced.frst.polarity, Polarity::Bright);
         // remaining chainable setters.
         assert_eq!(config.radius_hint, 12.5);
         assert_eq!(config.min_score, 0.2);
@@ -525,9 +526,9 @@ mod tests {
             polarity: Polarity::Bright,
             radius_hint: radius,
             advanced: DetectCirclesAdvanced {
-                frst: FrstConfig {
+                frst: FrstTuning {
                     gradient_threshold: 1.0,
-                    ..FrstConfig::default()
+                    ..FrstTuning::default()
                 },
                 ..DetectCirclesAdvanced::default()
             },

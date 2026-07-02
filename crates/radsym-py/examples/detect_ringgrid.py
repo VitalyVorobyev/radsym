@@ -106,13 +106,13 @@ def main() -> int:
 
     if args.fit_ellipses:
         outer_cfg = radsym.EllipseRefineConfig(
-            max_iterations=5, convergence_tol=0.05, annulus_margin=0.12, ray_count=96,
+            max_iterations=5, convergence_tol=0.05, ray_count=96,
             radial_search_inner=0.60, radial_search_outer=1.45,
             normal_search_half_width=6.0, min_inlier_coverage=0.60,
             max_center_shift_fraction=0.40, max_axis_ratio=1.80,
         )
         inner_cfg = radsym.EllipseRefineConfig(
-            max_iterations=5, convergence_tol=0.05, annulus_margin=0.10, ray_count=96,
+            max_iterations=5, convergence_tol=0.05, ray_count=96,
             radial_search_inner=0.75, radial_search_outer=1.20,
             normal_search_half_width=4.0, min_inlier_coverage=0.55,
             max_center_shift_fraction=0.25, max_axis_ratio=1.80,

@@ -115,10 +115,7 @@ pub struct EllipseRefineConfig {
 }
 
 pub struct EllipseRefineAdvanced {
-    pub annulus_margin: f32,             // 0.3
     pub radial_center: RadialCenterConfig,
-    pub sampling: AnnulusSamplingConfig,
-    pub min_alignment: f32,              // 0.3
     pub ray_count: usize,                // 96
     pub radial_search_inner: f32,        // 0.6
     pub radial_search_outer: f32,        // 1.45

@@ -103,7 +103,8 @@ pub use crate::core::polarity::Polarity;
 // Proposal generation
 pub use crate::propose::extract::{ResponseMap, extract_proposals, suppress_proposals_by_distance};
 pub use crate::propose::frst::{
-    FrstConfig, ScaledResponse, frst_response, frst_response_fused, frst_response_scaled,
+    FrstConfig, FrstTuning, ScaledResponse, frst_response, frst_response_fused,
+    frst_response_scaled,
 };
 pub use crate::propose::homography::{
     HomographyProposal, HomographyRerankAdvanced, HomographyRerankConfig, RectifiedResponseMap,

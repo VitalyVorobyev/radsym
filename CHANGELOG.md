@@ -9,12 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2026-07-02
 
-Public-API revision (iteration 3): the public surface is narrowed to the
-intended contract and the scoring functions are split into Result and
-Diagnostic tiers. Breaking for the `radsym` crate.
+Public-API revision: the public surface is narrowed to the intended contract,
+the scoring functions are split into Result and Diagnostic tiers, and the
+detection config gains a single source of truth for `radii`/`polarity` (with the
+dead "legacy" ellipse knobs pruned before they freeze). Breaking for the
+`radsym` crate; the PyO3 `EllipseRefineConfig` drops one no-op argument. The
+WASM/npm public API is unchanged.
 
 ### Changed
 
+- **`DetectCirclesAdvanced::frst` is now a `FrstTuning`, not a `FrstConfig`.**
+  `radii` and `polarity` were duplicated at the top level of
+  `DetectCirclesConfig` *and* inside `advanced.frst`; the pipeline silently
+  overwrote the nested copies, so `advanced.frst.{radii,polarity}` did nothing.
+  The new `FrstTuning` carries only the voting knobs (`alpha`,
+  `gradient_threshold`, `smoothing_factor`); the top-level
+  `DetectCirclesConfig::{radii,polarity}` are the sole source of truth. The
+  pipeline assembles the working FRST config via `FrstTuning::to_frst_config`.
+  *Migration:* set `radii`/`polarity` only on `DetectCirclesConfig`; move any
+  `advanced.frst` voting-knob tweaks onto the `FrstTuning` fields (or build one
+  from a `FrstConfig` via `FrstTuning::from`). `DetectCirclesConfig::polarity()`
+  no longer double-writes a shadow field.
+- **`FrstTuning` is a new public type** (re-exported at the crate root),
+  convertible to/from `FrstConfig`.
 - **Scoring functions re-tiered into Result + Diagnostic variants.**
   `score_circle_support`, `score_ellipse_support`, and
   `score_rectified_circle_support` now return the compact `SupportScore`
@@ -32,6 +49,12 @@ Diagnostic tiers. Breaking for the `radsym` crate.
 
 ### Removed
 
+- **`EllipseRefineAdvanced` loses its dead legacy fields `annulus_margin`,
+  `sampling`, and `min_alignment`.** They were documented "retained for
+  compatibility" but never read by ellipse refinement. *Migration:* drop these
+  fields from any `EllipseRefineAdvanced` you construct. The Python
+  `EllipseRefineConfig(...)` constructor drops its `annulus_margin` argument
+  (which previously set the dead field and had no effect).
 - **`core::circle_fit` (`fit_circle`, `fit_circle_weighted`) is now
   `pub(crate)`** — internal algebraic-fit plumbing with no external consumers.
 - **`propose::frst::frst_response_single` is now `pub(crate)`** — an internal

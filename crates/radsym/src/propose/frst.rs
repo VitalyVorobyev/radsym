@@ -98,6 +98,80 @@ impl Default for FrstConfig {
     }
 }
 
+/// FRST voting knobs *excluding* `radii` and `polarity`.
+///
+/// The [`detect_circles`](crate::pipeline::detect_circles) pipeline sources
+/// `radii` and `polarity` from the top-level [`DetectCirclesConfig`] fields —
+/// their single source of truth — so [`DetectCirclesAdvanced::frst`] carries
+/// only the remaining voting knobs. This makes the ambiguity of a shadow
+/// `advanced.frst.radii`/`polarity` (which the pipeline silently overwrote)
+/// impossible to express.
+///
+/// Assemble a full [`FrstConfig`] from a tuning plus the pipeline's radii +
+/// polarity with [`FrstTuning::to_frst_config`], or derive a tuning from an
+/// existing [`FrstConfig`] (dropping its radii + polarity) with
+/// [`From<FrstConfig>`](FrstTuning::from).
+///
+/// [`DetectCirclesConfig`]: crate::pipeline::DetectCirclesConfig
+/// [`DetectCirclesAdvanced::frst`]: crate::pipeline::DetectCirclesAdvanced::frst
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
+#[non_exhaustive]
+pub struct FrstTuning {
+    /// Radial strictness exponent (alpha). Higher values require more
+    /// consistent orientation evidence. Default: 2.0.
+    pub alpha: Scalar,
+    /// Minimum gradient magnitude to participate in voting. Pixels with
+    /// `|g| < gradient_threshold` are skipped. Default: 0.0 (all pixels vote).
+    pub gradient_threshold: Scalar,
+    /// Standard deviation of the Gaussian smoothing kernel applied per-radius,
+    /// relative to the radius: `sigma = kn * n`. Default: 0.5.
+    pub smoothing_factor: Scalar,
+}
+
+impl Default for FrstTuning {
+    fn default() -> Self {
+        // Track FrstConfig's defaults for the shared knobs.
+        let FrstConfig {
+            alpha,
+            gradient_threshold,
+            smoothing_factor,
+            ..
+        } = FrstConfig::default();
+        Self {
+            alpha,
+            gradient_threshold,
+            smoothing_factor,
+        }
+    }
+}
+
+impl FrstTuning {
+    /// Assemble a full [`FrstConfig`] from this tuning plus the pipeline's
+    /// single-source-of-truth `radii` and `polarity`.
+    pub fn to_frst_config(&self, radii: Vec<u32>, polarity: Polarity) -> FrstConfig {
+        FrstConfig {
+            radii,
+            alpha: self.alpha,
+            gradient_threshold: self.gradient_threshold,
+            polarity,
+            smoothing_factor: self.smoothing_factor,
+        }
+    }
+}
+
+impl From<FrstConfig> for FrstTuning {
+    /// Drop `radii` and `polarity`, keeping only the shared voting tuning knobs.
+    fn from(config: FrstConfig) -> Self {
+        Self {
+            alpha: config.alpha,
+            gradient_threshold: config.gradient_threshold,
+            smoothing_factor: config.smoothing_factor,
+        }
+    }
+}
+
 /// Reusable scratch buffers for a multi-radius FRST sweep.
 ///
 /// The orientation/magnitude accumulators, the per-radius response image, and

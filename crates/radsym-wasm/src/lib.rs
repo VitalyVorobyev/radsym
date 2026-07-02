@@ -8,7 +8,7 @@ use wasm_bindgen::prelude::*;
 
 use radsym::diagnostics::{Colormap, response_heatmap};
 use radsym::{
-    Circle, DetectCirclesConfig, GradientField, GradientOperator, ImageView, Polarity,
+    Circle, DetectCirclesConfig, FrstConfig, GradientField, GradientOperator, ImageView, Polarity,
     RefinementStatus, ResponseMap, RsdConfig, compute_gradient, detect_circles,
     detect_circles_with_diagnostics, extract_proposals, frst_response, frst_response_fused,
     refine_circle, rsd_response, rsd_response_fused, score_circle_support_detailed,
@@ -216,9 +216,7 @@ impl RadSymProcessor {
 
         let response = match algorithm {
             "frst_fused" => {
-                let mut cfg = self.config.advanced.frst.clone();
-                cfg.polarity = self.config.polarity;
-                frst_response_fused(&gradient, &cfg).map_err(to_js_err)?
+                frst_response_fused(&gradient, &self.frst_config()).map_err(to_js_err)?
             }
             "rsd" => rsd_response(&gradient, &self.rsd_config()).map_err(to_js_err)?,
             "rsd_fused" => rsd_response_fused(&gradient, &self.rsd_config()).map_err(to_js_err)?,
@@ -248,9 +246,7 @@ impl RadSymProcessor {
         let view = ImageView::from_slice(&self.gray_buf, width, height).map_err(to_js_err)?;
         let gradient = compute_gradient(&view, self.config.gradient_operator).map_err(to_js_err)?;
 
-        let mut frst_cfg = self.config.advanced.frst.clone();
-        frst_cfg.polarity = self.config.polarity;
-        let response = frst_response(&gradient, &frst_cfg).map_err(to_js_err)?;
+        let response = frst_response(&gradient, &self.frst_config()).map_err(to_js_err)?;
 
         let data = response.response().data();
         Ok(js_sys::Float32Array::from(data))
@@ -270,9 +266,7 @@ impl RadSymProcessor {
         let view = ImageView::from_slice(&self.gray_buf, width, height).map_err(to_js_err)?;
         let gradient = compute_gradient(&view, self.config.gradient_operator).map_err(to_js_err)?;
 
-        let mut frst_cfg = self.config.advanced.frst.clone();
-        frst_cfg.polarity = self.config.polarity;
-        let response = frst_response_fused(&gradient, &frst_cfg).map_err(to_js_err)?;
+        let response = frst_response_fused(&gradient, &self.frst_config()).map_err(to_js_err)?;
 
         let data = response.response().data();
         Ok(js_sys::Float32Array::from(data))
@@ -343,15 +337,9 @@ impl RadSymProcessor {
         let gradient = compute_gradient(&view, self.config.gradient_operator).map_err(to_js_err)?;
 
         let response = match algorithm {
-            "frst" => {
-                let mut cfg = self.config.advanced.frst.clone();
-                cfg.polarity = self.config.polarity;
-                frst_response(&gradient, &cfg).map_err(to_js_err)?
-            }
+            "frst" => frst_response(&gradient, &self.frst_config()).map_err(to_js_err)?,
             "frst_fused" => {
-                let mut cfg = self.config.advanced.frst.clone();
-                cfg.polarity = self.config.polarity;
-                frst_response_fused(&gradient, &cfg).map_err(to_js_err)?
+                frst_response_fused(&gradient, &self.frst_config()).map_err(to_js_err)?
             }
             "rsd" => rsd_response(&gradient, &self.rsd_config()).map_err(to_js_err)?,
             "rsd_fused" => rsd_response_fused(&gradient, &self.rsd_config()).map_err(to_js_err)?,
@@ -387,15 +375,9 @@ impl RadSymProcessor {
         let gradient = compute_gradient(&view, self.config.gradient_operator).map_err(to_js_err)?;
 
         let response = match algorithm {
-            "frst" => {
-                let mut cfg = self.config.advanced.frst.clone();
-                cfg.polarity = self.config.polarity;
-                frst_response(&gradient, &cfg).map_err(to_js_err)?
-            }
+            "frst" => frst_response(&gradient, &self.frst_config()).map_err(to_js_err)?,
             "frst_fused" => {
-                let mut cfg = self.config.advanced.frst.clone();
-                cfg.polarity = self.config.polarity;
-                frst_response_fused(&gradient, &cfg).map_err(to_js_err)?
+                frst_response_fused(&gradient, &self.frst_config()).map_err(to_js_err)?
             }
             "rsd" => rsd_response(&gradient, &self.rsd_config()).map_err(to_js_err)?,
             "rsd_fused" => rsd_response_fused(&gradient, &self.rsd_config()).map_err(to_js_err)?,
@@ -451,11 +433,10 @@ impl RadSymProcessor {
 
     /// Set the radii to test (in pixels).
     pub fn set_radii(&mut self, radii: &[u32]) {
-        // `detect_circles` reads the top-level `radii`, while the stage methods
-        // (`frst_response`, `extract_proposals`, ...) read `advanced.frst.radii`;
-        // keep both in sync so every method sees the requested radii.
+        // The top-level `radii` is the single source of truth: both
+        // `detect_circles` and the stage helpers (`frst_config`, `rsd_config`)
+        // read it.
         self.config.radii = radii.to_vec();
-        self.config.advanced.frst.radii = radii.to_vec();
     }
 
     /// Set the radial strictness exponent (alpha). Default: 2.0.
@@ -632,13 +613,22 @@ impl RadSymProcessor {
         rows.into_iter().flatten().collect()
     }
 
+    /// Build a full [`FrstConfig`] from the single-source-of-truth top-level
+    /// `radii` and `polarity` plus the shared voting tuning (`advanced.frst`).
+    fn frst_config(&self) -> FrstConfig {
+        self.config
+            .advanced
+            .frst
+            .to_frst_config(self.config.radii.clone(), self.config.polarity)
+    }
+
     /// Build an [`RsdConfig`] from the shared FRST config fields.
     ///
     /// RSD uses the same radii, gradient threshold, polarity, and smoothing
     /// factor as FRST; it simply omits the alpha exponent.
     fn rsd_config(&self) -> RsdConfig {
         let mut config = RsdConfig::default();
-        config.radii = self.config.advanced.frst.radii.clone();
+        config.radii = self.config.radii.clone();
         config.gradient_threshold = self.config.advanced.frst.gradient_threshold;
         config.polarity = self.config.polarity;
         config.smoothing_factor = self.config.advanced.frst.smoothing_factor;

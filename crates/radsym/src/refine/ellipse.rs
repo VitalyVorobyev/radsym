@@ -21,7 +21,6 @@ use crate::core::geometry::Ellipse;
 use crate::core::gradient::GradientField;
 use crate::core::image_view::ImageView;
 use crate::core::scalar::Scalar;
-use crate::support::annulus::AnnulusSamplingConfig;
 
 use super::edge_profiles::{
     DEFAULT_MAX_EDGE_CANDIDATES, DEFAULT_PEAK_MIN_SEPARATION_PX, best_hypotheses,
@@ -73,22 +72,16 @@ pub struct EllipseRefineConfig {
 /// Advanced tuning knobs for [`EllipseRefineConfig`].
 ///
 /// These fields control edge acquisition (ray counts, radial and normal search
-/// windows), inlier coverage, and legacy annulus sampling. Most callers should
-/// leave them at their defaults; they are split out of the stable
+/// windows), seed stabilization, and inlier coverage. Most callers should leave
+/// them at their defaults; they are split out of the stable
 /// [`EllipseRefineConfig`] surface so the common config reads as user intent
 /// rather than algorithm internals.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct EllipseRefineAdvanced {
-    /// Fractional annulus margin retained for compatibility and downstream diagnostics.
-    pub annulus_margin: Scalar,
     /// Radial center config for bounded seed stabilization.
     pub radial_center: RadialCenterConfig,
-    /// Legacy annulus sampling config retained for compatibility.
-    pub sampling: AnnulusSamplingConfig,
-    /// Minimum alignment for legacy annulus diagnostics.
-    pub min_alignment: Scalar,
     /// Number of angular sectors used for edge acquisition.
     pub ray_count: usize,
     /// Inner radius factor for the initial radial search.
@@ -117,10 +110,7 @@ impl EllipseRefineAdvanced {
 impl Default for EllipseRefineAdvanced {
     fn default() -> Self {
         Self {
-            annulus_margin: 0.3,
             radial_center: RadialCenterConfig::default(),
-            sampling: AnnulusSamplingConfig::default(),
-            min_alignment: 0.3,
             ray_count: 96,
             radial_search_inner: 0.6,
             radial_search_outer: 1.45,
