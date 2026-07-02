@@ -74,6 +74,7 @@ let img = null;                   // { pixels: Uint8Array, w, h }
 let results = { detections: [], proposals: [] };
 let displayScale = 1;             // CSS px per image px, main viewport
 let pinned = null;                // pinned inspector detection
+let runSeq = 0;                   // increments after each completed detection run
 
 // ---------------------------------------------------------------------------
 // Boot
@@ -124,6 +125,10 @@ function buildGallery() {
   els.fileInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    // An upload has no preset and no ground truth: drop the previous sample so
+    // its GT circles / params can't bleed onto the new image.
+    activeSample = null;
+    setGroundTruthAvailability(null);
     const url = URL.createObjectURL(file);
     await loadFromURL(url, null);
     URL.revokeObjectURL(url);
@@ -141,13 +146,22 @@ async function selectSample(sample) {
   activeSample = sample;
   markActiveThumb(sample.id);
   els.galleryCaption.textContent = sample.caption || '';
-  applyParams(sample.params || {});
-  // Ground-truth toggle availability.
-  const hasGt = Array.isArray(sample.groundTruth) && sample.groundTruth.length > 0;
-  els.showGroundTruth.disabled = !hasGt;
-  els.showGroundTruth.parentElement.style.opacity = hasGt ? '1' : '0.45';
+  // Reset every knob to its default first, then layer the sample's overrides on
+  // top, so a sample's detections depend only on its own preset — not on which
+  // sample (or manual tweak) preceded it.
+  applyParams({ ...DEFAULTS, ...(sample.params || {}) });
+  setGroundTruthAvailability(sample);
   await loadFromURL('./' + sample.file, sample);
   maybeRun(true);
+}
+
+// Enable the ground-truth overlay toggle only when the sample carries synthetic
+// ground-truth centers; otherwise disable and clear it (uploads pass null).
+function setGroundTruthAvailability(sample) {
+  const hasGt = !!sample && Array.isArray(sample.groundTruth) && sample.groundTruth.length > 0;
+  els.showGroundTruth.disabled = !hasGt;
+  if (!hasGt) els.showGroundTruth.checked = false;
+  els.showGroundTruth.parentElement.style.opacity = hasGt ? '1' : '0.45';
 }
 
 function loadFromURL(url, sample) {
@@ -302,6 +316,7 @@ function run() {
     renderLegend();
     updateChips();
     renderInspector(null);
+    runSeq++;
     setStatus(`Detected ${results.detections.length} circle${results.detections.length === 1 ? '' : 's'}.`);
   } catch (e) {
     setStatus('' + e, true);
@@ -685,6 +700,7 @@ window.__demo = {
   get results() { return results; },
   get displayScale() { return displayScale; },
   get sample() { return activeSample; },
+  get runSeq() { return runSeq; },
   tx: (ix) => TX(ix), ty: (iy) => TY(iy), tr: (r) => TR(r),
   run,
 };
