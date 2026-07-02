@@ -112,7 +112,6 @@ def choose_best_detection(
     refinement_config = radsym.EllipseRefineConfig(
         max_iterations=5,
         convergence_tol=0.05,
-        annulus_margin=0.12,
         ray_count=96,
         radial_search_inner=0.60,
         radial_search_outer=1.45,
