@@ -87,3 +87,7 @@ required-features = ["image-io", "serde"]
 [[example]]
 name = "perf_export"
 required-features = ["image-io", "serde"]
+
+[[example]]
+name = "gen_demo_samples"
+required-features = ["image-io"]
