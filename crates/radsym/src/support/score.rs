@@ -131,9 +131,9 @@ impl Default for ScoringConfig {
 
 /// Score how strongly the local image evidence supports a circle hypothesis.
 ///
-/// Returns a [`SupportScoreBreakdown`] with the headline `total` and its
-/// individual evidence components. Use [`SupportScoreBreakdown::score`] for the
-/// compact [`SupportScore`].
+/// Returns the compact [`SupportScore`] (the headline `total`), nameable from
+/// the crate root. For the full evidence breakdown — ringness, angular
+/// coverage, and the degeneracy flag — use [`score_circle_support_detailed`].
 ///
 /// # Example
 ///
@@ -154,10 +154,23 @@ impl Default for ScoringConfig {
 /// let grad = sobel_gradient(&image).unwrap();
 /// let circle = Circle::new(radsym::PixelCoord::new(32.0, 32.0), 10.0);
 /// let score = score_circle_support(&grad, &circle, &ScoringConfig::default());
-/// assert!(!score.is_degenerate);
 /// assert!(score.total > 0.0);
 /// ```
 pub fn score_circle_support(
+    gradient: &GradientField,
+    circle: &Circle,
+    config: &ScoringConfig,
+) -> SupportScore {
+    score_circle_support_detailed(gradient, circle, config).score()
+}
+
+/// Score a circle hypothesis, returning the full evidence
+/// [`SupportScoreBreakdown`] (Diagnostic tier).
+///
+/// The evidence-rich counterpart of [`score_circle_support`]: exposes
+/// `ringness`, `angular_coverage`, and the `is_degenerate` flag alongside the
+/// headline `total`.
+pub fn score_circle_support_detailed(
     gradient: &GradientField,
     circle: &Circle,
     config: &ScoringConfig,
@@ -201,10 +214,19 @@ pub fn score_circle_support(
 
 /// Score how strongly the local image evidence supports an ellipse hypothesis.
 ///
-/// Returns a [`SupportScoreBreakdown`] with the headline `total` and its
-/// individual evidence components. Use [`SupportScoreBreakdown::score`] for the
-/// compact [`SupportScore`].
+/// Returns the compact [`SupportScore`]. For the full evidence breakdown use
+/// [`score_ellipse_support_detailed`].
 pub fn score_ellipse_support(
+    gradient: &GradientField,
+    ellipse: &Ellipse,
+    config: &ScoringConfig,
+) -> SupportScore {
+    score_ellipse_support_detailed(gradient, ellipse, config).score()
+}
+
+/// Score an ellipse hypothesis, returning the full evidence
+/// [`SupportScoreBreakdown`] (Diagnostic tier).
+pub fn score_ellipse_support_detailed(
     gradient: &GradientField,
     ellipse: &Ellipse,
     config: &ScoringConfig,
@@ -243,10 +265,20 @@ pub fn score_ellipse_support(
 /// Score support for a rectified-frame circle by sampling in rectified angle
 /// and evaluating the pulled-back normal alignment in image space.
 ///
-/// Returns a [`SupportScoreBreakdown`] with the headline `total` and its
-/// individual evidence components. Use [`SupportScoreBreakdown::score`] for the
-/// compact [`SupportScore`].
+/// Returns the compact [`SupportScore`]. For the full evidence breakdown use
+/// [`score_rectified_circle_support_detailed`].
 pub fn score_rectified_circle_support(
+    gradient: &GradientField,
+    rectified_circle: &Circle,
+    homography: &Homography,
+    config: &ScoringConfig,
+) -> SupportScore {
+    score_rectified_circle_support_detailed(gradient, rectified_circle, homography, config).score()
+}
+
+/// Score a rectified-frame circle, returning the full evidence
+/// [`SupportScoreBreakdown`] (Diagnostic tier).
+pub fn score_rectified_circle_support_detailed(
     gradient: &GradientField,
     rectified_circle: &Circle,
     homography: &Homography,
@@ -376,7 +408,7 @@ mod tests {
         let grad = sobel_gradient(&image).unwrap();
 
         let circle = Circle::new(PixelCoord::new(cx, cy), 16.0);
-        let score = score_circle_support(&grad, &circle, &ScoringConfig::default());
+        let score = score_circle_support_detailed(&grad, &circle, &ScoringConfig::default());
 
         assert!(!score.is_degenerate, "should not be degenerate");
         assert!(
@@ -419,7 +451,7 @@ mod tests {
         let grad = sobel_gradient(&image).unwrap();
 
         let circle = Circle::new(PixelCoord::new(32.0, 32.0), 10.0);
-        let score = score_circle_support(&grad, &circle, &ScoringConfig::default());
+        let score = score_circle_support_detailed(&grad, &circle, &ScoringConfig::default());
 
         assert!(score.is_degenerate, "empty image should be degenerate");
         assert_eq!(score.total, 0.0);
@@ -435,7 +467,7 @@ mod tests {
         let grad = sobel_gradient(&image).unwrap();
 
         let ellipse = Ellipse::new(PixelCoord::new(cx, cy), 16.0, 16.0, 0.0);
-        let score = score_ellipse_support(&grad, &ellipse, &ScoringConfig::default());
+        let score = score_ellipse_support_detailed(&grad, &ellipse, &ScoringConfig::default());
 
         assert!(!score.is_degenerate);
         assert!(
@@ -472,7 +504,7 @@ mod tests {
         }
         let image = ImageView::from_slice(&data, size, size).unwrap();
         let gradient = sobel_gradient(&image).unwrap();
-        let score = score_rectified_circle_support(
+        let score = score_rectified_circle_support_detailed(
             &gradient,
             &rectified_circle,
             &homography,

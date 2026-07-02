@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-02
+
+Public-API revision (iteration 3): the public surface is narrowed to the
+intended contract and the scoring functions are split into Result and
+Diagnostic tiers. Breaking for the `radsym` crate.
+
+### Changed
+
+- **Scoring functions re-tiered into Result + Diagnostic variants.**
+  `score_circle_support`, `score_ellipse_support`, and
+  `score_rectified_circle_support` now return the compact `SupportScore`
+  (the headline `total`, nameable from the crate root). The evidence-rich
+  breakdown moved to new `*_detailed` variants returning
+  `SupportScoreBreakdown`. *Migration:* call the `*_detailed` variant (or
+  `.score()` on a breakdown) where you need `ringness` / `angular_coverage` /
+  `is_degenerate`.
+- **`frst_response_scaled` returns a named `ScaledResponse { response, scale_map }`**
+  instead of an unnamed `(ResponseMap, OwnedImage<f32>)` tuple. *Migration:*
+  bind the struct fields instead of destructuring a tuple.
+- **`SeedPoint`, `Peak`, and `AffineResponse` are now `#[non_exhaustive]`** so
+  they can gain fields without a future break. *Migration:* add `..` to any
+  exhaustive struct pattern; construct them only via library functions.
+
+### Removed
+
+- **`core::circle_fit` (`fit_circle`, `fit_circle_weighted`) is now
+  `pub(crate)`** — internal algebraic-fit plumbing with no external consumers.
+- **`propose::frst::frst_response_single` is now `pub(crate)`** — an internal
+  single-radius vote primitive used only by the rayon voting path.
+  (`rsd_response_single` stays public: a documented advanced primitive with a
+  benchmark consumer.)
+- `support::coverage` and `support::evidence` items corrected to `pub(crate)`
+  (already unreachable through their `pub(crate)` modules).
+
+### Added
+
+- `#![deny(missing_docs)]` on the `radsym` crate to hold documentation coverage.
+
 ## [0.3.0] - 2026-07-02
 
 Production-hardening pass. All changes are backward compatible for existing
@@ -337,7 +375,8 @@ Breaking for the `radsym` crate and both binding packages.
 - Zero unsafe code; zero clippy warnings; 138 unit and integration tests.
 - mdBook documentation with full mathematical derivations.
 
-[Unreleased]: https://github.com/VitalyVorobyev/radsym/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/VitalyVorobyev/radsym/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/VitalyVorobyev/radsym/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/VitalyVorobyev/radsym/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/VitalyVorobyev/radsym/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/VitalyVorobyev/radsym/compare/v0.1.3...v0.1.4

@@ -16,7 +16,7 @@ use crate::core::scalar::Scalar;
 /// gradient is well-aligned with the radial direction (alignment > `tolerance`).
 ///
 /// Returns a value in `[0, 1]`.
-pub fn angular_coverage(
+pub(crate) fn angular_coverage(
     gradient: &GradientField,
     center: PixelCoord,
     radius: Scalar,
@@ -63,7 +63,7 @@ pub fn angular_coverage(
 ///
 /// Samples the boundary at evenly spaced ellipse-relative angles and checks
 /// whether the local gradient aligns with the true ellipse normal.
-pub fn ellipse_angular_coverage(
+pub(crate) fn ellipse_angular_coverage(
     gradient: &GradientField,
     ellipse: &Ellipse,
     tolerance: Scalar,

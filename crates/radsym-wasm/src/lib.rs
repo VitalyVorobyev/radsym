@@ -11,7 +11,7 @@ use radsym::{
     Circle, DetectCirclesConfig, GradientField, GradientOperator, ImageView, Polarity,
     RefinementStatus, ResponseMap, RsdConfig, compute_gradient, detect_circles,
     detect_circles_with_diagnostics, extract_proposals, frst_response, frst_response_fused,
-    refine_circle, rsd_response, rsd_response_fused, score_circle_support,
+    refine_circle, rsd_response, rsd_response_fused, score_circle_support_detailed,
 };
 
 // ---------------------------------------------------------------------------
@@ -602,7 +602,8 @@ impl RadSymProcessor {
         let mut rows: Vec<[f32; 8]> = Vec::new();
         for p in &proposals {
             let circle = Circle::new(p.seed.position, self.config.radius_hint);
-            let breakdown = score_circle_support(gradient, &circle, &self.config.advanced.scoring);
+            let breakdown =
+                score_circle_support_detailed(gradient, &circle, &self.config.advanced.scoring);
             if breakdown.is_degenerate || breakdown.total < self.config.min_score {
                 continue;
             }

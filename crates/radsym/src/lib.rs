@@ -69,6 +69,8 @@
 //! - `affine` — experimental affine-aware extensions (GFRS)
 //! - `serde` — serialization support
 
+#![deny(missing_docs)]
+
 pub mod core;
 pub mod diagnostics;
 pub mod pipeline;
@@ -101,7 +103,7 @@ pub use crate::core::polarity::Polarity;
 // Proposal generation
 pub use crate::propose::extract::{ResponseMap, extract_proposals, suppress_proposals_by_distance};
 pub use crate::propose::frst::{
-    FrstConfig, frst_response, frst_response_fused, frst_response_scaled,
+    FrstConfig, ScaledResponse, frst_response, frst_response_fused, frst_response_scaled,
 };
 pub use crate::propose::homography::{
     HomographyProposal, HomographyRerankAdvanced, HomographyRerankConfig, RectifiedResponseMap,
@@ -115,8 +117,9 @@ pub use crate::propose::seed::{Proposal, ProposalSource, SeedPoint};
 // Support scoring
 pub use crate::support::annulus::AnnulusSamplingConfig;
 pub use crate::support::score::{
-    ScoringConfig, SupportScore, score_circle_support, score_ellipse_support,
-    score_rectified_circle_support,
+    ScoringConfig, SupportScore, score_circle_support, score_circle_support_detailed,
+    score_ellipse_support, score_ellipse_support_detailed, score_rectified_circle_support,
+    score_rectified_circle_support_detailed,
 };
 
 // Refinement

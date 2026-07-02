@@ -97,6 +97,9 @@ fn accumulate_response(sum: &mut OwnedImage<Scalar>, single: &OwnedImage<Scalar>
 /// pixel. No orientation accumulator is maintained. This is the
 /// single-radius vote primitive; use [`rsd_response`] to combine
 /// contributions across all radii in [`RsdConfig::radii`].
+///
+/// This low-level primitive is retained in the public API deliberately (for
+/// benchmarking and composition); most callers want [`rsd_response`].
 pub fn rsd_response_single(
     gradient: &GradientField,
     radius: u32,
