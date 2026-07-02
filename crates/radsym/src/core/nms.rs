@@ -48,6 +48,7 @@ impl Default for NmsConfig {
 /// A detected peak with position and score.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct Peak {
     /// Peak position in pixel coordinates.
     pub position: PixelCoord,

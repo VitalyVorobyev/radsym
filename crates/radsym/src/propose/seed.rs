@@ -7,6 +7,7 @@ use crate::core::scalar::Scalar;
 /// A candidate center location with a response score.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct SeedPoint {
     /// Position in pixel coordinates (x = col, y = row).
     pub position: PixelCoord,

@@ -14,11 +14,11 @@ use crate::diagnostics::detection::{
     CircleDetectionDiagnostics, RejectedProposal, RejectionReason,
 };
 use crate::propose::extract::extract_proposals;
-use crate::propose::frst::{FrstConfig, frst_response_scaled};
+use crate::propose::frst::{FrstConfig, ScaledResponse, frst_response_scaled};
 use crate::refine::circle::{CircleRefineConfig, refine_circle};
 use crate::refine::result::RefinementStatus;
 use crate::support::score::{
-    ScoringConfig, SupportScore, SupportScoreBreakdown, score_circle_support,
+    ScoringConfig, SupportScore, SupportScoreBreakdown, score_circle_support_detailed,
 };
 
 /// Aggregated configuration for [`detect_circles`].
@@ -303,7 +303,10 @@ fn run_detection<P: SourcePixel>(
     let mut frst_config = config.advanced.frst.clone();
     frst_config.radii = config.radii.clone();
     frst_config.polarity = config.polarity;
-    let (response, scale_map) = frst_response_scaled(&gradient, &frst_config)?;
+    let ScaledResponse {
+        response,
+        scale_map,
+    } = frst_response_scaled(&gradient, &frst_config)?;
 
     let mut proposals = extract_proposals(&response, &config.advanced.nms, config.polarity);
 
@@ -324,7 +327,7 @@ fn run_detection<P: SourcePixel>(
         // Use the proposal's winning radius when available, else the global hint.
         let radius = proposal.scale_hint.unwrap_or(config.radius_hint);
         let circle = Circle::new(proposal.seed.position, radius);
-        let breakdown = score_circle_support(&gradient, &circle, &config.advanced.scoring);
+        let breakdown = score_circle_support_detailed(&gradient, &circle, &config.advanced.scoring);
 
         if breakdown.is_degenerate {
             rejected.push(RejectedProposal {

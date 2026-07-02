@@ -6,7 +6,9 @@ use radsym::core::polarity::Polarity;
 use radsym::core::pyramid::pyramid_level_owned;
 use radsym::propose::extract::extract_proposals;
 use radsym::propose::seed::Proposal;
-use radsym::support::score::{SupportScoreBreakdown, score_circle_support, score_ellipse_support};
+use radsym::support::score::{
+    SupportScoreBreakdown, score_circle_support_detailed, score_ellipse_support_detailed,
+};
 use radsym::{
     Circle, Ellipse, EllipseRefineAdvanced, EllipseRefineConfig, FrstConfig, OwnedImage,
     PixelCoord, RadSymError, Result, ScoringConfig, refine_ellipse,
@@ -312,7 +314,8 @@ fn rank_candidates(
         let ellipse_seed = Ellipse::new(center, seed_radius, seed_radius, 0.0);
         let refined = refine_ellipse(gradient, &ellipse_seed, &refine_config).unwrap();
         let working_ellipse = refined.hypothesis;
-        let final_support = score_ellipse_support(gradient, &working_ellipse, &scoring_config);
+        let final_support =
+            score_ellipse_support_detailed(gradient, &working_ellipse, &scoring_config);
 
         let dx = working_ellipse.center.x - center_x;
         let dy = working_ellipse.center.y - center_y;
@@ -360,7 +363,7 @@ fn sweep_radius_at_center(
     let mut best: Option<(f32, SupportScoreBreakdown)> = None;
     while radius <= radius_max + 0.5 {
         let circle = Circle::new(center, radius);
-        let score = score_circle_support(gradient, &circle, &scoring_config);
+        let score = score_circle_support_detailed(gradient, &circle, &scoring_config);
         if !score.is_degenerate {
             match best {
                 None => best = Some((radius, score)),
@@ -381,7 +384,7 @@ fn sweep_radius_at_center(
         let fallback = Circle::new(center, radius_hint);
         (
             radius_hint,
-            score_circle_support(gradient, &fallback, &scoring_config),
+            score_circle_support_detailed(gradient, &fallback, &scoring_config),
         )
     })
 }

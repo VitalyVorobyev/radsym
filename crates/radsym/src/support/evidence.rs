@@ -9,7 +9,7 @@ use crate::core::scalar::Scalar;
 /// A single gradient sample with its radial alignment score.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct GradientSample {
+pub(crate) struct GradientSample {
     /// Sample position in image coordinates.
     pub position: PixelCoord,
     /// Absolute cosine between gradient direction and the radial direction
@@ -22,7 +22,7 @@ pub struct GradientSample {
 /// Produced by annulus sampling functions and consumed by scoring functions.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SupportEvidence {
+pub(crate) struct SupportEvidence {
     /// Individual gradient samples with alignment scores.
     pub gradient_samples: Vec<GradientSample>,
     /// Number of valid samples (with non-negligible gradient).

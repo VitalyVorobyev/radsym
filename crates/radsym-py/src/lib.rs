@@ -315,7 +315,8 @@ fn score_circle_support_py(
     config: Option<&PyScoringConfig>,
 ) -> PySupportScore {
     let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
-    let score = radsym::support::score::score_circle_support(&gradient.inner, &circle.inner, &cfg);
+    let score =
+        radsym::support::score::score_circle_support_detailed(&gradient.inner, &circle.inner, &cfg);
     PySupportScore { inner: score }
 }
 
@@ -336,8 +337,11 @@ fn score_ellipse_support_py(
     config: Option<&PyScoringConfig>,
 ) -> PySupportScore {
     let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
-    let score =
-        radsym::support::score::score_ellipse_support(&gradient.inner, &ellipse.inner, &cfg);
+    let score = radsym::support::score::score_ellipse_support_detailed(
+        &gradient.inner,
+        &ellipse.inner,
+        &cfg,
+    );
     PySupportScore { inner: score }
 }
 
@@ -351,7 +355,7 @@ fn score_rectified_circle_support_py(
     config: Option<&PyScoringConfig>,
 ) -> PySupportScore {
     let cfg = config.map(|c| c.inner.clone()).unwrap_or_default();
-    let score = radsym::score_rectified_circle_support(
+    let score = radsym::score_rectified_circle_support_detailed(
         &gradient.inner,
         &circle.inner,
         &homography.inner,

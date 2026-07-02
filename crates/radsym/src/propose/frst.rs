@@ -258,7 +258,10 @@ fn frst_single_into(
 /// Returns the smoothed per-radius contribution `S_n`. This is the
 /// single-radius vote primitive; use [`frst_response`] to combine
 /// contributions across all radii in [`FrstConfig::radii`].
-pub fn frst_response_single(
+// Only the rayon voting path (and unit tests) call this single-radius helper;
+// the non-rayon build folds each radius in place via `frst_single_into`.
+#[cfg_attr(not(feature = "rayon"), allow(dead_code))]
+pub(crate) fn frst_response_single(
     gradient: &GradientField,
     radius: u32,
     config: &FrstConfig,
@@ -348,19 +351,33 @@ pub fn frst_response(
     ))
 }
 
-/// FRST response together with a per-pixel "winning radius" map.
+/// FRST response paired with a per-pixel winning-radius map.
 ///
-/// The second return value records, for each pixel, the candidate radius whose
-/// *single-radius* response was largest there (`0.0` where no radius voted). It
-/// lets the pipeline score and refine each proposal at its own scale instead of
-/// a single global radius hint — widening the range of circle sizes a single
-/// [`detect_circles`](crate::detect_circles) call can recover.
+/// Returned by [`frst_response_scaled`]. Field access (`.response`,
+/// `.scale_map`) is stable; the struct is `#[non_exhaustive]` to allow future
+/// diagnostic fields.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct ScaledResponse {
+    /// Summed multi-radius FRST response, bit-for-bit identical to
+    /// [`frst_response`].
+    pub response: super::extract::ResponseMap,
+    /// Per-pixel winning radius: the candidate radius whose *single-radius*
+    /// response was largest at that pixel (`0.0` where no radius voted). Lets
+    /// the pipeline score and refine each proposal at its own scale instead of
+    /// a single global radius hint.
+    pub scale_map: OwnedImage<Scalar>,
+}
+
+/// Compute the FRST response together with a per-pixel winning-radius map.
 ///
-/// The summed response is bit-for-bit identical to [`frst_response`].
+/// See [`ScaledResponse`]. The summed response is bit-for-bit identical to
+/// [`frst_response`]; the winning-radius map widens the range of circle sizes a
+/// single [`detect_circles`](crate::detect_circles) call can recover.
 pub fn frst_response_scaled(
     gradient: &GradientField,
     config: &FrstConfig,
-) -> Result<(super::extract::ResponseMap, OwnedImage<Scalar>)> {
+) -> Result<ScaledResponse> {
     config.validate()?;
     let w = gradient.width();
     let h = gradient.height();
@@ -418,10 +435,10 @@ pub fn frst_response_scaled(
         }
     }
 
-    Ok((
-        super::extract::ResponseMap::new(response, super::seed::ProposalSource::Frst),
-        scale,
-    ))
+    Ok(ScaledResponse {
+        response: super::extract::ResponseMap::new(response, super::seed::ProposalSource::Frst),
+        scale_map: scale,
+    })
 }
 
 /// Compute a fused multi-radius response map in a single pixel pass.
@@ -588,11 +605,11 @@ mod tests {
         };
 
         let response = frst_response(&grad, &config).unwrap();
-        let (scaled, _scale) = frst_response_scaled(&grad, &config).unwrap();
+        let scaled = frst_response_scaled(&grad, &config).unwrap();
 
         assert_eq!(
             response.response().data(),
-            scaled.response().data(),
+            scaled.response.response().data(),
             "response-only path must equal the scaled variant's summed response bit-for-bit"
         );
     }

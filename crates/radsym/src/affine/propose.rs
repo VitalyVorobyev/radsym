@@ -51,7 +51,12 @@ impl Default for AffineFrstConfig {
 }
 
 /// Result of affine-aware voting for a single affine map.
+///
+/// Not `serde`-serializable: it carries a full [`OwnedImage`] response buffer
+/// (like [`ResponseMap`](crate::ResponseMap) and
+/// [`GradientField`](crate::GradientField), which are also not serde-gated).
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct AffineResponse {
     /// The response map for this affine map.
     pub response: OwnedImage<Scalar>,
