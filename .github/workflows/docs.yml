@@ -18,7 +18,12 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
+      # Fetch Git LFS objects (the demo's sample PNGs are LFS-tracked); without
+      # this the runner checks out pointer stubs and the deployed demo can't
+      # decode its sample images.
       - uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: dtolnay/rust-toolchain@stable
 
