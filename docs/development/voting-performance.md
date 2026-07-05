@@ -11,12 +11,12 @@ milliseconds as order-of-magnitude (see the variance note in
 
 Across every image on the performance page, voting (`frst_response_scaled`,
 including the per-pixel winning-radius map `run_detection` actually pays for)
-is now **69–77 %** of end-to-end `detect_circles` (e.g. synthetic-1024: 26.2 ms
-of 38.0 ms; surface-hole 2048×1536: 132.2 ms of 172.4 ms) — down from 88–92 %
+is now **67–76 %** of end-to-end `detect_circles` (e.g. synthetic-1024: 25.7 ms
+of 38.4 ms; surface-hole 2048×1536: 137.3 ms of 180.8 ms) — down from 88–92 %
 before the 0.4.1 cache-blocked blur rewrite (see
 [CHANGELOG](../../CHANGELOG.md)), which cut the dominant per-radius Gaussian
 blur cost by roughly 7×. NMS extraction is now a more significant share of the
-remainder (up to ~29 % at 1024²) than before the blur fix; gradient, scoring,
+remainder (up to ~31 % at 1024²) than before the blur fix; gradient, scoring,
 and refinement stay sub-millisecond to low-millisecond.
 
 The unfused path (`frst_response` → `frst_response_scaled`) computes, **per
@@ -88,7 +88,7 @@ radsym = { version = "0.4", features = ["rayon"] }
 ## Lever 2 — fused voting (faster, but diverges on real images)
 
 `frst_response_fused` collapses all radii into one voting pass and one blur. It
-is now **~2.3–2.5× faster** than serial unfused (down from 4–6× before the
+is now **~2.4–2.6× faster** than serial unfused (down from 4–6× before the
 0.4.1 blur rewrite — unfused paid for five per-radius blurs where fused pays
 for one, so it benefited proportionally more from the blur speedup, closing
 most of the gap; see the throughput table on the
@@ -130,7 +130,7 @@ silently.
 - **Cache-blocked box blur** — the vertical pass's stride-`w` traversal was
   cache-hostile; it's now tiled into 16-column strips, bit-identical output,
   ~7× faster alone (see [CHANGELOG](../../CHANGELOG.md)). This is what moved
-  voting's end-to-end share from 88–92 % down to 69–77 % above and closed most
+  voting's end-to-end share from 88–92 % down to 67–76 % above and closed most
   of the fused/unfused gap in Lever 2.
 
 ## Not pursued (and why)

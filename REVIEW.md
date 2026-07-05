@@ -105,7 +105,7 @@ generated locally and committed).
 ## Performance (measured, single-thread, Apple M4 Pro)
 
 > Addressed in 0.4.1 — see the backlog row below. Voting's share of
-> end-to-end cost dropped to ~69-77% after cache-blocking the blur; the
+> end-to-end cost dropped to ~67-76% after cache-blocking the blur; the
 > absolute numbers in this section predate that fix.
 
 The new `perf_export` harness produced a concrete, actionable finding:
