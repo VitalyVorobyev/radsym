@@ -32,9 +32,9 @@ use radsym::{
     Circle, DetectCirclesConfig, Ellipse, EllipseRefineConfig, FrstConfig, Homography,
     HomographyEllipseRefineConfig, OwnedImage, PixelCoord, Polarity, RadialCenterConfig, RsdConfig,
     compute_gradient, detect_circles, extract_proposals, frst_response, frst_response_fused,
-    load_grayscale, radial_center_refine_from_gradient, rectified_circle_to_image_ellipse,
-    refine_circle, refine_ellipse, refine_ellipse_homography, rsd_response, rsd_response_fused,
-    score_circle_support_detailed, sobel_gradient,
+    frst_response_scaled, load_grayscale, radial_center_refine_from_gradient,
+    rectified_circle_to_image_ellipse, refine_circle, refine_ellipse, refine_ellipse_homography,
+    rsd_response, rsd_response_fused, score_circle_support_detailed, sobel_gradient,
 };
 
 /// Base repeat count reported in `meta.repeats`; sub-megapixel images use this.
@@ -191,14 +191,18 @@ fn time_stages(image: &OwnedImage<u8>, cfg: &DetectCirclesConfig) -> StageTimes 
         let g_ms = t.elapsed().as_secs_f64() * 1e3;
 
         // Stage 2: FRST voting. radii/polarity come from the top-level config
-        // (their single source of truth) — mirrors detect_circles.
+        // (their single source of truth). Times `frst_response_scaled`, not
+        // plain `frst_response` — `run_detection` (pipeline.rs) calls the
+        // scaled variant to get the per-pixel winning-radius map, which costs
+        // extra `best`/`scale` buffer writes on top of the summed response.
         let frst_config = cfg
             .advanced
             .frst
             .to_frst_config(cfg.radii.clone(), cfg.polarity);
         let t = Instant::now();
-        let response = frst_response(black_box(&gradient), black_box(&frst_config)).unwrap();
+        let scaled = frst_response_scaled(black_box(&gradient), black_box(&frst_config)).unwrap();
         let v_ms = t.elapsed().as_secs_f64() * 1e3;
+        let response = scaled.response;
 
         // Stage 3: NMS proposal extraction — mirrors pipeline.rs:274.
         let t = Instant::now();
