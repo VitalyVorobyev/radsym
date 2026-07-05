@@ -32,7 +32,7 @@ Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-radsym = "0.2"
+radsym = "0.4"
 ```
 
 Detect circles in an image with the one-call pipeline:
