@@ -17,19 +17,25 @@ regenerate it.
    | Stage | Function | Frequency |
    |-------|----------|-----------|
    | gradient | `compute_gradient` (Sobel) | once |
-   | voting | `frst_response` (unfused FRST) | once |
+   | voting | `frst_response_scaled` (unfused FRST + winning-radius map) | once |
    | extract | `extract_proposals` (NMS) | once |
    | score | `score_circle_support` | every proposal |
    | refine | `refine_circle` | accepted proposals only |
 
-   The gradient is computed once and reused by voting, scoring, and refinement —
-   so those stages stay cheap. As a faithfulness check, the sum of an image's
-   stage bars equals its end-to-end `detect_circles` time within a few percent
-   (the residual is diagnostics bookkeeping).
+   The voting stage times `frst_response_scaled`, not plain `frst_response` —
+   `run_detection` calls the scaled variant to get the per-pixel winning-radius
+   map used for per-proposal scale hints, and that map costs extra `best`/`scale`
+   buffer writes on top of the summed response. The gradient is computed once
+   and reused by voting, scoring, and refinement — so those stages stay cheap.
+   As a faithfulness check, the sum of an image's stage bars tracks its
+   end-to-end `detect_circles` time within a couple of percent (separate
+   `Instant::now()` calls per stage vs. one averaged end-to-end call account
+   for the residual, which can go either direction).
 
 2. **Voting-backend throughput** — FRST vs RSD, unfused vs fused, across image
    sizes, on synthetic disks with the gradient precomputed (radii `[5,7,9,11,13]`,
-   matching `benches/frst_bench.rs` / `benches/rsd_bench.rs`). Reported as p50 ms
+   hardcoded in `perf_export.rs` and matching `benches/frst_bench.rs`; `benches/rsd_bench.rs`
+   uses a different radius set for its own criterion runs). Reported as p50 ms
    and megapixels/second.
 
 3. **Refinement cost** — per-call p50 (microseconds) of `radial_center`,
@@ -85,12 +91,14 @@ implementation — the same calls a real `detect_circles` makes.
 
 ## Refreshing the WASM demo
 
-The interactive demo at `/demo/` is bundled from `book/src/demo/`, whose
-`pkg/*.wasm` is committed. To rebuild it against the current source:
+The interactive demo's canonical source is `demo/` at the repo root
+(HTML/CSS/JS + sample images). The built WASM package (`pkg/*.wasm`) is a
+gitignored build artifact both there and in the generated `book/src/demo/`
+copy the build script stages it into. To rebuild against the current source:
 
 ```sh
 ./book/build.sh    # requires wasm-pack + mdbook
 ```
 
-This rebuilds the WASM package, copies it into `book/src/demo/pkg/`, and rebuilds
+This rebuilds the WASM package, stages it into `book/src/demo/`, and rebuilds
 the book. The `Docs` workflow then bundles it on the next push to `main`.

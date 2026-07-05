@@ -13,6 +13,7 @@ cargo test --workspace --all-features                              # test (all)
 cargo test --workspace --no-default-features                       # test (minimal)
 cargo bench                                                        # benchmarks
 wasm-pack build crates/radsym-wasm --target web                    # WASM build
+wasm-pack test --safari --headless --release crates/radsym-wasm    # WASM tests (Safari)
 ```
 
 ## Architecture
@@ -21,15 +22,18 @@ Workspace with three crates:
 
 - `crates/radsym/`      — core Rust library
 - `crates/radsym-py/`   — Python bindings via PyO3
-- `crates/radsym-wasm/` — WebAssembly bindings via wasm-bindgen
+- `crates/radsym-wasm/` — WebAssembly bindings via wasm-bindgen (npm: `@vitavision/radsym`)
 
 ### radsym modules
 
-- `core/`         — types, image view, errors, NMS, geometry, gradient, homography, circle fitting
-- `propose/`      — FRST, RSD, center voting, proposal extraction, homography-aware FRST
-- `support/`      — annulus sampling, profiles, scoring, hypothesis types
-- `refine/`       — Parthasarathy radial center, circle/ellipse refinement, homography refinement
-- `affine/`       — (feature-gated) affine-aware extensions
+- `core/`         — types, image view, errors, NMS, geometry, gradient (Sobel/Scharr),
+                     homography, circle fitting (Kåsa)
+- `propose/`      — FRST, RSD, center voting, proposal extraction,
+                     homography-aware FRST and reranking
+- `support/`      — annulus sampling, coverage analysis, evidence types, scoring
+- `refine/`       — Parthasarathy radial center, circle/ellipse refinement,
+                     homography-aware ellipse refinement
+- `affine/`       — (feature-gated) affine-aware extensions (GFRS)
 - `diagnostics/`  — heatmaps, overlays, export
 
 ## Coordinate Convention
@@ -49,6 +53,9 @@ rightward, y increases downward. `PixelCoord = nalgebra::Point2<f32>`.
 - `tracing` — structured logging
 - `affine` — experimental affine-aware extensions
 - `serde` — serialization for configs/results
+- `unsafe-opt` — unchecked-indexing fast paths in the voting hot loops (RSD/FRST
+  scatter). Indices proven in-bounds by preceding range checks; identical output
+  to the safe build. Off by default; opt in for the voting speedup.
 
 ## Dependency Rules
 
@@ -68,11 +75,31 @@ rightward, y increases downward. `PixelCoord = nalgebra::Point2<f32>`.
 - Every public item must have rustdoc
 - Literature traceability: algorithm implementations must cite source paper
 
+## Versioning
+
+- **Single source of truth**: `[workspace.package] version` in root `Cargo.toml`
+- `crates/radsym/Cargo.toml` and `crates/radsym-py/Cargo.toml` use
+  `version.workspace = true`
+- `crates/radsym-py/pyproject.toml` uses `dynamic = ["version"]` so maturin
+  reads the version from `Cargo.toml` automatically — **never hardcode a
+  version in pyproject.toml**
+- When bumping the version: update **only** root `Cargo.toml` and `CHANGELOG.md`
+
 ## Testing
 
 - Synthetic test generators for circles, rings, ellipses
 - Property tests: deterministic ordering, translation sanity
 - Benchmark with criterion before optimizing hot paths
+
+## Working Principles
+
+- **Every conclusion must be backed by reproducible proof.** Do not claim
+  something works, is correct, or is equivalent without a passing test, a
+  concrete benchmark result, or a verifiable code trace. "It should work" is
+  not acceptable — run the test, show the output.
+- **When in doubt, stop and ask.** If a requirement is ambiguous, a design
+  trade-off is unclear, or you are unsure whether a change is safe, ask the
+  user before proceeding. Do not guess or assume intent.
 
 ## Algorithm Families
 
@@ -83,6 +110,7 @@ rightward, y increases downward. `PixelCoord = nalgebra::Point2<f32>`.
 | Radial center | `refine::radial_center` | Parthasarathy, Nature Methods 2012 |
 | GFRS | `affine::propose` | Ni, Singh, Bahlmann, CVPR 2012 |
 | Kåsa circle fit | `core::circle_fit` | Kåsa, IEEE T-IM 1976 |
+| Gradient thinning (NMS) | `core::gradient::thin_gradient` | Canny, IEEE TPAMI 1986 |
 | Ellipse refinement | `refine::ellipse` | Fitzgibbon et al., TPAMI 1999 |
 | Homography FRST | `propose::homography` | Novel: FRST in rectified space |
 | Homography refinement | `refine::homography` | Novel: circle fit in rectified space |

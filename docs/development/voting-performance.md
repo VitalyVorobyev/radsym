@@ -9,10 +9,15 @@ milliseconds as order-of-magnitude (see the variance note in
 
 ## Where the time goes
 
-Across every image on the performance page, voting is **88–92 %** of end-to-end
-`detect_circles` (e.g. synthetic-1024: 127 ms of 139 ms; surface-hole
-2048×1536: 493 ms of 557 ms). NMS extraction is a distant second; gradient,
-scoring, and refinement are sub-millisecond to low-millisecond.
+Across every image on the performance page, voting (`frst_response_scaled`,
+including the per-pixel winning-radius map `run_detection` actually pays for)
+is now **67–76 %** of end-to-end `detect_circles` (e.g. synthetic-1024: 25.7 ms
+of 38.4 ms; surface-hole 2048×1536: 137.3 ms of 180.8 ms) — down from 88–92 %
+before the 0.4.1 cache-blocked blur rewrite (see
+[CHANGELOG](../../CHANGELOG.md)), which cut the dominant per-radius Gaussian
+blur cost by roughly 7×. NMS extraction is now a more significant share of the
+remainder (up to ~31 % at 1024²) than before the blur fix; gradient, scoring,
+and refinement stay sub-millisecond to low-millisecond.
 
 The unfused path (`frst_response` → `frst_response_scaled`) computes, **per
 radius**: a scatter-voting pass into two accumulators (`O_n`, `M_n`), a
@@ -67,25 +72,42 @@ Measured (unfused, real images, `rayon` on a 12-core M4 Pro):
 | surf1 2048×1536  | 501 ms | 123 ms | **4.1×** |
 | surf4 2048×1536  | 504 ms | 128 ms | **3.9×** |
 
+> These serial/rayon absolute timings predate the 0.4.1 cache-blocked blur
+> rewrite and have not been re-measured against it — the per-radius blur that
+> both paths now share got roughly 7× faster, so both columns (and likely the
+> speedup ratio) have shifted. Treat this table as showing that the lever
+> exists and roughly how it scales, not as current absolute numbers.
+
 This is the recommended production lever: ~min(cores, radii-count)× throughput
 with **no change in detection results**. Enable it with:
 
 ```toml
-radsym = { version = "0.2", features = ["rayon"] }
+radsym = { version = "0.4", features = ["rayon"] }
 ```
 
 ## Lever 2 — fused voting (faster, but diverges on real images)
 
 `frst_response_fused` collapses all radii into one voting pass and one blur. It
-is 4–6× faster than serial unfused, but it **drops the orientation (`|O_n|^α`)
+is now **~2.4–2.6× faster** than serial unfused (down from 4–6× before the
+0.4.1 blur rewrite — unfused paid for five per-radius blurs where fused pays
+for one, so it benefited proportionally more from the blur speedup, closing
+most of the gap; see the throughput table on the
+[performance page](https://VitalyVorobyev.github.io/radsym/performance/)).
+It still **drops the orientation (`|O_n|^α`)
 term** that gives FRST its selectivity. On clean synthetic disks the peaks agree
 within a few pixels; on real cluttered images they do **not**:
 
-| image | speedup | fused proposals landing within 2 px of unfused |
+| image | speedup (pre-0.4.1) | fused proposals landing within 2 px of unfused |
 |-------|---------|------------------------------------------------|
 | ringgrid | 4.3× | 3 / 60 (max displacement 97 px) |
 | surf1 | 6.4× | 0 / 10 (max 125 px) |
 | surf2 | 5.6× | counts even differ (6 vs 10), max 334 px |
+
+> The divergence columns (which proposals move, by how much) are unaffected by
+> the blur speedup — cache-blocking is bit-identical, so it changes timing
+> only, not results. The per-image speedup column predates it and has not been
+> re-measured; expect it to have come down like the synthetic throughput
+> numbers above.
 
 So fused is **not a safe default and not a drop-in** for unfused quality. It is
 appropriate only as an opt-in for callers who have validated it for their own
@@ -103,12 +125,17 @@ is an open product decision (it trades the scale-hint feature for throughput on
 validated imagery) — deliberately left for a follow-up rather than changed
 silently.
 
+## Done since (0.4.1)
+
+- **Cache-blocked box blur** — the vertical pass's stride-`w` traversal was
+  cache-hostile; it's now tiled into 16-column strips, bit-identical output,
+  ~7× faster alone (see [CHANGELOG](../../CHANGELOG.md)). This is what moved
+  voting's end-to-end share from 88–92 % down to 67–76 % above and closed most
+  of the fused/unfused gap in Lever 2.
+
 ## Not pursued (and why)
 
 - **Fewer blur passes / data-independent normalization** — would cut bandwidth
   but changes the response numerically (a quality decision, not a free win).
-- **Cache-blocked box blur** — the vertical pass is cache-hostile; tiling it
-  would help all blur callers but is intricate and was out of scope for a
-  bit-identical pass.
 - **Making fused or rayon the default** — both change behavior (results or
   build/runtime profile) and need an explicit decision.

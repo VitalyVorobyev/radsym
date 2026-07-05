@@ -88,6 +88,8 @@ Most config and result structs are `#[non_exhaustive]`: construct them via
 - `tracing`: structured instrumentation
 - `affine`: experimental affine-aware extensions
 - `serde`: serialization for configs and results
+- `unsafe-opt`: unchecked-indexing fast paths in the voting hot loops
+  (RSD/FRST scatter); identical output to the safe build
 
 ## Conventions
 
@@ -101,6 +103,7 @@ Most config and result structs are `#[non_exhaustive]`: construct them via
 - RSD: Barnes, Zelinsky, Fletcher, IEEE T-ITS 2008
 - Radial center: Parthasarathy, Nature Methods 2012
 - GFRS: Ni, Singh, Bahlmann, CVPR 2012
+- Gradient thinning (`core::gradient::thin_gradient`): Canny, IEEE TPAMI 1986
 
 ## License
 

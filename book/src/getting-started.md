@@ -6,7 +6,7 @@ Add the dependency to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-radsym = "0.2"
+radsym = "0.4"
 ```
 
 By default, no optional features are enabled. The core detection pipeline works
@@ -22,12 +22,13 @@ out of the box with zero additional dependencies beyond `nalgebra` and
 | `tracing` | Structured log spans and events via the `tracing` crate |
 | `affine` | Experimental affine-aware extensions (GFRS, Ni et al. CVPR 2012) |
 | `serde` | `Serialize` / `Deserialize` derives on all config and result types |
+| `unsafe-opt` | Unchecked-indexing fast paths in the voting hot loops (RSD/FRST scatter); identical output to the safe build |
 
 Enable features in `Cargo.toml` as needed:
 
 ```toml
 [dependencies]
-radsym = { version = "0.2", features = ["rayon", "image-io"] }
+radsym = { version = "0.4", features = ["rayon", "image-io"] }
 ```
 
 ## Quick Start: the One-Call API

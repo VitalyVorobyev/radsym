@@ -1,5 +1,16 @@
 # Handoff: Edge-Thinning (Gradient-Direction NMS) for radsym RSD
 
+> **Status: resolved in radsym 0.4.1.** `thin_gradient(field: &GradientField)
+> -> Result<GradientField>` shipped — solution #2 below ("a standalone
+> thinning transform"), 4-direction quantization via ratio tests (no
+> `atan2`). It landed in the *same* release that predates this document, not
+> the "target: radsym 0.5" originally estimated; the "there is still no way to
+> inject a thinned gradient" claim below no longer holds. See `CHANGELOG.md`
+> `[0.4.1]` for details, including the caveat that the voting-cost reduction
+> requires a positive `gradient_threshold` (at the default `0.0` it sharpens
+> the response without skipping zeroed pixels). The rest of this document is
+> kept as the original request/rationale.
+
 ## Problem
 
 The proposal stage (radsym RSD voting) is the dominant cost in ringgrid

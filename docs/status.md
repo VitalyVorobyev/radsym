@@ -2,6 +2,12 @@
 
 **Date:** 2026-07-02 · **Version:** 0.3.0 · **Workspace:** `radsym`, `radsym-py`, `radsym-wasm`
 
+> **Dated snapshot.** This report predates the 0.4.0 API revision and the
+> 0.4.1 performance release (cache-blocked blur, `thin_gradient`, `unsafe-opt`
+> voting) — see `CHANGELOG.md` for what has changed since. Not refreshed here;
+> treat the gaps/recommendations below as historical context, not current
+> status.
+
 ## 1. Executive summary
 
 `radsym` is unusually well-documented and mature for its size: the core
@@ -25,7 +31,7 @@ session.
 | Changelog | `CHANGELOG.md` follows Keep a Changelog + SemVer, with migration notes and compare links |
 | CI / release | 6 workflows in `.github/workflows/`: `ci.yml`, `docs.yml`, `publish-crates.yml`, `release-pypi.yml`, `release-npm.yml`, `release.yml` |
 | Test coverage | ~143 unit tests across 27 `#[cfg(test)]` modules; 13 integration test fns; 15 doctests; ~27 Python tests; wasm `web.rs`; 6 criterion benches |
-| Safety / hygiene | Zero `unsafe`; zero `TODO`/`FIXME`/`XXX` in `src/` |
+| Safety / hygiene | Zero `unsafe` outside the opt-in `unsafe-opt` feature (added 0.4.1, gated to the voting scatter loops, indices proven in-bounds); zero `TODO`/`FIXME`/`XXX` in `src/` |
 
 **CI detail (`ci.yml`):** `cargo fmt` + `clippy -D warnings`; test matrix over
 all-features and `--no-default-features`; MSRV 1.88; doc build; wasm check.

@@ -95,18 +95,18 @@ Literature: Loy & Zelinsky, ECCV 2002 / TPAMI 2003
 - [x] `sample_elliptical_annulus` — elliptical variant (accepts `&Ellipse`)
 - [x] Tests: sampling on synthetic ring, angular coverage verification
 
-### Milestone 3.2: Profiles
+### Milestone 3.2: Profiles — **removed in 0.2.0** (no consumers; see `CHANGELOG.md`)
 
-- [x] `RadialProfile` type (values, radii, center)
-- [x] `compute_radial_profile` — azimuthally-averaged radial profile
-- [x] `compute_normal_profile` — profile along ellipse normal (accepts `&Ellipse`)
-- [x] Tests: profile of synthetic ring shows peaks at edges
+- [x] ~~`RadialProfile` type (values, radii, center)~~
+- [x] ~~`compute_radial_profile` — azimuthally-averaged radial profile~~
+- [x] ~~`compute_normal_profile` — profile along ellipse normal (accepts `&Ellipse`)~~
+- [x] ~~Tests: profile of synthetic ring shows peaks at edges~~
 
-### Milestone 3.3: Hypothesis types
+### Milestone 3.3: Hypothesis types — **removed in 0.2.0** (no consumers; see `CHANGELOG.md`)
 
-- [x] `CircleHypothesis`, `EllipseHypothesis` (geometry + confidence)
-- [x] `AnnulusHypothesis`, `ConcentricPairHypothesis`
-- [x] Conversion: `CircleHypothesis` → `EllipseHypothesis`
+- [x] ~~`CircleHypothesis`, `EllipseHypothesis` (geometry + confidence)~~
+- [x] ~~`AnnulusHypothesis`, `ConcentricPairHypothesis`~~
+- [x] ~~Conversion: `CircleHypothesis` → `EllipseHypothesis`~~
 
 ### Milestone 3.4: Support scoring
 

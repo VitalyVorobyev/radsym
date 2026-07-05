@@ -104,6 +104,10 @@ generated locally and committed).
 
 ## Performance (measured, single-thread, Apple M4 Pro)
 
+> Addressed in 0.4.1 — see the backlog row below. Voting's share of
+> end-to-end cost dropped to ~67-76% after cache-blocking the blur; the
+> absolute numbers in this section predate that fix.
+
 The new `perf_export` harness produced a concrete, actionable finding:
 
 - **Voting dominates** end-to-end cost (>90% of every per-image stage breakdown).
@@ -128,5 +132,5 @@ The new `perf_export` harness produced a concrete, actionable finding:
 | P2 | Verify each algorithm against its source paper (FRST α/normalization, Kåsa bias, GN guards, homography pullback) | 2 |
 | P3 | Python `.pyi` stub for IDE discoverability | 2 |
 | P1 | Evaluate fused FRST as the pipeline default (~3.5× faster, measured) | 3 |
-| P2 | Profile + optimize voting + per-radius blur hot path (SIMD, allocation audit, rayon scaling) | 3 |
+| ✅ | Profile + optimize voting + per-radius blur hot path — cache-blocked the vertical box-blur pass (the actual bottleneck: ~96% of `rsd_response_fused`), bit-identical, ~7.4× on the blur alone. See `CHANGELOG.md` `[0.4.1]`. SIMD/allocation-audit/rayon-scaling beyond this were not pursued as part of that fix. | done (0.4.1) |
 | P3 | Optional benchmark-regression CI job | 3 |
