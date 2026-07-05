@@ -3,12 +3,10 @@
 use std::path::PathBuf;
 
 use radsym::core::gradient::sobel_gradient;
-use radsym::core::nms::NmsConfig;
-use radsym::propose::rsd::RsdConfig;
-use radsym::{
-    Ellipse, EllipseRefineAdvanced, EllipseRefineConfig, OwnedImage, PixelCoord, Polarity,
-    Proposal, extract_proposals, refine_ellipse, rsd_response, suppress_proposals_by_distance,
-};
+use radsym::{Ellipse, OwnedImage, PixelCoord, Proposal, refine_ellipse};
+
+#[path = "support/ringgrid_detect.rs"]
+mod ringgrid_detect;
 
 #[derive(serde::Deserialize)]
 struct RinggridFixture {
@@ -138,29 +136,6 @@ fn ringgrid_image(fixture: &RinggridFixture) -> OwnedImage<u8> {
     OwnedImage::from_vec(data, width, height).unwrap()
 }
 
-fn build_radius_band(
-    base_radius: f32,
-    start_scale: f32,
-    stop_scale: f32,
-    steps: usize,
-) -> Vec<u32> {
-    let start = (base_radius * start_scale).round().max(4.0) as u32;
-    let stop = (base_radius * stop_scale).round().max(start as f32 + 1.0) as u32;
-    if steps <= 1 || start == stop {
-        return vec![start];
-    }
-
-    let mut radii = (0..steps)
-        .map(|index| {
-            let t = index as f32 / (steps - 1) as f32;
-            (start as f32 + t * (stop - start) as f32).round() as u32
-        })
-        .collect::<Vec<_>>();
-    radii.sort_unstable();
-    radii.dedup();
-    radii
-}
-
 fn gt_centers(fixture: &RinggridFixture) -> Vec<PixelCoord> {
     fixture
         .detected_markers
@@ -232,22 +207,9 @@ fn detect_outer_rsd_candidates(
     fixture: &RinggridFixture,
     gradient: &radsym::core::gradient::GradientField,
 ) -> Vec<Proposal> {
-    let outer_hint = outer_radius_hint(fixture);
-    let mut rsd_config = RsdConfig::default();
-    rsd_config.radii = build_radius_band(outer_hint, 0.8, 1.16, 5);
-    rsd_config.gradient_threshold = 2.0;
-    rsd_config.polarity = Polarity::Dark;
-    rsd_config.smoothing_factor = 0.5;
-    let response = rsd_response(gradient, &rsd_config).unwrap();
-    let mut nms_config = NmsConfig::default();
-    nms_config.radius = (0.55 * outer_hint).round().max(6.0) as usize;
-    nms_config.threshold = 0.01;
-    nms_config.max_detections = 256;
-    let proposals = extract_proposals(&response, &nms_config, Polarity::Dark);
-
-    suppress_proposals_by_distance(
-        &proposals,
-        1.25 * outer_hint,
+    ringgrid_detect::detect_outer_candidates(
+        gradient,
+        outer_radius_hint(fixture),
         fixture.detected_markers.len() * 2,
     )
 }
@@ -307,30 +269,8 @@ fn ringgrid_local_ellipse_refinement_recovers_outer_and_inner_geometry() {
     let inner_ratio = inner_ratio_hint(&fixture);
 
     let proposals = detect_outer_rsd_candidates(&fixture, &gradient);
-    let mut outer_advanced = EllipseRefineAdvanced::default();
-    outer_advanced.ray_count = 96;
-    outer_advanced.radial_search_inner = 0.60;
-    outer_advanced.radial_search_outer = 1.45;
-    outer_advanced.normal_search_half_width = 6.0;
-    outer_advanced.min_inlier_coverage = 0.60;
-    let mut outer_config = EllipseRefineConfig::default();
-    outer_config.max_iterations = 5;
-    outer_config.convergence_tol = 0.05;
-    outer_config.max_center_shift_fraction = 0.40;
-    outer_config.max_axis_ratio = 1.80;
-    outer_config.advanced = outer_advanced;
-    let mut inner_advanced = EllipseRefineAdvanced::default();
-    inner_advanced.ray_count = 96;
-    inner_advanced.radial_search_inner = 0.75;
-    inner_advanced.radial_search_outer = 1.20;
-    inner_advanced.normal_search_half_width = 4.0;
-    inner_advanced.min_inlier_coverage = 0.55;
-    let mut inner_config = EllipseRefineConfig::default();
-    inner_config.max_iterations = 5;
-    inner_config.convergence_tol = 0.05;
-    inner_config.max_center_shift_fraction = 0.25;
-    inner_config.max_axis_ratio = 1.80;
-    inner_config.advanced = inner_advanced;
+    let outer_config = ringgrid_detect::outer_ellipse_config();
+    let inner_config = ringgrid_detect::inner_ellipse_config();
 
     let refined_outer = proposals
         .iter()

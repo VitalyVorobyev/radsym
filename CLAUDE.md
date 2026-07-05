@@ -90,6 +90,14 @@ rightward, y increases downward. `PixelCoord = nalgebra::Point2<f32>`.
 - Synthetic test generators for circles, rings, ellipses
 - Property tests: deterministic ordering, translation sanity
 - Benchmark with criterion before optimizing hot paths
+- **Performance metrics and overlays must be evaluated on sensible,
+  ground-truthed examples — not dummy computation.** The performance page and
+  any published detection overlay must exercise the detector at a realistic
+  scale on a feature it can actually find (verified against ground truth), so
+  the numbers and pictures reflect real detection quality. Configs must match
+  the feature scale (e.g. pyramid-downscale large features rather than searching
+  mismatched radii). Examples that use private data must not publish its pixels —
+  validate privately and publish a generated stand-in instead.
 
 ## Working Principles
 
