@@ -9,14 +9,15 @@ milliseconds as order-of-magnitude (see the variance note in
 
 ## Where the time goes
 
-Across every image on the performance page, voting is now **65–70 %** of
-end-to-end `detect_circles` (e.g. synthetic-1024: 23.2 ms of 35.5 ms;
-surface-hole 2048×1536: 115.7 ms of 165.4 ms) — down from 88–92 % before the
-0.4.1 cache-blocked blur rewrite (see [CHANGELOG](../../CHANGELOG.md)), which
-cut the dominant per-radius Gaussian blur cost by roughly 7×. NMS extraction is
-now a more significant share of the remainder (up to ~29 % at 1024²) than
-before the blur fix; gradient, scoring, and refinement stay sub-millisecond to
-low-millisecond.
+Across every image on the performance page, voting (`frst_response_scaled`,
+including the per-pixel winning-radius map `run_detection` actually pays for)
+is now **69–77 %** of end-to-end `detect_circles` (e.g. synthetic-1024: 26.2 ms
+of 38.0 ms; surface-hole 2048×1536: 132.2 ms of 172.4 ms) — down from 88–92 %
+before the 0.4.1 cache-blocked blur rewrite (see
+[CHANGELOG](../../CHANGELOG.md)), which cut the dominant per-radius Gaussian
+blur cost by roughly 7×. NMS extraction is now a more significant share of the
+remainder (up to ~29 % at 1024²) than before the blur fix; gradient, scoring,
+and refinement stay sub-millisecond to low-millisecond.
 
 The unfused path (`frst_response` → `frst_response_scaled`) computes, **per
 radius**: a scatter-voting pass into two accumulators (`O_n`, `M_n`), a
@@ -129,7 +130,7 @@ silently.
 - **Cache-blocked box blur** — the vertical pass's stride-`w` traversal was
   cache-hostile; it's now tiled into 16-column strips, bit-identical output,
   ~7× faster alone (see [CHANGELOG](../../CHANGELOG.md)). This is what moved
-  voting's end-to-end share from 88–92 % down to 65–70 % above and closed most
+  voting's end-to-end share from 88–92 % down to 69–77 % above and closed most
   of the fused/unfused gap in Lever 2.
 
 ## Not pursued (and why)

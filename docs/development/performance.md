@@ -17,15 +17,20 @@ regenerate it.
    | Stage | Function | Frequency |
    |-------|----------|-----------|
    | gradient | `compute_gradient` (Sobel) | once |
-   | voting | `frst_response` (unfused FRST) | once |
+   | voting | `frst_response_scaled` (unfused FRST + winning-radius map) | once |
    | extract | `extract_proposals` (NMS) | once |
    | score | `score_circle_support` | every proposal |
    | refine | `refine_circle` | accepted proposals only |
 
-   The gradient is computed once and reused by voting, scoring, and refinement —
-   so those stages stay cheap. As a faithfulness check, the sum of an image's
-   stage bars equals its end-to-end `detect_circles` time within a few percent
-   (the residual is diagnostics bookkeeping).
+   The voting stage times `frst_response_scaled`, not plain `frst_response` —
+   `run_detection` calls the scaled variant to get the per-pixel winning-radius
+   map used for per-proposal scale hints, and that map costs extra `best`/`scale`
+   buffer writes on top of the summed response. The gradient is computed once
+   and reused by voting, scoring, and refinement — so those stages stay cheap.
+   As a faithfulness check, the sum of an image's stage bars tracks its
+   end-to-end `detect_circles` time within a couple of percent (separate
+   `Instant::now()` calls per stage vs. one averaged end-to-end call account
+   for the residual, which can go either direction).
 
 2. **Voting-backend throughput** — FRST vs RSD, unfused vs fused, across image
    sizes, on synthetic disks with the gradient precomputed (radii `[5,7,9,11,13]`,
