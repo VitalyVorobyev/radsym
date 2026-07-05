@@ -20,6 +20,7 @@ All features are opt-in. The default build has zero optional dependencies.
 | `tracing`  | Structured logging                        | `tracing`          |
 | `affine`   | Experimental GFRS extensions              | none (code-gated)  |
 | `serde`    | Serialization for configs and results     | `serde`            |
+| `unsafe-opt` | Unchecked-indexing fast paths in the voting hot loops (RSD/FRST scatter) | none (code-gated) |
 
 ## Consequences
 
@@ -29,3 +30,11 @@ All features are opt-in. The default build has zero optional dependencies.
   the feature matrix compiles.
 - The `affine` feature gates an entire module, not individual items —
   keeps the feature boundary simple.
+
+## Update (2026-07-05)
+
+Added `unsafe-opt` (0.4.1) under the same principle: off by default, code-gated
+(no new dependency), identical output to the safe build (indices are proven
+in-bounds by preceding range checks). It exists purely to opt into the
+unchecked-indexing fast path in the voting scatter loops for callers who want
+the extra throughput.

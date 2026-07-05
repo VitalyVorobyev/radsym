@@ -68,6 +68,8 @@
 //! - `tracing` — structured logging
 //! - `affine` — experimental affine-aware extensions (GFRS)
 //! - `serde` — serialization support
+//! - `unsafe-opt` — unchecked-indexing fast paths in the voting hot loops
+//!   (RSD/FRST scatter); identical output to the safe build
 
 #![deny(missing_docs)]
 

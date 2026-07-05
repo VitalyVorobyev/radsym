@@ -2,9 +2,9 @@
   "meta": {
     "cpu": "Apple M4 Pro",
     "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
-    "git_sha": "961a32a",
-    "git_dirty": true,
-    "generated": "2026-06-25T18:59:38Z",
+    "git_sha": "e92389a",
+    "git_dirty": false,
+    "generated": "2026-07-05T18:53:09Z",
     "repeats": 50,
     "warmup": 5,
     "threads": "single",
@@ -27,12 +27,12 @@
         16
       ],
       "detections": 1,
-      "gradient_ms": 0.041,
-      "voting_ms": 3.506,
-      "extract_ms": 0.484,
+      "gradient_ms": 0.043,
+      "voting_ms": 1.372,
+      "extract_ms": 0.49,
       "score_ms": 0.003,
       "refine_ms": 0.004,
-      "end_to_end_ms": 3.943,
+      "end_to_end_ms": 2.018,
       "note": "Small radii [8-16], Sobel + FRST. Voting dominates; the gradient is computed once and reused by scoring and refinement."
     },
     {
@@ -51,12 +51,12 @@
         16
       ],
       "detections": 1,
-      "gradient_ms": 0.166,
-      "voting_ms": 15.43,
-      "extract_ms": 2.067,
-      "score_ms": 0.005,
-      "refine_ms": 0.005,
-      "end_to_end_ms": 17.76,
+      "gradient_ms": 0.154,
+      "voting_ms": 5.447,
+      "extract_ms": 2.075,
+      "score_ms": 0.004,
+      "refine_ms": 0.004,
+      "end_to_end_ms": 8.32,
       "note": "Same radii as the 256 case: cost grows with the response-map area, not the radii."
     },
     {
@@ -76,11 +76,11 @@
       ],
       "detections": 1,
       "gradient_ms": 0.579,
-      "voting_ms": 127.61,
-      "extract_ms": 10.738,
-      "score_ms": 0.008,
-      "refine_ms": 0.009,
-      "end_to_end_ms": 139.245,
+      "voting_ms": 23.217,
+      "extract_ms": 10.426,
+      "score_ms": 0.007,
+      "refine_ms": 0.006,
+      "end_to_end_ms": 35.51,
       "note": "Large image: 20 timed reps (see methodology)."
     },
     {
@@ -99,12 +99,12 @@
         16
       ],
       "detections": 60,
-      "gradient_ms": 0.25,
-      "voting_ms": 13.64,
-      "extract_ms": 3.526,
-      "score_ms": 0.261,
-      "refine_ms": 0.417,
-      "end_to_end_ms": 18.159,
+      "gradient_ms": 0.235,
+      "voting_ms": 10.514,
+      "extract_ms": 3.485,
+      "score_ms": 0.234,
+      "refine_ms": 0.416,
+      "end_to_end_ms": 15.668,
       "note": "Many proposals: per-proposal score + refine becomes visible, but five-radius FRST voting still dominates."
     },
     {
@@ -123,12 +123,12 @@
         40
       ],
       "detections": 5,
-      "gradient_ms": 1.711,
-      "voting_ms": 493.153,
-      "extract_ms": 39.004,
-      "score_ms": 0.038,
-      "refine_ms": 0.163,
-      "end_to_end_ms": 557.115,
+      "gradient_ms": 1.687,
+      "voting_ms": 115.728,
+      "extract_ms": 39.334,
+      "score_ms": 0.037,
+      "refine_ms": 0.162,
+      "end_to_end_ms": 165.438,
       "note": "Large image: 8 timed reps (see methodology)."
     }
   ],
@@ -139,85 +139,85 @@
         "algo": "frst",
         "variant": "unfused",
         "size": 256,
-        "ms": 4.251,
-        "melems_per_s": 15.4
+        "ms": 2.018,
+        "melems_per_s": 32.5
       },
       {
         "algo": "frst",
         "variant": "fused",
         "size": 256,
-        "ms": 1.227,
-        "melems_per_s": 53.4
+        "ms": 0.859,
+        "melems_per_s": 76.3
       },
       {
         "algo": "rsd",
         "variant": "unfused",
         "size": 256,
-        "ms": 4.009,
-        "melems_per_s": 16.3
+        "ms": 1.82,
+        "melems_per_s": 36.0
       },
       {
         "algo": "rsd",
         "variant": "fused",
         "size": 256,
-        "ms": 1.237,
-        "melems_per_s": 53.0
+        "ms": 0.853,
+        "melems_per_s": 76.8
       },
       {
         "algo": "frst",
         "variant": "unfused",
         "size": 512,
-        "ms": 18.489,
-        "melems_per_s": 14.2
+        "ms": 8.127,
+        "melems_per_s": 32.3
       },
       {
         "algo": "frst",
         "variant": "fused",
         "size": 512,
-        "ms": 5.518,
-        "melems_per_s": 47.5
+        "ms": 3.584,
+        "melems_per_s": 73.1
       },
       {
         "algo": "rsd",
         "variant": "unfused",
         "size": 512,
-        "ms": 17.807,
-        "melems_per_s": 14.7
+        "ms": 7.28,
+        "melems_per_s": 36.0
       },
       {
         "algo": "rsd",
         "variant": "fused",
         "size": 512,
-        "ms": 5.437,
-        "melems_per_s": 48.2
+        "ms": 3.595,
+        "melems_per_s": 72.9
       },
       {
         "algo": "frst",
         "variant": "unfused",
         "size": 1024,
-        "ms": 147.039,
-        "melems_per_s": 7.1
+        "ms": 35.056,
+        "melems_per_s": 29.9
       },
       {
         "algo": "frst",
         "variant": "fused",
         "size": 1024,
-        "ms": 27.994,
-        "melems_per_s": 37.5
+        "ms": 13.995,
+        "melems_per_s": 74.9
       },
       {
         "algo": "rsd",
         "variant": "unfused",
         "size": 1024,
-        "ms": 147.588,
-        "melems_per_s": 7.1
+        "ms": 31.195,
+        "melems_per_s": 33.6
       },
       {
         "algo": "rsd",
         "variant": "fused",
         "size": 1024,
-        "ms": 28.745,
-        "melems_per_s": 36.5
+        "ms": 14.02,
+        "melems_per_s": 74.8
       }
     ]
   },
@@ -231,17 +231,17 @@
       },
       {
         "name": "circle",
-        "us": 7.04,
+        "us": 7.08,
         "note": "iterative: radial-center + annulus radius re-estimate"
       },
       {
         "name": "ellipse",
-        "us": 80.94,
+        "us": 79.04,
         "note": "iterative edge search + guarded Gauss-Newton"
       },
       {
         "name": "homography",
-        "us": 68.5,
+        "us": 68.25,
         "note": "homography-aware ellipse refine in rectified space"
       }
     ]
@@ -252,27 +252,27 @@
       {
         "file": "synthetic:disk-256",
         "note": "Bright, radii [8, 10, 12, 14, 16]",
-        "ms": 3.943
+        "ms": 2.018
       },
       {
         "file": "synthetic:disk-512",
         "note": "Bright, radii [8, 10, 12, 14, 16]",
-        "ms": 17.76
+        "ms": 8.32
       },
       {
         "file": "synthetic:disk-1024",
         "note": "Bright, radii [8, 10, 12, 14, 16]",
-        "ms": 139.245
+        "ms": 35.51
       },
       {
         "file": "testdata/ringgrid.png",
         "note": "Dark, radii [8, 10, 12, 14, 16]",
-        "ms": 18.159
+        "ms": 15.668
       },
       {
         "file": "data/surf1.png",
         "note": "Bright, radii [20, 25, 30, 35, 40]",
-        "ms": 557.115
+        "ms": 165.438
       }
     ]
   }

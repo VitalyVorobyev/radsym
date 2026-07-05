@@ -30,7 +30,7 @@ Workspace with three crates:
                      homography, circle fitting (Kåsa)
 - `propose/`      — FRST, RSD, center voting, proposal extraction,
                      homography-aware FRST and reranking
-- `support/`      — annulus sampling, profiles, scoring, hypothesis types
+- `support/`      — annulus sampling, coverage analysis, evidence types, scoring
 - `refine/`       — Parthasarathy radial center, circle/ellipse refinement,
                      homography-aware ellipse refinement
 - `affine/`       — (feature-gated) affine-aware extensions (GFRS)

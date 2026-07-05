@@ -138,6 +138,7 @@ All features are opt-in. The default build has zero optional dependencies.
 | `tracing` | Structured logging |
 | `affine` | Experimental affine-aware extensions (GFRS) |
 | `serde` | Serialization for configs and results |
+| `unsafe-opt` | Unchecked-indexing fast paths in the voting hot loops (RSD/FRST scatter); identical output to the safe build |
 
 ## Conventions
 
@@ -153,6 +154,7 @@ All features are opt-in. The default build has zero optional dependencies.
 | RSD | Barnes, N., Zelinsky, A., Fletcher, L.S. *Real-time speed sign detection using the radial symmetry detector.* IEEE T-ITS 9(2), 2008 |
 | Radial center | Parthasarathy, R. *Rapid, accurate particle tracking by calculation of radial symmetry centers.* Nature Methods 9, 2012 |
 | GFRS | Ni, K., Singh, M., Bahlmann, C. *Fast Radial Symmetry Detection Under Affine Transformations.* CVPR, 2012 |
+| Gradient thinning (`core::gradient::thin_gradient`) | Canny, J. *A Computational Approach to Edge Detection.* IEEE TPAMI 8(6), 1986 |
 
 ## License
 
