@@ -93,7 +93,7 @@ pub use crate::core::error::{RadSymError, Result};
 pub use crate::core::geometry::{Annulus, Circle, Ellipse, Rect};
 pub use crate::core::gradient::{
     GradientField, GradientOperator, SourcePixel, compute_gradient, compute_gradient_f32,
-    scharr_gradient, scharr_gradient_f32, sobel_gradient, sobel_gradient_f32,
+    scharr_gradient, scharr_gradient_f32, sobel_gradient, sobel_gradient_f32, thin_gradient,
 };
 pub use crate::core::homography::{Homography, RectifiedGrid, rectified_circle_to_image_ellipse};
 pub use crate::core::image_view::{ImageView, OwnedImage};

@@ -200,6 +200,131 @@ pub fn gradient_magnitude(field: &GradientField) -> Result<OwnedImage<Scalar>> {
     Ok(mag)
 }
 
+/// Thin a gradient field to single-pixel-wide ridges via non-maximum
+/// suppression along the gradient direction (Canny-style edge thinning).
+///
+/// Each interior pixel's gradient orientation is quantized to one of four
+/// directions — 0°, 45°, 90°, 135° — using ratio tests on `(gx, gy)` (no
+/// `atan2`, no trigonometry). Its squared magnitude is compared against the two
+/// 8-neighbours straddling that direction; pixels that are not a local maximum
+/// along the gradient are set to `(0, 0)`. Multi-pixel-wide gradient bands
+/// collapse to a single ridge pixel, which sharpens center-voting responses and
+/// — with a positive gradient threshold — reduces the number of voting pixels.
+///
+/// Output dimensions match the input; the 1-pixel border stays zero, matching
+/// [`sobel_gradient`] / [`scharr_gradient`]. Images smaller than 3×3 in either
+/// axis have no interior and yield an all-zero field.
+///
+/// This is distinct from [`non_maximum_suppression`](crate::NmsConfig), which
+/// suppresses peaks of a scalar *response* map in a square window; this thins a
+/// *gradient* field along the gradient normal.
+///
+/// # Threshold note
+///
+/// Suppressed pixels are set to exactly zero, and the RSD/FRST voting gate skips
+/// a pixel only when `mag² < gradient_threshold²`. At a gradient threshold of
+/// `0.0`, a zeroed pixel is therefore *not* skipped (`0.0 < 0.0` is false):
+/// thinning still sharpens the response but does not reduce voting iterations.
+/// Use a small positive gradient threshold to reclaim the voting-cost reduction.
+///
+/// # References
+///
+/// Canny, J. (1986). *A Computational Approach to Edge Detection.* IEEE TPAMI
+/// 8(6), 679–698 — the non-maximum-suppression stage.
+///
+/// # Example
+///
+/// ```rust
+/// use radsym::{ImageView, scharr_gradient, thin_gradient};
+///
+/// let size = 32usize;
+/// let mut data = vec![0u8; size * size];
+/// for y in 0..size {
+///     for x in 16..size {
+///         data[y * size + x] = 255; // vertical step edge at x = 16
+///     }
+/// }
+/// let image = ImageView::from_slice(&data, size, size).unwrap();
+/// let grad = scharr_gradient(&image).unwrap();
+/// let thin = thin_gradient(&grad).unwrap();
+/// assert_eq!((thin.width(), thin.height()), (size, size));
+///
+/// // Thinning keeps no more active pixels than the raw field.
+/// let active = |g: &radsym::GradientField| {
+///     (0..g.height())
+///         .flat_map(|y| (0..g.width()).map(move |x| (x, y)))
+///         .filter(|&(x, y)| g.magnitude(x, y).unwrap() > 0.0)
+///         .count()
+/// };
+/// assert!(active(&thin) <= active(&grad));
+/// ```
+pub fn thin_gradient(field: &GradientField) -> Result<GradientField> {
+    let w = field.width();
+    let h = field.height();
+
+    let gx_in = field.gx.data();
+    let gy_in = field.gy.data();
+
+    // Read-only squared-magnitude scratch: never mutated during the pass, so the
+    // result is independent of traversal order (fully deterministic).
+    let mut mag_sq = vec![0.0f32; w * h];
+    for i in 0..w * h {
+        mag_sq[i] = gx_in[i] * gx_in[i] + gy_in[i] * gy_in[i];
+    }
+
+    let mut out_gx = OwnedImage::<Scalar>::zeros(w, h)?;
+    let mut out_gy = OwnedImage::<Scalar>::zeros(w, h)?;
+    let out_gx_data = out_gx.data_mut();
+    let out_gy_data = out_gy.data_mut();
+
+    // tan(22.5°) = √2 − 1, tan(67.5°) = √2 + 1.
+    const LO: Scalar = std::f32::consts::SQRT_2 - 1.0;
+    const HI: Scalar = std::f32::consts::SQRT_2 + 1.0;
+
+    // Interior only; borders stay zero. saturating_sub keeps tiny images safe.
+    for y in 1..h.saturating_sub(1) {
+        for x in 1..w.saturating_sub(1) {
+            let idx = y * w + x;
+            let m = mag_sq[idx];
+            if m == 0.0 {
+                continue; // no direction; nothing to keep
+            }
+
+            let gx = gx_in[idx];
+            let gy = gy_in[idx];
+            let ax = gx.abs();
+            let ay = gy.abs();
+
+            // Step toward the +gradient neighbour. sign picks, for the diagonal
+            // sector, the same-sign "\" vs opposite-sign "/" diagonal.
+            let sx: isize = if gx >= 0.0 { 1 } else { -1 };
+            let sy: isize = if gy >= 0.0 { 1 } else { -1 };
+            let (fx, fy): (isize, isize) = if ay < LO * ax {
+                (sx, 0) // horizontal gradient → compare left/right
+            } else if ay > HI * ax {
+                (0, sy) // vertical gradient → compare up/down
+            } else {
+                (sx, sy) // diagonal gradient
+            };
+
+            let fwd = mag_sq[(y as isize + fy) as usize * w + (x as isize + fx) as usize];
+            let bwd = mag_sq[(y as isize - fy) as usize * w + (x as isize - fx) as usize];
+
+            // Asymmetric tie-break (`>=` forward, `>` backward) so an equal-value
+            // band along the gradient reduces to exactly one pixel.
+            if m >= fwd && m > bwd {
+                out_gx_data[idx] = gx;
+                out_gy_data[idx] = gy;
+            }
+        }
+    }
+
+    Ok(GradientField {
+        gx: out_gx,
+        gy: out_gy,
+    })
+}
+
 /// Choice of 3x3 gradient operator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -399,6 +524,150 @@ mod tests {
         let grad = sobel_gradient(&image).unwrap();
         assert_eq!(grad.width(), 5);
         assert_eq!(grad.height(), 4);
+    }
+
+    /// Build a gradient field from raw component vectors (test-only).
+    fn field_from(w: usize, h: usize, gx: Vec<Scalar>, gy: Vec<Scalar>) -> GradientField {
+        GradientField {
+            gx: OwnedImage::from_vec(gx, w, h).unwrap(),
+            gy: OwnedImage::from_vec(gy, w, h).unwrap(),
+        }
+    }
+
+    #[test]
+    fn thin_reduces_horizontal_band_to_single_column() {
+        // 5x5 field, purely horizontal gradient (gy=0), triangular ridge across
+        // columns: magnitude 0,1,2,1,0 in every row. NMS along the gradient
+        // (left/right) must keep only the peak column (x=2) for interior rows.
+        let w = 5;
+        let h = 5;
+        let row = [0.0, 1.0, 2.0, 1.0, 0.0];
+        let mut gx = vec![0.0f32; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                gx[y * w + x] = row[x];
+            }
+        }
+        let field = field_from(w, h, gx, vec![0.0; w * h]);
+        let thin = thin_gradient(&field).unwrap();
+
+        for y in 0..h {
+            for x in 0..w {
+                let kept = thin.magnitude(x, y).unwrap() > 0.0;
+                // Only interior rows (1..=3) at the peak column x=2 survive.
+                let expect = (1..=3).contains(&y) && x == 2;
+                assert_eq!(
+                    kept, expect,
+                    "pixel ({x},{y}) kept={kept}, expected {expect}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn thin_reduces_vertical_band_to_single_row() {
+        // Transpose of the horizontal case: gx=0, gy ridge down the rows.
+        let w = 5;
+        let h = 5;
+        let col = [0.0, 1.0, 2.0, 1.0, 0.0];
+        let mut gy = vec![0.0f32; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                gy[y * w + x] = col[y];
+            }
+        }
+        let field = field_from(w, h, vec![0.0; w * h], gy);
+        let thin = thin_gradient(&field).unwrap();
+
+        for y in 0..h {
+            for x in 0..w {
+                let kept = thin.magnitude(x, y).unwrap() > 0.0;
+                let expect = y == 2 && (1..=3).contains(&x);
+                assert_eq!(
+                    kept, expect,
+                    "pixel ({x},{y}) kept={kept}, expected {expect}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn thin_preserves_surviving_gradient_values() {
+        // The kept peak must retain its exact (gx, gy), not a modified value.
+        let w = 5;
+        let h = 3;
+        let row = [0.0, 1.0, 2.0, 1.0, 0.0];
+        let mut gx = vec![0.0f32; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                gx[y * w + x] = row[x];
+            }
+        }
+        let field = field_from(w, h, gx, vec![0.0; w * h]);
+        let thin = thin_gradient(&field).unwrap();
+        let (gx_k, gy_k) = thin.get(2, 1).unwrap();
+        assert_eq!((gx_k, gy_k), (2.0, 0.0));
+    }
+
+    #[test]
+    fn thin_borders_stay_zero() {
+        // A sobel gradient of a disk, then confirm the 1px border is all zero.
+        let size = 32;
+        let mut data = vec![0u8; size * size];
+        for y in 0..size {
+            for x in 0..size {
+                let dx = x as f32 - 16.0;
+                let dy = y as f32 - 16.0;
+                if dx * dx + dy * dy <= 64.0 {
+                    data[y * size + x] = 255;
+                }
+            }
+        }
+        let image = ImageView::from_slice(&data, size, size).unwrap();
+        let thin = thin_gradient(&sobel_gradient(&image).unwrap()).unwrap();
+        for x in 0..size {
+            assert_eq!(thin.magnitude(x, 0).unwrap(), 0.0);
+            assert_eq!(thin.magnitude(x, size - 1).unwrap(), 0.0);
+        }
+        for y in 0..size {
+            assert_eq!(thin.magnitude(0, y).unwrap(), 0.0);
+            assert_eq!(thin.magnitude(size - 1, y).unwrap(), 0.0);
+        }
+    }
+
+    #[test]
+    fn thin_is_deterministic_and_idempotent() {
+        // Deterministic pseudo-pattern field with mixed directions.
+        let w = 16;
+        let h = 12;
+        let mut gx = vec![0.0f32; w * h];
+        let mut gy = vec![0.0f32; w * h];
+        for i in 0..w * h {
+            gx[i] = ((i * 7) % 11) as f32 - 5.0;
+            gy[i] = ((i * 13) % 9) as f32 - 4.0;
+        }
+        let field = field_from(w, h, gx, gy);
+
+        let a = thin_gradient(&field).unwrap();
+        let b = thin_gradient(&field).unwrap();
+        assert_eq!(a.gx.data(), b.gx.data(), "gx not deterministic");
+        assert_eq!(a.gy.data(), b.gy.data(), "gy not deterministic");
+
+        // Thinning an already-thinned field is stable.
+        let c = thin_gradient(&a).unwrap();
+        assert_eq!(a.gx.data(), c.gx.data(), "not idempotent (gx)");
+        assert_eq!(a.gy.data(), c.gy.data(), "not idempotent (gy)");
+    }
+
+    #[test]
+    fn thin_tiny_image_no_panic() {
+        for (w, h) in [(2usize, 2usize), (1, 5), (5, 1), (3, 1), (1, 1)] {
+            let field = field_from(w, h, vec![1.0; w * h], vec![1.0; w * h]);
+            let thin = thin_gradient(&field).unwrap();
+            // No interior → everything suppressed.
+            assert!(thin.gx.data().iter().all(|&v| v == 0.0));
+            assert!(thin.gy.data().iter().all(|&v| v == 0.0));
+        }
     }
 
     #[test]

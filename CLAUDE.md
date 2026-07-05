@@ -53,6 +53,9 @@ rightward, y increases downward. `PixelCoord = nalgebra::Point2<f32>`.
 - `tracing` — structured logging
 - `affine` — experimental affine-aware extensions
 - `serde` — serialization for configs/results
+- `unsafe-opt` — unchecked-indexing fast paths in the voting hot loops (RSD/FRST
+  scatter). Indices proven in-bounds by preceding range checks; identical output
+  to the safe build. Off by default; opt in for the voting speedup.
 
 ## Dependency Rules
 
@@ -107,6 +110,7 @@ rightward, y increases downward. `PixelCoord = nalgebra::Point2<f32>`.
 | Radial center | `refine::radial_center` | Parthasarathy, Nature Methods 2012 |
 | GFRS | `affine::propose` | Ni, Singh, Bahlmann, CVPR 2012 |
 | Kåsa circle fit | `core::circle_fit` | Kåsa, IEEE T-IM 1976 |
+| Gradient thinning (NMS) | `core::gradient::thin_gradient` | Canny, IEEE TPAMI 1986 |
 | Ellipse refinement | `refine::ellipse` | Fitzgibbon et al., TPAMI 1999 |
 | Homography FRST | `propose::homography` | Novel: FRST in rectified space |
 | Homography refinement | `refine::homography` | Novel: circle fit in rectified space |

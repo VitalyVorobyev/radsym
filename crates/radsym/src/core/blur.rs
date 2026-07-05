@@ -208,31 +208,62 @@ fn box_blur_horizontal(src: &[Scalar], dst: &mut [Scalar], w: usize, h: usize, r
     }
 }
 
+/// Number of adjacent columns processed together in the vertical pass.
+///
+/// A vertical box blur walks *down* columns; on a row-major buffer that is a
+/// stride-`w` access that touches a fresh cache line almost every step. Handling
+/// a strip of `VSTRIP` contiguous columns at once turns each row access into one
+/// fully-used 64-byte cache line and exposes `VSTRIP` independent running sums
+/// that the autovectorizer maps onto SIMD lanes. `16` = one cache line of `f32`
+/// and a clean multiple of both NEON (4) and AVX (8) widths.
+const VSTRIP: usize = 16;
+
 /// Vertical box blur pass using running sums. O(1) per pixel.
 ///
 /// Reads from `src`, writes to `dst`. Box radius `r` gives window width `2r+1`.
 /// Uses mirror-clamp boundary handling.
+///
+/// Columns are processed in [`VSTRIP`]-wide strips so the memory access is
+/// cache-line-contiguous and vectorizable. Each column's running sum is updated
+/// in exactly the same order as a naive per-column sweep, so the output is
+/// bit-identical to the scalar reference (see `vertical_strip_matches_naive`).
 fn box_blur_vertical(src: &[Scalar], dst: &mut [Scalar], w: usize, h: usize, r: usize) {
     let diameter = 2 * r + 1;
     let inv = 1.0 / diameter as Scalar;
     let h_i32 = h as i32;
 
-    for x in 0..w {
-        // Initialize running sum with the first window (centered at y=0)
-        let mut sum = 0.0f32;
+    let mut x0 = 0;
+    while x0 < w {
+        let cw = VSTRIP.min(w - x0);
+
+        // One running sum per column in the strip.
+        // One running sum per column in the strip.
+        let mut sums = [0.0f32; VSTRIP];
         for i in 0..diameter {
             let sy = (i as i32 - r as i32).clamp(0, h_i32 - 1) as usize;
-            sum += src[sy * w + x];
+            let base = sy * w + x0;
+            for c in 0..cw {
+                sums[c] += src[base + c];
+            }
         }
-        dst[x] = sum * inv;
+        for c in 0..cw {
+            dst[x0 + c] = sums[c] * inv;
+        }
 
-        // Slide the window down the column
+        // Slide all columns of the strip down together.
         for y in 1..h {
             let enter = (y as i32 + r as i32).clamp(0, h_i32 - 1) as usize;
             let leave = (y as i32 - r as i32 - 1).clamp(0, h_i32 - 1) as usize;
-            sum += src[enter * w + x] - src[leave * w + x];
-            dst[y * w + x] = sum * inv;
+            let ebase = enter * w + x0;
+            let lbase = leave * w + x0;
+            let obase = y * w + x0;
+            for c in 0..cw {
+                sums[c] += src[ebase + c] - src[lbase + c];
+                dst[obase + c] = sums[c] * inv;
+            }
         }
+
+        x0 += VSTRIP;
     }
 }
 
@@ -278,6 +309,48 @@ mod tests {
             "box blur should approximate Gaussian within 10%, got {:.1}%",
             relative_err * 100.0
         );
+    }
+
+    /// The cache-blocked vertical pass must be bit-identical to a naive
+    /// per-column sweep, including partial (non-VSTRIP-multiple) tail strips.
+    #[test]
+    fn vertical_strip_matches_naive() {
+        fn naive_vertical(src: &[Scalar], dst: &mut [Scalar], w: usize, h: usize, r: usize) {
+            let diameter = 2 * r + 1;
+            let inv = 1.0 / diameter as Scalar;
+            let h_i32 = h as i32;
+            for x in 0..w {
+                let mut sum = 0.0f32;
+                for i in 0..diameter {
+                    let sy = (i as i32 - r as i32).clamp(0, h_i32 - 1) as usize;
+                    sum += src[sy * w + x];
+                }
+                dst[x] = sum * inv;
+                for y in 1..h {
+                    let enter = (y as i32 + r as i32).clamp(0, h_i32 - 1) as usize;
+                    let leave = (y as i32 - r as i32 - 1).clamp(0, h_i32 - 1) as usize;
+                    sum += src[enter * w + x] - src[leave * w + x];
+                    dst[y * w + x] = sum * inv;
+                }
+            }
+        }
+
+        // Widths chosen to exercise full strips, a single strip, and tails of
+        // various widths (17 = 16 + 1, 30 = 16 + 14, 7 < 16).
+        for &(w, h) in &[(7usize, 9usize), (16, 16), (17, 5), (30, 13), (64, 40)] {
+            let mut src = vec![0.0f32; w * h];
+            for (i, v) in src.iter_mut().enumerate() {
+                // Deterministic non-trivial pattern.
+                *v = ((i * 37 % 251) as f32) - 125.0;
+            }
+            for &r in &[1usize, 3, 6] {
+                let mut a = vec![0.0f32; w * h];
+                let mut b = vec![0.0f32; w * h];
+                box_blur_vertical(&src, &mut a, w, h, r);
+                naive_vertical(&src, &mut b, w, h, r);
+                assert_eq!(a, b, "strip != naive for w={w} h={h} r={r}");
+            }
+        }
     }
 
     /// Box radii computation produces reasonable values.

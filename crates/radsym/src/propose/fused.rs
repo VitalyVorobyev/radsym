@@ -6,6 +6,8 @@ use crate::core::image_view::OwnedImage;
 use crate::core::polarity::Polarity;
 use crate::core::scalar::Scalar;
 
+use crate::core::unchecked::{add_at, ld};
+
 /// Compute the median of a non-empty slice of radii.
 pub(crate) fn compute_median_radius(radii: &[u32]) -> Scalar {
     let mut sorted = radii.to_vec();
@@ -45,8 +47,9 @@ pub(crate) fn fused_voting_pass(
     for y in 0..h {
         for x in 0..w {
             let idx = y * w + x;
-            let gx = gx_data[idx];
-            let gy = gy_data[idx];
+            // `idx = y*w + x` with `y < h`, `x < w` ⇒ `idx < w*h`, in bounds.
+            let gx = ld(gx_data, idx);
+            let gy = ld(gy_data, idx);
             let mag_sq = gx * gx + gy * gy;
             if mag_sq < thresh_sq {
                 continue;
@@ -66,7 +69,9 @@ pub(crate) fn fused_voting_pass(
                     let px = x as isize + offset_x;
                     let py = y as isize + offset_y;
                     if px >= 0 && (px as usize) < w && py >= 0 && (py as usize) < h {
-                        acc_data[py as usize * w + px as usize] += mag;
+                        // The `px`/`py` range test above proves the index is
+                        // `< w*h`, so `add_at` may skip the redundant check.
+                        add_at(acc_data, py as usize * w + px as usize, mag);
                     }
                 }
 
@@ -74,7 +79,7 @@ pub(crate) fn fused_voting_pass(
                     let px = x as isize - offset_x;
                     let py = y as isize - offset_y;
                     if px >= 0 && (px as usize) < w && py >= 0 && (py as usize) < h {
-                        acc_data[py as usize * w + px as usize] += mag;
+                        add_at(acc_data, py as usize * w + px as usize, mag);
                     }
                 }
             }

@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-05
+
+Performance release: the RSD/FRST proposal stage is 2.7–4× faster with
+**identical output**. Profiling showed the Gaussian blur — not the center
+voting — dominated `rsd_response_fused` (~96 % of its time at 1024²), caused by
+a cache-hostile column-major traversal in the box-blur vertical pass. Also adds
+an opt-in edge-thinning transform and an opt-in unchecked-indexing feature for
+the voting hot loops. No breaking changes.
+
+### Added
+
+- **`thin_gradient(&GradientField) -> Result<GradientField>`** — Canny-style
+  gradient-direction non-maximum suppression (4-direction quantization, no
+  `atan2`). Thins multi-pixel edge bands to single-pixel ridges before voting;
+  composes with every proposer. Re-exported at the crate root. Distinct from
+  `non_maximum_suppression` (which suppresses scalar response-map peaks). *Note:*
+  the voting-cost reduction requires a positive `gradient_threshold`; at the
+  default `0.0` it sharpens the response but does not skip the zeroed pixels.
+- **`unsafe-opt` feature** (default off) — enables unchecked-indexing fast paths
+  in the RSD/FRST voting scatter loops (`fused_voting_pass`,
+  `rsd_response_single`, FRST voting). Indices are proven in-bounds by preceding
+  range checks; the safe build (feature off) uses checked indexing with
+  **identical** numerical output (verified by the FRST bit-for-bit test on both
+  paths). ~20 % on the voting stage; ~3–4 % end-to-end where the blur dominates.
+
+### Changed
+
+- **Gaussian blur vertical pass is now cache-blocked** (16-column strips), fixing
+  the stride-`w` access that made it scale super-linearly. Bit-identical output
+  (guarded by a new reference test). Benchmarks (Apple M4 Pro, release):
+  `rsd_response_fused` −63 % @1024² (35.4 → 13.1 ms); `rsd_response` (5 per-radius
+  blurs) −75 % @1024² (129.6 → 32.7 ms); the blur alone ~7.4× faster.
+
 ## [0.4.0] - 2026-07-02
 
 Public-API revision: the public surface is narrowed to the intended contract,
@@ -398,7 +431,8 @@ Breaking for the `radsym` crate and both binding packages.
 - Zero unsafe code; zero clippy warnings; 138 unit and integration tests.
 - mdBook documentation with full mathematical derivations.
 
-[Unreleased]: https://github.com/VitalyVorobyev/radsym/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/VitalyVorobyev/radsym/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/VitalyVorobyev/radsym/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/VitalyVorobyev/radsym/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/VitalyVorobyev/radsym/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/VitalyVorobyev/radsym/compare/v0.1.4...v0.2.0
