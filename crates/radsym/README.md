@@ -12,7 +12,7 @@ single end-to-end pipeline.
 
 ```toml
 [dependencies]
-radsym = "0.2"
+radsym = "0.4"
 ```
 
 ## Quick start
