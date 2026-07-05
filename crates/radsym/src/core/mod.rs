@@ -17,3 +17,4 @@ pub mod nms;
 pub mod polarity;
 pub mod pyramid;
 pub mod scalar;
+pub(crate) mod unchecked;

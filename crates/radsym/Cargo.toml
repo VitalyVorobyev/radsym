@@ -43,6 +43,10 @@ image-io = ["dep:image"]
 tracing = ["dep:tracing", "box-image-pyramid/tracing"]
 affine = []
 serde = ["dep:serde", "nalgebra/serde-serialize"]
+# Enables unchecked-indexing fast paths in the blur and voting hot loops. The
+# indices are proven in-bounds by preceding range checks / loop bounds; the safe
+# build (feature off) uses checked indexing with identical numerical output.
+unsafe-opt = []
 
 [[bench]]
 name = "frst_bench"

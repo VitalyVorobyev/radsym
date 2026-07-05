@@ -80,7 +80,8 @@ impl Default for RsdConfig {
 #[inline]
 fn accumulate_vote(acc_data: &mut [Scalar], w: usize, h: usize, x: i32, y: i32, mag: Scalar) {
     if x >= 0 && (x as usize) < w && y >= 0 && (y as usize) < h {
-        acc_data[y as usize * w + x as usize] += mag;
+        // The range test proves `y*w + x < w*h`, in bounds for `acc_data`.
+        crate::core::unchecked::add_at(acc_data, y as usize * w + x as usize, mag);
     }
 }
 
@@ -121,8 +122,9 @@ pub fn rsd_response_single(
             for y in 0..h {
                 for x in 0..w {
                     let idx = y * w + x;
-                    let gx = gx_data[idx];
-                    let gy = gy_data[idx];
+                    // `idx = y*w + x` with `y < h`, `x < w` ⇒ `idx < w*h`.
+                    let gx = crate::core::unchecked::ld(gx_data, idx);
+                    let gy = crate::core::unchecked::ld(gy_data, idx);
                     let mag_sq = gx * gx + gy * gy;
                     if mag_sq < thresh_sq {
                         continue;
@@ -147,8 +149,9 @@ pub fn rsd_response_single(
             for y in 0..h {
                 for x in 0..w {
                     let idx = y * w + x;
-                    let gx = gx_data[idx];
-                    let gy = gy_data[idx];
+                    // `idx = y*w + x` with `y < h`, `x < w` ⇒ `idx < w*h`.
+                    let gx = crate::core::unchecked::ld(gx_data, idx);
+                    let gy = crate::core::unchecked::ld(gy_data, idx);
                     let mag_sq = gx * gx + gy * gy;
                     if mag_sq < thresh_sq {
                         continue;
@@ -173,8 +176,9 @@ pub fn rsd_response_single(
             for y in 0..h {
                 for x in 0..w {
                     let idx = y * w + x;
-                    let gx = gx_data[idx];
-                    let gy = gy_data[idx];
+                    // `idx = y*w + x` with `y < h`, `x < w` ⇒ `idx < w*h`.
+                    let gx = crate::core::unchecked::ld(gx_data, idx);
+                    let gy = crate::core::unchecked::ld(gy_data, idx);
                     let mag_sq = gx * gx + gy * gy;
                     if mag_sq < thresh_sq {
                         continue;
@@ -296,7 +300,7 @@ pub fn rsd_response_fused(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::gradient::sobel_gradient;
+    use crate::core::gradient::{sobel_gradient, thin_gradient};
     use crate::core::image_view::ImageView;
     use crate::core::nms::{NmsConfig, non_maximum_suppression};
 
@@ -347,6 +351,72 @@ mod tests {
             "peak at ({}, {}) too far from center ({cx}, {cy}), error={err}",
             best.position.x,
             best.position.y
+        );
+    }
+
+    #[test]
+    fn thin_then_rsd_still_detects_center() {
+        // Accuracy-preserving acceptance: thinning the gradient before voting
+        // must still localize the disk center (within the same 5px tolerance).
+        let size = 64;
+        let cx = 32.0;
+        let cy = 32.0;
+        let data = make_disk(size, cx, cy, 8.0);
+        let image = ImageView::from_slice(&data, size, size).unwrap();
+        let grad = sobel_gradient(&image).unwrap();
+        let thin = thin_gradient(&grad).unwrap();
+
+        let config = RsdConfig {
+            radii: vec![7, 8, 9],
+            polarity: Polarity::Bright,
+            gradient_threshold: 1.0, // positive: where the voting-cost win lives
+            ..RsdConfig::default()
+        };
+        let response = rsd_response_fused(&thin, &config).unwrap();
+
+        let peaks = non_maximum_suppression(
+            &response.view(),
+            &NmsConfig {
+                radius: 5,
+                threshold: 0.0,
+                max_detections: 5,
+            },
+        );
+
+        assert!(!peaks.is_empty(), "should detect at least one peak");
+        let best = &peaks[0];
+        let err = ((best.position.x - cx).powi(2) + (best.position.y - cy).powi(2)).sqrt();
+        assert!(
+            err < 5.0,
+            "thinned peak at ({}, {}) too far from center ({cx}, {cy}), error={err}",
+            best.position.x,
+            best.position.y
+        );
+    }
+
+    #[test]
+    fn thin_reduces_voting_pixel_count() {
+        // The mechanism behind the perf win: thinning cuts the number of pixels
+        // whose magnitude clears a positive threshold.
+        let size = 96;
+        let data = make_disk(size, 48.0, 48.0, 16.0);
+        let image = ImageView::from_slice(&data, size, size).unwrap();
+        let grad = sobel_gradient(&image).unwrap();
+        let thin = thin_gradient(&grad).unwrap();
+
+        let threshold = 1.0f32;
+        let count = |g: &crate::core::gradient::GradientField| -> usize {
+            (0..g.height())
+                .flat_map(|y| (0..g.width()).map(move |x| (x, y)))
+                .filter(|&(x, y)| g.magnitude(x, y).unwrap() > threshold)
+                .count()
+        };
+        let before = count(&grad);
+        let after = count(&thin);
+        assert!(before > 0);
+        assert!(
+            after < before,
+            "thinning should reduce strong-edge count: before={before}, after={after}"
         );
     }
 

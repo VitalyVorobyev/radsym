@@ -34,6 +34,7 @@ use crate::core::gradient::GradientField;
 use crate::core::image_view::OwnedImage;
 use crate::core::polarity::Polarity;
 use crate::core::scalar::Scalar;
+use crate::core::unchecked::{add_at, ld};
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
@@ -239,8 +240,9 @@ fn frst_single_into(
     for y in 0..h {
         for x in 0..w {
             let idx = y * w + x;
-            let gx = gx_data[idx];
-            let gy = gy_data[idx];
+            // `idx = y*w + x` with `y < h`, `x < w` ⇒ `idx < w*h`.
+            let gx = ld(gx_data, idx);
+            let gy = ld(gy_data, idx);
             let mag_sq = gx * gx + gy * gy;
 
             if mag_sq < thresh_sq {
@@ -259,9 +261,10 @@ fn frst_single_into(
                 let px = x as i32 + offset_x;
                 let py = y as i32 + offset_y;
                 if px >= 0 && (px as usize) < w && py >= 0 && (py as usize) < h {
+                    // The range test proves `pidx < w*h`, in bounds for both.
                     let pidx = py as usize * w + px as usize;
-                    o_data[pidx] += 1.0;
-                    m_data[pidx] += mag;
+                    add_at(o_data, pidx, 1.0);
+                    add_at(m_data, pidx, mag);
                 }
             }
 
@@ -270,8 +273,8 @@ fn frst_single_into(
                 let py = y as i32 - offset_y;
                 if px >= 0 && (px as usize) < w && py >= 0 && (py as usize) < h {
                     let pidx = py as usize * w + px as usize;
-                    o_data[pidx] -= 1.0;
-                    m_data[pidx] += mag;
+                    add_at(o_data, pidx, -1.0);
+                    add_at(m_data, pidx, mag);
                 }
             }
         }
@@ -915,8 +918,9 @@ mod tests {
         for y in 0..h {
             for x in 0..w {
                 let idx = y * w + x;
-                let gx = gx_data[idx];
-                let gy = gy_data[idx];
+                // `idx = y*w + x` with `y < h`, `x < w` ⇒ `idx < w*h`.
+                let gx = ld(gx_data, idx);
+                let gy = ld(gy_data, idx);
                 let mag_sq = gx * gx + gy * gy;
                 if mag_sq < thresh_sq {
                     continue;
@@ -931,9 +935,10 @@ mod tests {
                     let px = x as i32 + offset_x;
                     let py = y as i32 + offset_y;
                     if px >= 0 && (px as usize) < w && py >= 0 && (py as usize) < h {
+                        // The range test proves `pidx < w*h`, in bounds for both.
                         let pidx = py as usize * w + px as usize;
-                        o_data[pidx] += 1.0;
-                        m_data[pidx] += mag;
+                        add_at(o_data, pidx, 1.0);
+                        add_at(m_data, pidx, mag);
                     }
                 }
                 if vote_neg {
@@ -941,8 +946,8 @@ mod tests {
                     let py = y as i32 - offset_y;
                     if px >= 0 && (px as usize) < w && py >= 0 && (py as usize) < h {
                         let pidx = py as usize * w + px as usize;
-                        o_data[pidx] -= 1.0;
-                        m_data[pidx] += mag;
+                        add_at(o_data, pidx, -1.0);
+                        add_at(m_data, pidx, mag);
                     }
                 }
             }
