@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+use std::hint::black_box;
+use std::time::{Duration, Instant};
+
 use radsym::core::gradient::sobel_gradient;
 use radsym::core::nms::NmsConfig;
 use radsym::core::polarity::Polarity;
@@ -181,17 +184,9 @@ pub fn detect_case_image(image: &OwnedImage<u8>, level: u8) -> Result<SyntheticS
     let radii = build_radius_band(radius_hint, 5);
 
     let gradient = sobel_gradient(&working_image)?;
-    let mut frst_config = FrstConfig::default();
-    frst_config.radii = radii.clone();
-    frst_config.alpha = 2.0;
-    frst_config.gradient_threshold = 1.5;
-    frst_config.polarity = Polarity::Bright;
-    frst_config.smoothing_factor = 0.5;
+    let frst_config = surf_frst_config(radii.clone());
     let response = radsym::frst_response(&gradient, &frst_config)?;
-    let mut nms_config = NmsConfig::default();
-    nms_config.radius = (radius_hint * 0.8).round().max(10.0) as usize;
-    nms_config.threshold = 0.01;
-    nms_config.max_detections = 12;
+    let nms_config = surf_nms_config(radius_hint);
     let proposals = extract_proposals(&response, &nms_config, Polarity::Bright);
 
     if proposals.is_empty() {
@@ -221,6 +216,326 @@ pub fn detect_case_image(image: &OwnedImage<u8>, level: u8) -> Result<SyntheticS
         proposals,
         best,
         candidates,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Shared config builders — single source of truth for the surf-hole pipeline,
+// used by both `detect_case_image`/`rank_candidates` (the CI-tested detection)
+// and `time_case_once` (the perf page's stage timing) so the two never drift.
+// ---------------------------------------------------------------------------
+
+fn surf_frst_config(radii: Vec<u32>) -> FrstConfig {
+    let mut frst_config = FrstConfig::default();
+    frst_config.radii = radii;
+    frst_config.alpha = 2.0;
+    frst_config.gradient_threshold = 1.5;
+    frst_config.polarity = Polarity::Bright;
+    frst_config.smoothing_factor = 0.5;
+    frst_config
+}
+
+fn surf_nms_config(radius_hint: f32) -> NmsConfig {
+    let mut nms_config = NmsConfig::default();
+    nms_config.radius = (radius_hint * 0.8).round().max(10.0) as usize;
+    nms_config.threshold = 0.01;
+    nms_config.max_detections = 12;
+    nms_config
+}
+
+fn surf_rank_scoring_config() -> ScoringConfig {
+    let mut scoring_config = ScoringConfig::default();
+    scoring_config.annulus_margin = 0.12;
+    scoring_config.min_samples = 32;
+    scoring_config
+}
+
+fn surf_ellipse_refine_config() -> EllipseRefineConfig {
+    let mut refine_advanced = EllipseRefineAdvanced::default();
+    refine_advanced.ray_count = 96;
+    refine_advanced.radial_search_inner = 0.60;
+    refine_advanced.radial_search_outer = 1.45;
+    refine_advanced.normal_search_half_width = 6.0;
+    refine_advanced.min_inlier_coverage = 0.60;
+    let mut refine_config = EllipseRefineConfig::default();
+    refine_config.max_iterations = 5;
+    refine_config.convergence_tol = 0.05;
+    refine_config.max_center_shift_fraction = 0.40;
+    refine_config.max_axis_ratio = 1.80;
+    refine_config.advanced = refine_advanced;
+    refine_config
+}
+
+/// Wall-clock cost of each stage of one [`detect_case_image`] pass.
+///
+/// Mirrors the five stage bars the performance page draws for other cases:
+/// gradient (pyramid downsample + Sobel), voting (FRST), extract (NMS), score
+/// (per-proposal radius sweep), and refine (per-candidate ellipse fit).
+#[derive(Clone, Copy, Debug)]
+pub struct SurfStageDurations {
+    pub gradient: Duration,
+    pub voting: Duration,
+    pub extract: Duration,
+    pub score: Duration,
+    pub refine: Duration,
+}
+
+/// Run one full [`detect_case_image`]-equivalent pass, timing each stage.
+///
+/// Reproduces the exact stage sequence of [`detect_case_image`] using the same
+/// shared config builders and helpers, so the reported bars stay faithful to the
+/// detection whose ellipse the page overlays. The one-time pyramid downsample is
+/// folded into the `gradient` stage (detection runs on the small working image,
+/// so the stage bars do not sum to a full-resolution `detect_circles` cost).
+pub fn time_case_once(image: &OwnedImage<u8>, level: u8) -> Result<SurfStageDurations> {
+    // Stage 1: pyramid downsample + Sobel gradient on the working image.
+    let t = Instant::now();
+    let pyramid = pyramid_level_owned(&image.view(), level)?;
+    let working_image = pyramid.image();
+    let gradient = sobel_gradient(&working_image)?;
+    let gradient_dur = t.elapsed();
+
+    let working_size = working_image.width().min(working_image.height()) as f32;
+    let radius_hint = (working_size * 0.16).max(14.0);
+    let radii = build_radius_band(radius_hint, 5);
+
+    // Stage 2: FRST voting.
+    let frst_config = surf_frst_config(radii);
+    let t = Instant::now();
+    let response = radsym::frst_response(black_box(&gradient), black_box(&frst_config))?;
+    let voting_dur = t.elapsed();
+
+    // Stage 3: NMS proposal extraction.
+    let nms_config = surf_nms_config(radius_hint);
+    let t = Instant::now();
+    let proposals = extract_proposals(black_box(&response), &nms_config, Polarity::Bright);
+    let extract_dur = t.elapsed();
+
+    if proposals.is_empty() {
+        return Err(RadSymError::DegenerateHypothesis {
+            reason: "no proposals remained after extraction",
+        });
+    }
+
+    // Stage 4: per-proposal radius sweep → ellipse seeds (mirrors rank_candidates).
+    let t = Instant::now();
+    let mut seeds = Vec::with_capacity(proposals.len().min(12));
+    for proposal in proposals.iter().take(12) {
+        let center = proposal.seed.position;
+        let (radius_sweep_radius, _) = sweep_radius_at_center(&gradient, center, radius_hint);
+        let seed_radius = radius_sweep_radius.max(0.8 * radius_hint);
+        seeds.push(Ellipse::new(center, seed_radius, seed_radius, 0.0));
+    }
+    let score_dur = t.elapsed();
+
+    // Stage 5: per-candidate ellipse refinement.
+    let refine_config = surf_ellipse_refine_config();
+    let t = Instant::now();
+    for seed in &seeds {
+        let _ = black_box(refine_ellipse(
+            black_box(&gradient),
+            black_box(seed),
+            &refine_config,
+        ));
+    }
+    let refine_dur = t.elapsed();
+
+    Ok(SurfStageDurations {
+        gradient: gradient_dur,
+        voting: voting_dur,
+        extract: extract_dur,
+        score: score_dur,
+        refine: refine_dur,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Multi-ellipse detection: recover ALL elliptical features (the target hole
+// plus the smaller distractors), not just the single best one. Used by the
+// performance page to show that varied-scale ellipses are all localised.
+// ---------------------------------------------------------------------------
+
+/// FRST radii spanning the small distractors up to the large target hole (on
+/// the level-3 working image); wider than [`surf_frst_config`]'s target-only band.
+const MULTI_SEED_RADII: [f32; 4] = [8.0, 14.0, 22.0, 30.0];
+/// Two full-res detections closer than this are treated as the same feature.
+const MULTI_DEDUPE_DIST: f32 = 60.0;
+/// Minimum ellipse support (ringness+coverage) to accept a refined candidate.
+const MULTI_MIN_SUPPORT: f32 = 0.4;
+
+/// One detected elliptical feature, in both working- and full-image frames.
+#[derive(Clone, Copy, Debug)]
+pub struct SurfEllipse {
+    /// Ellipse in full-resolution image coordinates (for overlays/GT checks).
+    pub image_ellipse: Ellipse,
+    /// Ellipse in the downsampled working-image frame.
+    pub working_ellipse: Ellipse,
+    /// Support score (0..1) at acceptance.
+    pub support: f32,
+}
+
+/// All elliptical features found in a surf-hole image.
+#[derive(Clone, Debug)]
+pub struct SurfMultiDetection {
+    pub level: u8,
+    pub radii: Vec<u32>,
+    pub proposal_count: usize,
+    /// Accepted ellipses, strongest support first.
+    pub ellipses: Vec<SurfEllipse>,
+}
+
+fn surf_multi_frst_config() -> FrstConfig {
+    let mut frst_config = FrstConfig::default();
+    frst_config.radii = vec![6, 9, 12, 16, 20, 26, 32];
+    frst_config.alpha = 2.0;
+    frst_config.gradient_threshold = 1.5;
+    frst_config.polarity = Polarity::Bright;
+    frst_config.smoothing_factor = 0.5;
+    frst_config
+}
+
+fn surf_multi_nms_config() -> NmsConfig {
+    let mut nms_config = NmsConfig::default();
+    nms_config.radius = 8;
+    nms_config.threshold = 0.01;
+    nms_config.max_detections = 16;
+    nms_config
+}
+
+fn surf_multi_scoring_config() -> ScoringConfig {
+    let mut scoring_config = ScoringConfig::default();
+    scoring_config.annulus_margin = 0.15;
+    scoring_config.min_samples = 16;
+    scoring_config
+}
+
+fn surf_multi_refine_config() -> EllipseRefineConfig {
+    let mut refine_advanced = EllipseRefineAdvanced::default();
+    refine_advanced.ray_count = 96;
+    refine_advanced.radial_search_inner = 0.55;
+    refine_advanced.radial_search_outer = 1.5;
+    refine_advanced.normal_search_half_width = 6.0;
+    refine_advanced.min_inlier_coverage = 0.5;
+    let mut refine_config = EllipseRefineConfig::default();
+    refine_config.max_iterations = 6;
+    refine_config.convergence_tol = 0.05;
+    refine_config.max_center_shift_fraction = 0.45;
+    refine_config.max_axis_ratio = 2.2;
+    refine_config.advanced = refine_advanced;
+    refine_config
+}
+
+/// Detect every elliptical feature (target hole + distractors) in a surf image.
+///
+/// Runs FRST over a wide radius band on the level-`level` working image, refines
+/// each proposal into an ellipse from several seed radii, keeps well-supported
+/// fits, and deduplicates by full-resolution center. Returns ellipses sorted by
+/// descending support.
+pub fn detect_all_ellipses(image: &OwnedImage<u8>, level: u8) -> Result<SurfMultiDetection> {
+    let pyramid = pyramid_level_owned(&image.view(), level)?;
+    let working_image = pyramid.image();
+    let gradient = sobel_gradient(&working_image)?;
+
+    let frst_config = surf_multi_frst_config();
+    let radii = frst_config.radii.clone();
+    let response = radsym::frst_response(&gradient, &frst_config)?;
+    let proposals = extract_proposals(&response, &surf_multi_nms_config(), Polarity::Bright);
+    let proposal_count = proposals.len();
+
+    let scoring_config = surf_multi_scoring_config();
+    let refine_config = surf_multi_refine_config();
+    let mut candidates: Vec<SurfEllipse> = Vec::new();
+    for proposal in &proposals {
+        for &seed_radius in &MULTI_SEED_RADII {
+            let seed = Ellipse::new(proposal.seed.position, seed_radius, seed_radius, 0.0);
+            let Ok(refined) = refine_ellipse(&gradient, &seed, &refine_config) else {
+                continue;
+            };
+            let working_ellipse = refined.hypothesis;
+            let support =
+                score_ellipse_support_detailed(&gradient, &working_ellipse, &scoring_config);
+            if support.is_degenerate || support.total <= MULTI_MIN_SUPPORT {
+                continue;
+            }
+            candidates.push(SurfEllipse {
+                image_ellipse: pyramid.map_ellipse_to_image(working_ellipse),
+                working_ellipse,
+                support: support.total,
+            });
+        }
+    }
+
+    candidates.sort_by(|a, b| b.support.total_cmp(&a.support));
+    let mut ellipses: Vec<SurfEllipse> = Vec::new();
+    for candidate in candidates {
+        let is_new = ellipses.iter().all(|kept| {
+            (kept.image_ellipse.center.x - candidate.image_ellipse.center.x)
+                .hypot(kept.image_ellipse.center.y - candidate.image_ellipse.center.y)
+                > MULTI_DEDUPE_DIST
+        });
+        if is_new {
+            ellipses.push(candidate);
+        }
+    }
+
+    Ok(SurfMultiDetection {
+        level,
+        radii,
+        proposal_count,
+        ellipses,
+    })
+}
+
+/// Time the [`detect_all_ellipses`] stages for the performance page (same five
+/// bars as the other cases; the one-time pyramid downsample folds into gradient).
+pub fn time_multi_once(image: &OwnedImage<u8>, level: u8) -> Result<SurfStageDurations> {
+    let t = Instant::now();
+    let pyramid = pyramid_level_owned(&image.view(), level)?;
+    let working_image = pyramid.image();
+    let gradient = sobel_gradient(&working_image)?;
+    let gradient_dur = t.elapsed();
+
+    let frst_config = surf_multi_frst_config();
+    let t = Instant::now();
+    let response = radsym::frst_response(black_box(&gradient), black_box(&frst_config))?;
+    let voting_dur = t.elapsed();
+
+    let t = Instant::now();
+    let proposals = extract_proposals(
+        black_box(&response),
+        &surf_multi_nms_config(),
+        Polarity::Bright,
+    );
+    let extract_dur = t.elapsed();
+
+    let scoring_config = surf_multi_scoring_config();
+    let refine_config = surf_multi_refine_config();
+    let mut refine_dur = Duration::ZERO;
+    let mut score_dur = Duration::ZERO;
+    for proposal in &proposals {
+        for &seed_radius in &MULTI_SEED_RADII {
+            let seed = Ellipse::new(proposal.seed.position, seed_radius, seed_radius, 0.0);
+            let t = Instant::now();
+            let refined = refine_ellipse(black_box(&gradient), black_box(&seed), &refine_config);
+            refine_dur += t.elapsed();
+            if let Ok(refined) = refined {
+                let t = Instant::now();
+                let _ = black_box(score_ellipse_support_detailed(
+                    black_box(&gradient),
+                    black_box(&refined.hypothesis),
+                    &scoring_config,
+                ));
+                score_dur += t.elapsed();
+            }
+        }
+    }
+
+    Ok(SurfStageDurations {
+        gradient: gradient_dur,
+        voting: voting_dur,
+        extract: extract_dur,
+        score: score_dur,
+        refine: refine_dur,
     })
 }
 
@@ -289,21 +604,8 @@ fn rank_candidates(
     let center_x = width as f32 * 0.5;
     let center_y = height as f32 * 0.5;
     let max_center_distance = center_x.hypot(center_y);
-    let mut scoring_config = ScoringConfig::default();
-    scoring_config.annulus_margin = 0.12;
-    scoring_config.min_samples = 32;
-    let mut refine_advanced = EllipseRefineAdvanced::default();
-    refine_advanced.ray_count = 96;
-    refine_advanced.radial_search_inner = 0.60;
-    refine_advanced.radial_search_outer = 1.45;
-    refine_advanced.normal_search_half_width = 6.0;
-    refine_advanced.min_inlier_coverage = 0.60;
-    let mut refine_config = EllipseRefineConfig::default();
-    refine_config.max_iterations = 5;
-    refine_config.convergence_tol = 0.05;
-    refine_config.max_center_shift_fraction = 0.40;
-    refine_config.max_axis_ratio = 1.80;
-    refine_config.advanced = refine_advanced;
+    let scoring_config = surf_rank_scoring_config();
+    let refine_config = surf_ellipse_refine_config();
 
     let mut ranked = Vec::new();
     for proposal in proposals.iter().take(12) {

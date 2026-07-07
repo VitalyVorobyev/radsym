@@ -2,9 +2,9 @@
   "meta": {
     "cpu": "Apple M4 Pro",
     "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
-    "git_sha": "bd2c8e6",
-    "git_dirty": false,
-    "generated": "2026-07-05T19:20:07Z",
+    "git_sha": "a2646e4",
+    "git_dirty": true,
+    "generated": "2026-07-05T21:00:51Z",
     "repeats": 50,
     "warmup": 5,
     "threads": "single",
@@ -15,121 +15,123 @@
       "label": "Synthetic disk 256",
       "kind": "synthetic disk",
       "file": "synthetic:disk-256",
-      "img": null,
+      "img": "img/disk-256.png",
       "width": 256,
       "height": 256,
       "polarity": "Bright",
       "radii": [
-        8,
         10,
+        11,
         12,
-        14,
-        16
+        13,
+        14
       ],
       "detections": 1,
-      "gradient_ms": 0.044,
-      "voting_ms": 1.529,
-      "extract_ms": 0.509,
-      "score_ms": 0.004,
+      "gradient_ms": 0.041,
+      "voting_ms": 3.351,
+      "extract_ms": 0.476,
+      "score_ms": 0.003,
       "refine_ms": 0.004,
-      "end_to_end_ms": 2.071,
-      "note": "Small radii [8-16], Sobel + FRST. Voting dominates; the gradient is computed once and reused by scoring and refinement."
+      "end_to_end_ms": 3.888,
+      "note": "Radii bracket the radius-12 disk, Sobel + FRST. Voting dominates; the gradient is computed once and reused by scoring and refinement."
     },
     {
       "label": "Synthetic disk 512",
       "kind": "synthetic disk",
       "file": "synthetic:disk-512",
-      "img": null,
+      "img": "img/disk-512.png",
       "width": 512,
       "height": 512,
       "polarity": "Bright",
       "radii": [
-        8,
         10,
+        11,
         12,
-        14,
-        16
+        13,
+        14
       ],
       "detections": 1,
-      "gradient_ms": 0.173,
-      "voting_ms": 6.029,
-      "extract_ms": 2.142,
-      "score_ms": 0.005,
-      "refine_ms": 0.005,
-      "end_to_end_ms": 8.286,
+      "gradient_ms": 0.152,
+      "voting_ms": 12.022,
+      "extract_ms": 2.052,
+      "score_ms": 0.003,
+      "refine_ms": 0.004,
+      "end_to_end_ms": 14.557,
       "note": "Same radii as the 256 case: cost grows with the response-map area, not the radii."
     },
     {
       "label": "Synthetic disk 1024",
       "kind": "synthetic disk",
       "file": "synthetic:disk-1024",
-      "img": null,
+      "img": "img/disk-1024.png",
       "width": 1024,
       "height": 1024,
       "polarity": "Bright",
       "radii": [
-        8,
         10,
+        11,
         12,
-        14,
-        16
+        13,
+        14
       ],
       "detections": 1,
-      "gradient_ms": 0.575,
-      "voting_ms": 26.374,
-      "extract_ms": 11.874,
-      "score_ms": 0.008,
-      "refine_ms": 0.009,
-      "end_to_end_ms": 38.656,
+      "gradient_ms": 0.563,
+      "voting_ms": 48.411,
+      "extract_ms": 12.338,
+      "score_ms": 0.006,
+      "refine_ms": 0.005,
+      "end_to_end_ms": 63.594,
       "note": "Large image: 20 timed reps (see methodology)."
     },
     {
       "label": "Ring grid",
       "kind": "ring grid",
       "file": "testdata/ringgrid.png",
-      "img": null,
+      "img": "img/ringgrid.png",
       "width": 720,
       "height": 540,
       "polarity": "Dark",
       "radii": [
-        8,
-        10,
-        12,
-        14,
-        16
+        18,
+        20,
+        22,
+        24,
+        26
       ],
-      "detections": 60,
-      "gradient_ms": 0.258,
-      "voting_ms": 13.069,
-      "extract_ms": 3.754,
-      "score_ms": 0.295,
-      "refine_ms": 0.437,
-      "end_to_end_ms": 17.181,
-      "note": "Many proposals: per-proposal score + refine becomes visible, but five-radius FRST voting still dominates."
+      "detections": 130,
+      "gradient_ms": 0.232,
+      "voting_ms": 10.143,
+      "extract_ms": 3.194,
+      "score_ms": 14.182,
+      "refine_ms": 27.926,
+      "end_to_end_ms": 55.984,
+      "note": "Each ring's outer (rose) and inner (blue) ellipse via RSD centre voting + local ellipse refinement. Recovers all 63 labelled outer centres to sub-pixel accuracy (mean centre error ~0.5px, axis error ~0.4px)."
     },
     {
-      "label": "Surface hole",
+      "label": "Surface hole (synthetic)",
       "kind": "surface hole",
-      "file": "data/surf1.png",
-      "img": null,
+      "file": "synthetic:surf-hole",
+      "img": "img/surf-hole.png",
       "width": 2048,
       "height": 1536,
       "polarity": "Bright",
       "radii": [
+        6,
+        9,
+        12,
+        16,
         20,
-        25,
-        30,
-        35,
-        40
+        26,
+        32
       ],
-      "detections": 5,
-      "gradient_ms": 1.737,
-      "voting_ms": 138.59,
-      "extract_ms": 40.523,
-      "score_ms": 0.037,
-      "refine_ms": 0.16,
-      "end_to_end_ms": 180.879,
-      "note": "Large image: 8 timed reps (see methodology)."
+      "detections": 3,
+      "gradient_ms": 0.1,
+      "voting_ms": 1.439,
+      "extract_ms": 0.357,
+      "score_ms": 0.058,
+      "refine_ms": 1.686,
+      "end_to_end_ms": 3.597,
+      "note": "Generated stand-in for the private surf dataset (its pixels are not published). All three elliptical features (the large tilted hole plus two smaller distractors) detected via the pyramid (level 3) + multi-scale ellipse pipeline; correctness is CI-asserted by tests/perf_export_surf.rs. The one-time downsample is folded into the gradient bar, so detection runs on the small working image. Large image: 8 timed reps (see methodology)."
     }
   ],
   "throughput": {
@@ -139,85 +141,85 @@
         "algo": "frst",
         "variant": "unfused",
         "size": 256,
-        "ms": 2.082,
-        "melems_per_s": 31.5
+        "ms": 2.019,
+        "melems_per_s": 32.5
       },
       {
         "algo": "frst",
         "variant": "fused",
         "size": 256,
-        "ms": 0.886,
-        "melems_per_s": 74.0
+        "ms": 0.85,
+        "melems_per_s": 77.1
       },
       {
         "algo": "rsd",
         "variant": "unfused",
         "size": 256,
-        "ms": 1.943,
-        "melems_per_s": 33.7
+        "ms": 1.803,
+        "melems_per_s": 36.3
       },
       {
         "algo": "rsd",
         "variant": "fused",
         "size": 256,
-        "ms": 0.932,
-        "melems_per_s": 70.4
+        "ms": 0.846,
+        "melems_per_s": 77.5
       },
       {
         "algo": "frst",
         "variant": "unfused",
         "size": 512,
-        "ms": 9.89,
-        "melems_per_s": 26.5
+        "ms": 8.12,
+        "melems_per_s": 32.3
       },
       {
         "algo": "frst",
         "variant": "fused",
         "size": 512,
-        "ms": 5.135,
-        "melems_per_s": 51.0
+        "ms": 3.421,
+        "melems_per_s": 76.6
       },
       {
         "algo": "rsd",
         "variant": "unfused",
         "size": 512,
-        "ms": 7.719,
-        "melems_per_s": 34.0
+        "ms": 7.25,
+        "melems_per_s": 36.2
       },
       {
         "algo": "rsd",
         "variant": "fused",
         "size": 512,
-        "ms": 3.577,
-        "melems_per_s": 73.3
+        "ms": 3.421,
+        "melems_per_s": 76.6
       },
       {
         "algo": "frst",
         "variant": "unfused",
         "size": 1024,
-        "ms": 38.124,
-        "melems_per_s": 27.5
+        "ms": 35.194,
+        "melems_per_s": 29.8
       },
       {
         "algo": "frst",
         "variant": "fused",
         "size": 1024,
-        "ms": 19.985,
-        "melems_per_s": 52.5
+        "ms": 13.857,
+        "melems_per_s": 75.7
       },
       {
         "algo": "rsd",
         "variant": "unfused",
         "size": 1024,
-        "ms": 48.613,
-        "melems_per_s": 21.6
+        "ms": 30.672,
+        "melems_per_s": 34.2
       },
       {
         "algo": "rsd",
         "variant": "fused",
         "size": 1024,
-        "ms": 14.656,
-        "melems_per_s": 71.5
+        "ms": 13.97,
+        "melems_per_s": 75.1
       }
     ]
   },
@@ -231,17 +233,17 @@
       },
       {
         "name": "circle",
-        "us": 7.04,
+        "us": 6.88,
         "note": "iterative: radial-center + annulus radius re-estimate"
       },
       {
         "name": "ellipse",
-        "us": 82.04,
+        "us": 74.06,
         "note": "iterative edge search + guarded Gauss-Newton"
       },
       {
         "name": "homography",
-        "us": 69.38,
+        "us": 63.71,
         "note": "homography-aware ellipse refine in rectified space"
       }
     ]
@@ -251,28 +253,28 @@
     "frames": [
       {
         "file": "synthetic:disk-256",
-        "note": "Bright, radii [8, 10, 12, 14, 16]",
-        "ms": 2.071
+        "note": "Bright, radii [10, 11, 12, 13, 14]",
+        "ms": 3.888
       },
       {
         "file": "synthetic:disk-512",
-        "note": "Bright, radii [8, 10, 12, 14, 16]",
-        "ms": 8.286
+        "note": "Bright, radii [10, 11, 12, 13, 14]",
+        "ms": 14.557
       },
       {
         "file": "synthetic:disk-1024",
-        "note": "Bright, radii [8, 10, 12, 14, 16]",
-        "ms": 38.656
+        "note": "Bright, radii [10, 11, 12, 13, 14]",
+        "ms": 63.594
       },
       {
         "file": "testdata/ringgrid.png",
-        "note": "Dark, radii [8, 10, 12, 14, 16]",
-        "ms": 17.181
+        "note": "Dark, radii [18, 20, 22, 24, 26]",
+        "ms": 55.984
       },
       {
-        "file": "data/surf1.png",
-        "note": "Bright, radii [20, 25, 30, 35, 40]",
-        "ms": 180.879
+        "file": "synthetic:surf-hole",
+        "note": "Bright, radii [6, 9, 12, 16, 20, 26, 32]",
+        "ms": 3.597
       }
     ]
   }

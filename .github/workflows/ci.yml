@@ -35,6 +35,8 @@ jobs:
             flags: --no-default-features
     steps:
       - uses: actions/checkout@v6
+        with:
+          lfs: true # testdata/*.png is Git LFS-backed; perf_export_ringgrid decodes it
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --exclude radsym-wasm ${{ matrix.flags }}
