@@ -138,6 +138,7 @@ All features are opt-in. The default build has zero optional dependencies.
 | `tracing` | Structured logging |
 | `affine` | Experimental affine-aware extensions (GFRS) |
 | `serde` | Serialization for configs and results |
+| `schemars` | `JsonSchema` for the detection config types (implies `serde`); schema in `schemas/detect_circles_config.json` |
 | `unsafe-opt` | Unchecked-indexing fast paths in the voting hot loops (RSD/FRST scatter); identical output to the safe build |
 
 ## Conventions

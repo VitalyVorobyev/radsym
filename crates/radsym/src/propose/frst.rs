@@ -118,16 +118,25 @@ impl Default for FrstConfig {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(default))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct FrstTuning {
-    /// Radial strictness exponent (alpha). Higher values require more
-    /// consistent orientation evidence. Default: 2.0.
+    /// Radial strictness exponent (alpha); must be at least 0. Higher values
+    /// require more consistent orientation evidence. Default: 2.0.
+    #[cfg_attr(feature = "schemars", schemars(range(min = 0.0)))]
     pub alpha: Scalar,
     /// Minimum gradient magnitude to participate in voting. Pixels with
     /// `|g| < gradient_threshold` are skipped. Default: 0.0 (all pixels vote).
+    ///
+    /// Magnitudes scale with the input's value range (Sobel/Scharr units of
+    /// the raw pixel values), so a threshold tuned for 8-bit data is ~256x too
+    /// small for raw 16-bit data.
+    #[cfg_attr(feature = "schemars", schemars(range(min = 0.0)))]
     pub gradient_threshold: Scalar,
     /// Standard deviation of the Gaussian smoothing kernel applied per-radius,
-    /// relative to the radius: `sigma = kn * n`. Default: 0.5.
+    /// relative to the radius: `sigma = smoothing_factor * radius`; must be
+    /// greater than 0. Default: 0.5.
+    #[cfg_attr(feature = "schemars", schemars(extend("exclusiveMinimum" = 0.0)))]
     pub smoothing_factor: Scalar,
 }
 

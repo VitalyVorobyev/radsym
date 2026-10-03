@@ -22,6 +22,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --all-features --exclude radsym-wasm -- -D warnings
+      # schemas/*.json are generated from the config types; fail on drift.
+      - name: Check generated config schemas are up to date
+        run: cargo run -p xtask -- emit-schemas --check
 
   test:
     name: Test
@@ -73,3 +76,15 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - run: cargo check -p radsym-wasm --target wasm32-unknown-unknown
+      # Native tests for the JSON config helpers (no JsValue involved).
+      - run: cargo test -p radsym-wasm --lib
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Build WASM package
+        run: wasm-pack build crates/radsym-wasm --target web --release
+      # Same packaging as release-npm.yml: the JSON Schemas must ride along in
+      # the npm tarball.
+      - name: Bundle JSON Schemas into the package
+        run: scripts/bundle-npm-schemas.sh
+      - name: Assert the npm tarball contains the schemas
+        run: scripts/check-npm-pack.sh

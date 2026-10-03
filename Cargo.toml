@@ -4,6 +4,7 @@ members = [
     "crates/radsym",
     "crates/radsym-py",
     "crates/radsym-wasm",
+    "xtask",
 ]
 
 [profile.release]
@@ -11,7 +12,7 @@ lto = "thin"
 codegen-units = 1
 
 [workspace.package]
-version = "0.4.1"
+version = "0.4.2"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.88"

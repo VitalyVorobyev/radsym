@@ -18,11 +18,12 @@ wasm-pack test --safari --headless --release crates/radsym-wasm    # WASM tests 
 
 ## Architecture
 
-Workspace with three crates:
+Workspace with three crates plus a dev-tooling `xtask`:
 
 - `crates/radsym/`      — core Rust library
 - `crates/radsym-py/`   — Python bindings via PyO3
 - `crates/radsym-wasm/` — WebAssembly bindings via wasm-bindgen (npm: `@vitavision/radsym`)
+- `xtask/`              — dev tooling (`cargo xtask emit-schemas [--check]`), not published
 
 ### radsym modules
 
@@ -53,6 +54,9 @@ rightward, y increases downward. `PixelCoord = nalgebra::Point2<f32>`.
 - `tracing` — structured logging
 - `affine` — experimental affine-aware extensions
 - `serde` — serialization for configs/results
+- `schemars` — `JsonSchema` for the detection config types (implies `serde`);
+  `cargo xtask emit-schemas` writes `schemas/detect_circles_config.json`
+  (CI runs it with `--check`; re-emit and commit after changing a config type)
 - `unsafe-opt` — unchecked-indexing fast paths in the voting hot loops (RSD/FRST
   scatter). Indices proven in-bounds by preceding range checks; identical output
   to the safe build. Off by default; opt in for the voting speedup.

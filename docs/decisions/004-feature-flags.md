@@ -21,6 +21,7 @@ All features are opt-in. The default build has zero optional dependencies.
 | `affine`   | Experimental GFRS extensions              | none (code-gated)  |
 | `serde`    | Serialization for configs and results     | `serde`            |
 | `unsafe-opt` | Unchecked-indexing fast paths in the voting hot loops (RSD/FRST scatter) | none (code-gated) |
+| `schemars` | `JsonSchema` for the detection config types (implies `serde`) | `schemars` |
 
 ## Consequences
 

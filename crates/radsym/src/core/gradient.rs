@@ -328,6 +328,7 @@ pub fn thin_gradient(field: &GradientField) -> Result<GradientField> {
 /// Choice of 3x3 gradient operator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub enum GradientOperator {
     /// Sobel 3x3 (weights 1-2-1). Standard, widely used.
