@@ -13,11 +13,16 @@ use super::evidence::{GradientSample, SupportEvidence};
 /// Configuration for annulus sampling.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct AnnulusSamplingConfig {
-    /// Number of angular samples around the annulus.
+    /// Number of angular samples around the annulus; must be at least 4.
+    /// Also sets the number of angular bins used for the coverage score.
+    #[cfg_attr(feature = "schemars", schemars(range(min = 4)))]
     pub num_angular_samples: usize,
-    /// Number of radial samples across the annulus width.
+    /// Number of radial samples across the annulus width; must be at least 1.
+    #[cfg_attr(feature = "schemars", schemars(range(min = 1)))]
     pub num_radial_samples: usize,
 }
 

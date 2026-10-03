@@ -88,6 +88,7 @@ Most config and result structs are `#[non_exhaustive]`: construct them via
 - `tracing`: structured instrumentation
 - `affine`: experimental affine-aware extensions
 - `serde`: serialization for configs and results
+- `schemars`: `JsonSchema` for the detection config types (implies `serde`)
 - `unsafe-opt`: unchecked-indexing fast paths in the voting hot loops
   (RSD/FRST scatter); identical output to the safe build
 

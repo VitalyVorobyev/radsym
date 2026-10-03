@@ -28,6 +28,7 @@ rayon = { version = "1", optional = true }
 image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg"] }
 tracing = { version = "0.1", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
+schemars = { version = "1", optional = true }
 box-image-pyramid = { version = "0.4.2", default-features = false }
 
 [dev-dependencies]
@@ -35,6 +36,9 @@ rand = "0.10"
 criterion = "0.8"
 approx = "0.5"
 serde_json = "1"
+# Validates serialized configs against the generated JSON Schema. No default
+# features: the HTTP/TLS reference resolvers are not needed.
+jsonschema = { version = "0.58", default-features = false }
 
 [features]
 default = []
@@ -43,6 +47,9 @@ image-io = ["dep:image"]
 tracing = ["dep:tracing", "box-image-pyramid/tracing"]
 affine = []
 serde = ["dep:serde", "nalgebra/serde-serialize"]
+# Derives `schemars::JsonSchema` on the detection config types. Implies `serde`:
+# the schema describes the serde JSON shape, so it is meaningless without it.
+schemars = ["dep:schemars", "serde"]
 # Enables unchecked-indexing fast paths in the blur and voting hot loops. The
 # indices are proven in-bounds by preceding range checks / loop bounds; the safe
 # build (feature off) uses checked indexing with identical numerical output.

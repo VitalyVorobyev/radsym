@@ -7,13 +7,24 @@ use super::scalar::Scalar;
 /// Configuration for non-maximum suppression.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct NmsConfig {
-    /// Suppression radius in pixels (half-window size).
+    /// Suppression radius in pixels (half-window size); must be at least 1.
+    ///
+    /// A peak must be strictly greater than every pixel within this distance.
+    /// The window `2 * radius + 1` must fit inside the image, otherwise no
+    /// proposals are returned.
+    #[cfg_attr(feature = "schemars", schemars(range(min = 1)))]
+    #[cfg_attr(feature = "schemars", schemars(extend("x-unit" = "px")))]
     pub radius: usize,
-    /// Minimum response value to consider a pixel as a candidate.
+    /// Minimum response value for a pixel to be considered a candidate.
+    ///
+    /// Units are those of the voting response map, not pixels.
     pub threshold: Scalar,
-    /// Maximum number of detections to return (budget cap).
+    /// Maximum number of proposals kept after suppression (budget cap); must be at least 1.
+    #[cfg_attr(feature = "schemars", schemars(range(min = 1)))]
     pub max_detections: usize,
 }
 

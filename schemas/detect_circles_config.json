@@ -1,0 +1,450 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DetectCirclesConfig",
+  "description": "Aggregated configuration for `detect_circles`.",
+  "type": "object",
+  "properties": {
+    "radii": {
+      "description": "Candidate FRST voting radii, in pixels; at least one, each at least 1.\n\nThe single source of truth for the radii the pipeline votes over:\n`advanced.frst` carries no radii of its own (`detect_circles` combines\nthe two to build the working FRST config).",
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 1
+      },
+      "minItems": 1,
+      "default": [
+        3,
+        5,
+        7,
+        9,
+        11
+      ],
+      "x-unit": "px"
+    },
+    "polarity": {
+      "description": "Which polarity to detect.\n\nThe single source of truth for voting and extraction polarity:\n`advanced.frst` carries no polarity of its own.",
+      "$ref": "#/$defs/Polarity",
+      "default": "Both"
+    },
+    "radius_hint": {
+      "description": "Approximate expected radius used as the initial circle hypothesis,\nin pixels; must be greater than 0.\n\nUsed for scoring and refinement when a proposal has no per-proposal\nradius from the FRST scale map.",
+      "type": "number",
+      "format": "float",
+      "default": 10.0,
+      "exclusiveMinimum": 0.0,
+      "x-unit": "px"
+    },
+    "min_score": {
+      "description": "Minimum support score to keep a detection (in `[0, 1]`).",
+      "type": "number",
+      "format": "float",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "gradient_operator": {
+      "description": "Gradient operator to use (default: Sobel).",
+      "$ref": "#/$defs/GradientOperator",
+      "default": "Sobel"
+    },
+    "roi": {
+      "description": "Optional rectangular region of interest.\n\nWhen set, the whole pipeline (gradient, voting, scoring, refinement) runs\nonly inside this rectangle, and the returned detection centers are\ntranslated back to full-frame image coordinates. `None` / `null` (the\ndefault) searches the entire image. An out-of-bounds rectangle is a hard\nerror.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Rect"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "advanced": {
+      "description": "Advanced per-stage configuration.",
+      "$ref": "#/$defs/DetectCirclesAdvanced",
+      "default": {
+        "frst": {
+          "alpha": 2.0,
+          "gradient_threshold": 0.0,
+          "smoothing_factor": 0.5
+        },
+        "nms": {
+          "radius": 5,
+          "threshold": 0.0,
+          "max_detections": 1000
+        },
+        "scoring": {
+          "sampling": {
+            "num_angular_samples": 64,
+            "num_radial_samples": 9
+          },
+          "annulus_margin": 0.3,
+          "min_samples": 8,
+          "weight_ringness": 0.6,
+          "weight_coverage": 0.4
+        },
+        "refinement": {
+          "max_iterations": 10,
+          "convergence_tol": 0.1,
+          "max_center_drift": 0.5,
+          "advanced": {
+            "annulus_margin": 0.3,
+            "radial_center": {
+              "patch_radius": 12,
+              "gradient_threshold": 0.0001
+            },
+            "sampling": {
+              "num_angular_samples": 64,
+              "num_radial_samples": 9
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "Polarity": {
+      "description": "Controls which gradient polarity is used during voting and scoring.",
+      "oneOf": [
+        {
+          "description": "Bright center on dark surround.",
+          "type": "string",
+          "const": "Bright"
+        },
+        {
+          "description": "Dark center on bright surround.",
+          "type": "string",
+          "const": "Dark"
+        },
+        {
+          "description": "Detect either polarity.",
+          "type": "string",
+          "const": "Both"
+        }
+      ]
+    },
+    "GradientOperator": {
+      "description": "Choice of 3x3 gradient operator.",
+      "oneOf": [
+        {
+          "description": "Sobel 3x3 (weights 1-2-1). Standard, widely used.",
+          "type": "string",
+          "const": "Sobel"
+        },
+        {
+          "description": "Scharr 3x3 (weights 3-10-3). Better rotational symmetry than Sobel.",
+          "type": "string",
+          "const": "Scharr"
+        }
+      ]
+    },
+    "Rect": {
+      "description": "An axis-aligned integer rectangle in image pixel coordinates.",
+      "type": "object",
+      "properties": {
+        "x": {
+          "description": "Left edge (column) in pixels. `x + width` must not exceed the image width.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "x-unit": "px"
+        },
+        "y": {
+          "description": "Top edge (row) in pixels. `y + height` must not exceed the image height.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "x-unit": "px"
+        },
+        "width": {
+          "description": "Width in pixels; must be at least 1.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 1,
+          "x-unit": "px"
+        },
+        "height": {
+          "description": "Height in pixels; must be at least 1.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 1,
+          "x-unit": "px"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ]
+    },
+    "DetectCirclesAdvanced": {
+      "description": "Advanced per-stage configuration for `DetectCirclesConfig`.",
+      "type": "object",
+      "properties": {
+        "frst": {
+          "description": "FRST voting tuning (alpha, gradient threshold, smoothing).\n\n`radii` and `polarity` are *not* part of this tuning: the pipeline takes\nthem from the top-level `radii` and `polarity` fields (see\n`FrstTuning::to_frst_config`).",
+          "$ref": "#/$defs/FrstTuning",
+          "default": {
+            "alpha": 2.0,
+            "gradient_threshold": 0.0,
+            "smoothing_factor": 0.5
+          }
+        },
+        "nms": {
+          "description": "Non-maximum suppression for proposal extraction.",
+          "$ref": "#/$defs/NmsConfig",
+          "default": {
+            "radius": 5,
+            "threshold": 0.0,
+            "max_detections": 1000
+          }
+        },
+        "scoring": {
+          "description": "Support scoring configuration.",
+          "$ref": "#/$defs/ScoringConfig",
+          "default": {
+            "sampling": {
+              "num_angular_samples": 64,
+              "num_radial_samples": 9
+            },
+            "annulus_margin": 0.3,
+            "min_samples": 8,
+            "weight_ringness": 0.6,
+            "weight_coverage": 0.4
+          }
+        },
+        "refinement": {
+          "description": "Iterative circle refinement configuration.",
+          "$ref": "#/$defs/CircleRefineConfig",
+          "default": {
+            "max_iterations": 10,
+            "convergence_tol": 0.1,
+            "max_center_drift": 0.5,
+            "advanced": {
+              "annulus_margin": 0.3,
+              "radial_center": {
+                "patch_radius": 12,
+                "gradient_threshold": 0.0001
+              },
+              "sampling": {
+                "num_angular_samples": 64,
+                "num_radial_samples": 9
+              }
+            }
+          }
+        }
+      }
+    },
+    "FrstTuning": {
+      "description": "FRST voting knobs *excluding* `radii` and `polarity`.",
+      "type": "object",
+      "properties": {
+        "alpha": {
+          "description": "Radial strictness exponent (alpha); must be at least 0. Higher values\nrequire more consistent orientation evidence. Default: 2.0.",
+          "type": "number",
+          "format": "float",
+          "minimum": 0.0,
+          "default": 2.0
+        },
+        "gradient_threshold": {
+          "description": "Minimum gradient magnitude to participate in voting. Pixels with\n`|g| < gradient_threshold` are skipped. Default: 0.0 (all pixels vote).\n\nMagnitudes scale with the input's value range (Sobel/Scharr units of\nthe raw pixel values), so a threshold tuned for 8-bit data is ~256x too\nsmall for raw 16-bit data.",
+          "type": "number",
+          "format": "float",
+          "minimum": 0.0,
+          "default": 0.0
+        },
+        "smoothing_factor": {
+          "description": "Standard deviation of the Gaussian smoothing kernel applied per-radius,\nrelative to the radius: `sigma = smoothing_factor * radius`; must be\ngreater than 0. Default: 0.5.",
+          "type": "number",
+          "format": "float",
+          "default": 0.5,
+          "exclusiveMinimum": 0.0
+        }
+      }
+    },
+    "NmsConfig": {
+      "description": "Configuration for non-maximum suppression.",
+      "type": "object",
+      "properties": {
+        "radius": {
+          "description": "Suppression radius in pixels (half-window size); must be at least 1.\n\nA peak must be strictly greater than every pixel within this distance.\nThe window `2 * radius + 1` must fit inside the image, otherwise no\nproposals are returned.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 1,
+          "default": 5,
+          "x-unit": "px"
+        },
+        "threshold": {
+          "description": "Minimum response value for a pixel to be considered a candidate.\n\nUnits are those of the voting response map, not pixels.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        },
+        "max_detections": {
+          "description": "Maximum number of proposals kept after suppression (budget cap); must be at least 1.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 1,
+          "default": 1000
+        }
+      }
+    },
+    "ScoringConfig": {
+      "description": "Configuration for support scoring.",
+      "type": "object",
+      "properties": {
+        "sampling": {
+          "description": "Annulus sampling configuration.",
+          "$ref": "#/$defs/AnnulusSamplingConfig",
+          "default": {
+            "num_angular_samples": 64,
+            "num_radial_samples": 9
+          }
+        },
+        "annulus_margin": {
+          "description": "How much wider than the hypothesized radius to sample (as a fraction);\nmust be greater than 0.\nE.g., 0.3 means sample from `0.7*r` to `1.3*r`.",
+          "type": "number",
+          "format": "float",
+          "default": 0.3,
+          "exclusiveMinimum": 0.0
+        },
+        "min_samples": {
+          "description": "Minimum number of valid gradient samples; a candidate with fewer is\nflagged degenerate and rejected. Must be at least 1.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 1,
+          "default": 8
+        },
+        "weight_ringness": {
+          "description": "Weight of the ringness (gradient alignment) component in the total\nscore; must be at least 0. The total is clamped to `[0, 1]`.",
+          "type": "number",
+          "format": "float",
+          "minimum": 0.0,
+          "default": 0.6
+        },
+        "weight_coverage": {
+          "description": "Weight of the angular coverage component in the total score; must be\nat least 0. The total is clamped to `[0, 1]`.",
+          "type": "number",
+          "format": "float",
+          "minimum": 0.0,
+          "default": 0.4
+        }
+      }
+    },
+    "AnnulusSamplingConfig": {
+      "description": "Configuration for annulus sampling.",
+      "type": "object",
+      "properties": {
+        "num_angular_samples": {
+          "description": "Number of angular samples around the annulus; must be at least 4.\nAlso sets the number of angular bins used for the coverage score.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 4,
+          "default": 64
+        },
+        "num_radial_samples": {
+          "description": "Number of radial samples across the annulus width; must be at least 1.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 1,
+          "default": 9
+        }
+      }
+    },
+    "CircleRefineConfig": {
+      "description": "Configuration for iterative circle refinement.",
+      "type": "object",
+      "properties": {
+        "max_iterations": {
+          "description": "Maximum number of refinement iterations; must be at least 1.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 1,
+          "default": 10
+        },
+        "convergence_tol": {
+          "description": "Convergence tolerance: stop when center shift < this (pixels); must be\ngreater than 0.",
+          "type": "number",
+          "format": "float",
+          "default": 0.1,
+          "exclusiveMinimum": 0.0,
+          "x-unit": "px"
+        },
+        "max_center_drift": {
+          "description": "Maximum allowed total center drift as a fraction of the initial radius;\nmust be greater than 0.\n\nIf the refined center moves farther than `max_center_drift * radius`\nfrom the initial center, refinement stops with `RefinementStatus::OutOfBounds`.",
+          "type": "number",
+          "format": "float",
+          "default": 0.5,
+          "exclusiveMinimum": 0.0
+        },
+        "advanced": {
+          "description": "Advanced acquisition and sampling knobs.",
+          "$ref": "#/$defs/CircleRefineAdvanced",
+          "default": {
+            "annulus_margin": 0.3,
+            "radial_center": {
+              "patch_radius": 12,
+              "gradient_threshold": 0.0001
+            },
+            "sampling": {
+              "num_angular_samples": 64,
+              "num_radial_samples": 9
+            }
+          }
+        }
+      }
+    },
+    "CircleRefineAdvanced": {
+      "description": "Advanced tuning knobs for `CircleRefineConfig`.",
+      "type": "object",
+      "properties": {
+        "annulus_margin": {
+          "description": "Fractional annulus margin around the hypothesized radius, used to\nre-estimate the radius each iteration; must be greater than 0.\nE.g., 0.3 samples from `0.7*r` to `1.3*r`.",
+          "type": "number",
+          "format": "float",
+          "default": 0.3,
+          "exclusiveMinimum": 0.0
+        },
+        "radial_center": {
+          "description": "Radial center config for center refinement sub-step.",
+          "$ref": "#/$defs/RadialCenterConfig",
+          "default": {
+            "patch_radius": 12,
+            "gradient_threshold": 0.0001
+          }
+        },
+        "sampling": {
+          "description": "Annulus sampling config for radius estimation.",
+          "$ref": "#/$defs/AnnulusSamplingConfig",
+          "default": {
+            "num_angular_samples": 64,
+            "num_radial_samples": 9
+          }
+        }
+      }
+    },
+    "RadialCenterConfig": {
+      "description": "Configuration for radial center refinement.",
+      "type": "object",
+      "properties": {
+        "patch_radius": {
+          "description": "Half-width of the patch around the seed (in pixels); must be at least 1.\nThe full patch is `(2*patch_radius+1)²`.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 1,
+          "default": 12,
+          "x-unit": "px"
+        },
+        "gradient_threshold": {
+          "description": "Minimum gradient magnitude to include a pixel in the fit; must be at\nleast 0.\n\nMagnitudes scale with the input's value range, so the threshold is\nbit-depth dependent (see `gradient_threshold` of the FRST tuning).",
+          "type": "number",
+          "format": "float",
+          "minimum": 0.0,
+          "default": 0.0001
+        }
+      }
+    }
+  }
+}

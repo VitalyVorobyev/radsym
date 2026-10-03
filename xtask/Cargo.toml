@@ -1,0 +1,18 @@
+[package]
+name = "xtask"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+radsym = { path = "../crates/radsym", features = ["schemars"] }
+anyhow = "1"
+serde_json = "1"
+# Exact pin: the committed schema is compared byte-for-byte in CI and Cargo.lock
+# is not committed, so a schemars patch release that tweaks output must not be
+# able to break CI. Bump deliberately and re-run `cargo xtask emit-schemas`.
+# `preserve_order` keeps properties in struct-declaration order (nicer form
+# layout, and independent of serde_json feature unification).
+schemars = { version = "=1.2.2", features = ["preserve_order"] }

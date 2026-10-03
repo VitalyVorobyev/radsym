@@ -23,6 +23,27 @@ fn to_js_err(e: radsym::RadSymError) -> JsValue {
     JsValue::from_str(&e.to_string())
 }
 
+/// Build a real JS `Error` (with `message` and a stack) from a message.
+///
+/// Used by the JSON config API so callers can `catch (e) { e.message }`.
+fn js_error(message: &str) -> JsValue {
+    js_sys::Error::new(message).into()
+}
+
+/// Parse a JSON document into a [`DetectCirclesConfig`].
+///
+/// Missing fields fall back to their defaults (the config is deserialized with
+/// `serde(default)`), so a partial document such as `{"radii": [8, 10]}` is
+/// valid. Ill-typed fields are errors; unknown fields are ignored.
+fn parse_config_json(json: &str) -> Result<DetectCirclesConfig, String> {
+    serde_json::from_str(json).map_err(|e| format!("invalid config JSON: {e}"))
+}
+
+/// Serialize a [`DetectCirclesConfig`] to compact JSON.
+fn config_to_json(config: &DetectCirclesConfig) -> Result<String, String> {
+    serde_json::to_string(config).map_err(|e| format!("cannot serialize config: {e}"))
+}
+
 /// Convert RGBA pixels to grayscale using BT.601 luma weights.
 ///
 /// Reuses `buf` to avoid per-call allocation.
@@ -57,6 +78,25 @@ fn parse_colormap(name: &str) -> Result<Colormap, JsValue> {
             "unknown colormap \"{name}\": expected \"jet\", \"hot\", or \"magma\""
         ))),
     }
+}
+
+// ---------------------------------------------------------------------------
+// JSON config
+// ---------------------------------------------------------------------------
+
+/// The default detection configuration as a JSON string.
+///
+/// The JSON shape is described by `schemas/detect_circles_config.json`, which
+/// ships inside the npm package. Enum values keep their Rust names
+/// (`"Bright"`, `"Dark"`, `"Both"`; `"Sobel"`, `"Scharr"`), unlike the
+/// lowercase strings accepted by `set_polarity` / `set_gradient_operator`.
+///
+/// The proposal algorithm (`"frst"`, `"rsd"`, ...) is not part of this config;
+/// it is an argument of `detect_circles_detailed_with`, `response_heatmap` and
+/// `extract_proposals`.
+#[wasm_bindgen]
+pub fn default_config_json() -> Result<String, JsValue> {
+    config_to_json(&DetectCirclesConfig::default()).map_err(|e| js_error(&e))
 }
 
 // ---------------------------------------------------------------------------
@@ -112,6 +152,36 @@ impl RadSymProcessor {
             config: DetectCirclesConfig::default(),
             gray_buf: Vec::new(),
         }
+    }
+
+    /// Create a processor from a JSON config.
+    ///
+    /// Fields missing from the JSON take their default values, so a partial
+    /// document such as `{"radii": [8, 10], "polarity": "Bright"}` is valid.
+    /// Throws on malformed JSON or ill-typed fields (unknown fields are ignored). See
+    /// [`default_config_json`] for the shape.
+    pub fn with_config_json(json: &str) -> Result<RadSymProcessor, JsValue> {
+        let config = parse_config_json(json).map_err(|e| js_error(&e))?;
+        Ok(Self {
+            config,
+            gray_buf: Vec::new(),
+        })
+    }
+
+    /// Replace the whole configuration from a JSON document.
+    ///
+    /// Same semantics as [`with_config_json`](Self::with_config_json): missing
+    /// fields take their defaults (they do *not* keep the previous values).
+    /// On error the current configuration is left unchanged.
+    pub fn set_config_json(&mut self, json: &str) -> Result<(), JsValue> {
+        self.config = parse_config_json(json).map_err(|e| js_error(&e))?;
+        Ok(())
+    }
+
+    /// The current configuration as a JSON string, including any changes made
+    /// through the `set_*` methods.
+    pub fn config_json(&self) -> Result<String, JsValue> {
+        config_to_json(&self.config).map_err(|e| js_error(&e))
     }
 
     // -- Full pipeline methods ----------------------------------------------
@@ -633,5 +703,74 @@ impl RadSymProcessor {
         config.polarity = self.config.polarity;
         config.smoothing_factor = self.config.advanced.frst.smoothing_factor;
         config
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Native tests for the JSON config path. The error branches that build a
+    //! `JsValue` are not exercised here (they only work on wasm32); the parsing
+    //! helpers they wrap are.
+
+    use super::*;
+
+    fn as_value(config: &DetectCirclesConfig) -> serde_json::Value {
+        serde_json::to_value(config).unwrap()
+    }
+
+    #[test]
+    fn default_config_json_round_trips() {
+        let json = config_to_json(&DetectCirclesConfig::default()).unwrap();
+        let parsed = parse_config_json(&json).unwrap();
+        assert_eq!(as_value(&parsed), as_value(&DetectCirclesConfig::default()));
+    }
+
+    #[test]
+    fn partial_json_takes_defaults() {
+        let parsed = parse_config_json(r#"{"radii": [4, 6], "polarity": "Bright"}"#).unwrap();
+        assert_eq!(parsed.radii, vec![4, 6]);
+        assert_eq!(parsed.polarity, Polarity::Bright);
+        assert_eq!(
+            parsed.radius_hint,
+            DetectCirclesConfig::default().radius_hint
+        );
+    }
+
+    #[test]
+    fn invalid_json_reports_a_useful_message() {
+        let err = parse_config_json("{not json").unwrap_err();
+        assert!(err.starts_with("invalid config JSON:"), "{err}");
+        let err = parse_config_json(r#"{"polarity": "Sideways"}"#).unwrap_err();
+        assert!(err.contains("Sideways") || err.contains("variant"), "{err}");
+        let err = parse_config_json(r#"{"radii": "ten"}"#).unwrap_err();
+        assert!(err.contains("invalid type"), "{err}");
+    }
+
+    #[test]
+    fn setters_are_reflected_in_config_json() {
+        let mut p = RadSymProcessor::new();
+        p.set_radii(&[7, 9]);
+        p.set_alpha(3.0);
+        p.set_nms_radius(8);
+        p.set_polarity("dark")
+            .unwrap_or_else(|_| panic!("set_polarity"));
+        let value: serde_json::Value = serde_json::from_str(&p.config_json().unwrap()).unwrap();
+        assert_eq!(value["radii"], serde_json::json!([7, 9]));
+        assert_eq!(value["polarity"], "Dark");
+        assert_eq!(value["advanced"]["frst"]["alpha"], 3.0);
+        assert_eq!(value["advanced"]["nms"]["radius"], 8);
+    }
+
+    #[test]
+    fn config_json_drives_the_processor() {
+        let json = r#"{"radii": [5], "advanced": {"nms": {"radius": 9}}}"#;
+        let p = RadSymProcessor::with_config_json(json).unwrap();
+        assert_eq!(p.config.radii, vec![5]);
+        assert_eq!(p.config.advanced.nms.radius, 9);
+        // Untouched sibling keeps its default.
+        assert_eq!(
+            p.config.advanced.nms.max_detections,
+            DetectCirclesConfig::default().advanced.nms.max_detections
+        );
     }
 }

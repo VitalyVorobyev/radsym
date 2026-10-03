@@ -22,6 +22,7 @@ out of the box with zero additional dependencies beyond `nalgebra` and
 | `tracing` | Structured log spans and events via the `tracing` crate |
 | `affine` | Experimental affine-aware extensions (GFRS, Ni et al. CVPR 2012) |
 | `serde` | `Serialize` / `Deserialize` derives on all config and result types |
+| `schemars` | `JsonSchema` for the detection config types (implies `serde`); schema in `schemas/detect_circles_config.json` |
 | `unsafe-opt` | Unchecked-indexing fast paths in the voting hot loops (RSD/FRST scatter); identical output to the safe build |
 
 Enable features in `Cargo.toml` as needed:

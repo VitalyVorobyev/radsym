@@ -24,22 +24,35 @@ use crate::support::score::{
 /// Aggregated configuration for [`detect_circles`].
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct DetectCirclesConfig {
-    /// Candidate FRST voting radii, in pixels.
+    /// Candidate FRST voting radii, in pixels; at least one, each at least 1.
     ///
     /// The single source of truth for the radii the pipeline votes over:
-    /// [`detect_circles`] combines it with [`DetectCirclesAdvanced::frst`] (which
-    /// no longer carries its own `radii`) to build the working FRST config.
+    /// `advanced.frst` carries no radii of its own ([`detect_circles`] combines
+    /// the two to build the working FRST config).
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(length(min = 1), inner(range(min = 1)), extend("x-unit" = "px"))
+    )]
     pub radii: Vec<u32>,
     /// Which polarity to detect.
     ///
-    /// The single source of truth for voting/extraction polarity; combined with
-    /// [`DetectCirclesAdvanced::frst`] to build the working FRST config.
+    /// The single source of truth for voting and extraction polarity:
+    /// `advanced.frst` carries no polarity of its own.
     pub polarity: Polarity,
-    /// Approximate expected radius used as the initial circle hypothesis.
+    /// Approximate expected radius used as the initial circle hypothesis,
+    /// in pixels; must be greater than 0.
+    ///
+    /// Used for scoring and refinement when a proposal has no per-proposal
+    /// radius from the FRST scale map.
+    #[cfg_attr(feature = "schemars", schemars(extend("exclusiveMinimum" = 0.0)))]
+    #[cfg_attr(feature = "schemars", schemars(extend("x-unit" = "px")))]
     pub radius_hint: Scalar,
     /// Minimum support score to keep a detection (in `[0, 1]`).
+    #[cfg_attr(feature = "schemars", schemars(range(min = 0.0, max = 1.0)))]
     pub min_score: Scalar,
     /// Gradient operator to use (default: Sobel).
     pub gradient_operator: GradientOperator,
@@ -47,8 +60,9 @@ pub struct DetectCirclesConfig {
     ///
     /// When set, the whole pipeline (gradient, voting, scoring, refinement) runs
     /// only inside this rectangle, and the returned detection centers are
-    /// translated back to full-frame image coordinates. `None` (the default)
-    /// searches the entire image. An out-of-bounds rectangle is a hard error.
+    /// translated back to full-frame image coordinates. `None` / `null` (the
+    /// default) searches the entire image. An out-of-bounds rectangle is a hard
+    /// error.
     pub roi: Option<Rect>,
     /// Advanced per-stage configuration.
     pub advanced: DetectCirclesAdvanced,
@@ -63,14 +77,15 @@ pub struct DetectCirclesConfig {
 /// tune FRST voting, NMS, scoring, or refinement directly.
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct DetectCirclesAdvanced {
     /// FRST voting tuning (alpha, gradient threshold, smoothing).
     ///
-    /// `radii` and `polarity` are *not* part of this tuning: the pipeline sources
-    /// them from the top-level [`DetectCirclesConfig::radii`] and
-    /// [`DetectCirclesConfig::polarity`] (their single source of truth) and
-    /// combines them with this tuning via [`FrstTuning::to_frst_config`].
+    /// `radii` and `polarity` are *not* part of this tuning: the pipeline takes
+    /// them from the top-level `radii` and `polarity` fields (see
+    /// [`FrstTuning::to_frst_config`]).
     pub frst: FrstTuning,
     /// Non-maximum suppression for proposal extraction.
     pub nms: NmsConfig,

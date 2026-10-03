@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-03
+
+Config-schema release: the circle-detection config now has a machine-readable
+JSON Schema, published in the npm package, and the WASM API can read and write
+the whole config as JSON so a schema-driven form can edit it. No breaking
+changes.
+
+### Added
+
+- **`schemars` feature** (implies `serde`) — derives `schemars::JsonSchema` on
+  `DetectCirclesConfig` and every type reachable from it (`DetectCirclesAdvanced`,
+  `FrstTuning`, `NmsConfig`, `ScoringConfig`, `AnnulusSamplingConfig`,
+  `CircleRefineConfig`, `CircleRefineAdvanced`, `RadialCenterConfig`, `Rect`,
+  `Polarity`, `GradientOperator`). The schema describes the serde shape exactly
+  (enum values keep their Rust names, e.g. `"Bright"`, `"Sobel"`). Each field
+  carries a `description`, the `default`, `minimum`/`maximum`/`exclusiveMinimum`
+  where the code enforces or assumes bounds, and `x-unit: "px"` on pixel-valued
+  fields.
+- **`schemas/detect_circles_config.json`** — the generated schema, committed.
+  Regenerate with `cargo xtask emit-schemas`; CI runs
+  `cargo xtask emit-schemas --check` and fails on drift. New unpublished
+  `xtask` workspace member (schemars pinned to an exact version so the committed
+  output is reproducible without a committed `Cargo.lock`).
+- **WASM JSON config API** (`@vitavision/radsym`): `default_config_json()`,
+  `RadSymProcessor.with_config_json(json)` (static constructor),
+  `set_config_json(json)` and `config_json()`. All existing `set_*` methods keep
+  working and are reflected in `config_json()`. Malformed JSON or ill-typed
+  fields throw an `Error` carrying the serde message. The proposal algorithm
+  (`"frst"`, `"rsd"`, ...) is not part of the config and remains an argument of
+  `detect_circles_detailed_with` / `response_heatmap` / `extract_proposals`.
+- **npm package ships the schema** at `schemas/detect_circles_config.json`
+  (added to `package.json` `files`; no `exports` map). CI's WASM job now builds
+  the package and asserts the tarball contains it (`npm pack --dry-run`).
+
+### Changed
+
+- Config structs with a `Default` (`DetectCirclesConfig`, `DetectCirclesAdvanced`,
+  `NmsConfig`, `ScoringConfig`, `AnnulusSamplingConfig`, `CircleRefineConfig`,
+  `CircleRefineAdvanced`, `RadialCenterConfig`) now deserialize with
+  `#[serde(default)]`, so partial JSON such as `{"radii": [8, 10]}` works.
+  Strictly more lenient: every previously valid document still parses to the
+  same value.
+- The WASM build now enables radsym's `serde` feature; the `.wasm` grows from
+  ~103 KiB to ~216 KiB (about 41 KiB to 92 KiB gzipped), mostly the JSON parser.
+- Config-field doc comments now state units and valid ranges.
+
 ## [0.4.1] - 2026-07-05
 
 Performance release: the RSD/FRST proposal stage is 2.7–4× faster with
@@ -431,7 +477,8 @@ Breaking for the `radsym` crate and both binding packages.
 - Zero unsafe code; zero clippy warnings; 138 unit and integration tests.
 - mdBook documentation with full mathematical derivations.
 
-[Unreleased]: https://github.com/VitalyVorobyev/radsym/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/VitalyVorobyev/radsym/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/VitalyVorobyev/radsym/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/VitalyVorobyev/radsym/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/VitalyVorobyev/radsym/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/VitalyVorobyev/radsym/compare/v0.2.0...v0.3.0

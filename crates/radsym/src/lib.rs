@@ -68,6 +68,8 @@
 //! - `tracing` — structured logging
 //! - `affine` — experimental affine-aware extensions (GFRS)
 //! - `serde` — serialization support
+//! - `schemars` — `schemars::JsonSchema` for the detection config types
+//!   (implies `serde`); the schema is emitted to `schemas/` by `cargo xtask emit-schemas`
 //! - `unsafe-opt` — unchecked-indexing fast paths in the voting hot loops
 //!   (RSD/FRST scatter); identical output to the safe build
 

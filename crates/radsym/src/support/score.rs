@@ -74,18 +74,28 @@ impl From<SupportScoreBreakdown> for SupportScore {
 /// Configuration for support scoring.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct ScoringConfig {
     /// Annulus sampling configuration.
     pub sampling: AnnulusSamplingConfig,
-    /// How much wider than the hypothesized radius to sample (as a fraction).
+    /// How much wider than the hypothesized radius to sample (as a fraction);
+    /// must be greater than 0.
     /// E.g., 0.3 means sample from `0.7*r` to `1.3*r`.
+    #[cfg_attr(feature = "schemars", schemars(extend("exclusiveMinimum" = 0.0)))]
     pub annulus_margin: Scalar,
-    /// Minimum number of gradient samples to avoid degeneracy flag.
+    /// Minimum number of valid gradient samples; a candidate with fewer is
+    /// flagged degenerate and rejected. Must be at least 1.
+    #[cfg_attr(feature = "schemars", schemars(range(min = 1)))]
     pub min_samples: usize,
-    /// Weight of ringness component in total score.
+    /// Weight of the ringness (gradient alignment) component in the total
+    /// score; must be at least 0. The total is clamped to `[0, 1]`.
+    #[cfg_attr(feature = "schemars", schemars(range(min = 0.0)))]
     pub weight_ringness: Scalar,
-    /// Weight of angular coverage in total score.
+    /// Weight of the angular coverage component in the total score; must be
+    /// at least 0. The total is clamped to `[0, 1]`.
+    #[cfg_attr(feature = "schemars", schemars(range(min = 0.0)))]
     pub weight_coverage: Scalar,
 }
 

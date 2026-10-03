@@ -52,12 +52,21 @@ jobs:
       - name: Copy README into pkg
         run: cp crates/radsym-wasm/README.md crates/radsym-wasm/pkg/README.md
 
+      - name: Verify committed schemas are up to date
+        run: cargo run -p xtask -- emit-schemas --check
+
+      - name: Bundle JSON Schemas into pkg
+        run: scripts/bundle-npm-schemas.sh
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
           package-manager-cache: false
+
+      - name: Assert the npm tarball contains the schemas
+        run: scripts/check-npm-pack.sh
 
       - name: Publish to npm via trusted publishing
         working-directory: crates/radsym-wasm/pkg

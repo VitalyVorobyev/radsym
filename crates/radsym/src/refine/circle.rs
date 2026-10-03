@@ -18,16 +18,24 @@ use super::result::{RefinementResult, RefinementStatus};
 /// Configuration for iterative circle refinement.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct CircleRefineConfig {
-    /// Maximum number of refinement iterations.
+    /// Maximum number of refinement iterations; must be at least 1.
+    #[cfg_attr(feature = "schemars", schemars(range(min = 1)))]
     pub max_iterations: usize,
-    /// Convergence tolerance: stop when center shift < this (pixels).
+    /// Convergence tolerance: stop when center shift < this (pixels); must be
+    /// greater than 0.
+    #[cfg_attr(feature = "schemars", schemars(extend("exclusiveMinimum" = 0.0)))]
+    #[cfg_attr(feature = "schemars", schemars(extend("x-unit" = "px")))]
     pub convergence_tol: Scalar,
-    /// Maximum allowed total center drift as a fraction of the initial radius.
+    /// Maximum allowed total center drift as a fraction of the initial radius;
+    /// must be greater than 0.
     ///
     /// If the refined center moves farther than `max_center_drift * radius`
     /// from the initial center, refinement stops with [`RefinementStatus::OutOfBounds`].
+    #[cfg_attr(feature = "schemars", schemars(extend("exclusiveMinimum" = 0.0)))]
     pub max_center_drift: Scalar,
     /// Advanced acquisition and sampling knobs.
     pub advanced: CircleRefineAdvanced,
@@ -41,9 +49,14 @@ pub struct CircleRefineConfig {
 /// intent rather than algorithm internals.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct CircleRefineAdvanced {
-    /// Fractional annulus margin around the hypothesized radius.
+    /// Fractional annulus margin around the hypothesized radius, used to
+    /// re-estimate the radius each iteration; must be greater than 0.
+    /// E.g., 0.3 samples from `0.7*r` to `1.3*r`.
+    #[cfg_attr(feature = "schemars", schemars(extend("exclusiveMinimum" = 0.0)))]
     pub annulus_margin: Scalar,
     /// Radial center config for center refinement sub-step.
     pub radial_center: RadialCenterConfig,

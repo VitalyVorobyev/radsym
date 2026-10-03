@@ -112,6 +112,43 @@ All `DetectCirclesConfig` fields are exposed as flat setters:
 | `set_min_score(f32)` | `0.0` | Minimum score threshold |
 | `set_gradient_operator(str)` | `"sobel"` | `"sobel"` or `"scharr"` |
 
+### JSON configuration and schema
+
+The whole configuration, including fields that have no setter (such as the
+`roi` rectangle), can be edited as JSON. Missing fields take their defaults, so
+partial documents are valid.
+
+```js
+import { RadSymProcessor, default_config_json } from '@vitavision/radsym';
+
+const config = JSON.parse(default_config_json());   // full default config
+config.polarity = 'Bright';                         // enum values keep Rust names
+config.advanced.nms.radius = 7;
+
+const processor = RadSymProcessor.with_config_json(JSON.stringify(config));
+processor.set_config_json('{"radii": [8, 10, 12]}'); // replaces the whole config
+processor.config_json();                             // current config, incl. set_* changes
+```
+
+Invalid JSON or ill-typed fields throw an `Error` whose `message` is the serde message;
+unknown fields are ignored. Enum values are `"Bright"` / `"Dark"` / `"Both"` and
+`"Sobel"` / `"Scharr"` in JSON, unlike the lowercase strings the `set_polarity` /
+`set_gradient_operator` setters accept.
+
+The package ships the JSON Schema of this config at
+`schemas/detect_circles_config.json` (JSON Schema 2020-12, with `description`,
+`default`, `minimum`/`maximum` and an `x-unit: "px"` annotation on pixel-valued
+fields), suitable for driving a schema-based form:
+
+```js
+import schema from '@vitavision/radsym/schemas/detect_circles_config.json' with { type: 'json' };
+```
+
+(The package defines no `exports` map, so the file is also reachable by path in
+`node_modules/@vitavision/radsym/schemas/`.) The proposal algorithm
+(`"frst"`, `"rsd"`, ...) is not part of the config; it stays an argument of
+`detect_circles_detailed_with`, `response_heatmap` and `extract_proposals`.
+
 ## Output formats
 
 | Method | Return type | Stride | Fields |

@@ -26,12 +26,21 @@ use super::result::{RefinementResult, RefinementStatus};
 /// Configuration for radial center refinement.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct RadialCenterConfig {
-    /// Half-width of the patch around the seed (in pixels).
+    /// Half-width of the patch around the seed (in pixels); must be at least 1.
     /// The full patch is `(2*patch_radius+1)²`.
+    #[cfg_attr(feature = "schemars", schemars(range(min = 1)))]
+    #[cfg_attr(feature = "schemars", schemars(extend("x-unit" = "px")))]
     pub patch_radius: usize,
-    /// Minimum gradient magnitude to include a pixel in the fit.
+    /// Minimum gradient magnitude to include a pixel in the fit; must be at
+    /// least 0.
+    ///
+    /// Magnitudes scale with the input's value range, so the threshold is
+    /// bit-depth dependent (see `gradient_threshold` of the FRST tuning).
+    #[cfg_attr(feature = "schemars", schemars(range(min = 0.0)))]
     pub gradient_threshold: Scalar,
 }
 

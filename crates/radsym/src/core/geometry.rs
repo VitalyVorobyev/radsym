@@ -28,14 +28,21 @@ impl Circle {
 /// columns `x..x+width` and rows `y..y+height`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Rect {
-    /// Left edge (column) in pixels.
+    /// Left edge (column) in pixels. `x + width` must not exceed the image width.
+    #[cfg_attr(feature = "schemars", schemars(extend("x-unit" = "px")))]
     pub x: usize,
-    /// Top edge (row) in pixels.
+    /// Top edge (row) in pixels. `y + height` must not exceed the image height.
+    #[cfg_attr(feature = "schemars", schemars(extend("x-unit" = "px")))]
     pub y: usize,
-    /// Width in pixels.
+    /// Width in pixels; must be at least 1.
+    #[cfg_attr(feature = "schemars", schemars(range(min = 1)))]
+    #[cfg_attr(feature = "schemars", schemars(extend("x-unit" = "px")))]
     pub width: usize,
-    /// Height in pixels.
+    /// Height in pixels; must be at least 1.
+    #[cfg_attr(feature = "schemars", schemars(range(min = 1)))]
+    #[cfg_attr(feature = "schemars", schemars(extend("x-unit" = "px")))]
     pub height: usize,
 }
 

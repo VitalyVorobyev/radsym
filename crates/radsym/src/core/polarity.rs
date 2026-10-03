@@ -7,6 +7,7 @@
 /// - `Both`: detect either polarity.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub enum Polarity {
     /// Bright center on dark surround.
