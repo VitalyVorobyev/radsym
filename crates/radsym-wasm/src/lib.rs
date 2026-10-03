@@ -59,11 +59,9 @@ fn rgba_to_gray(rgba: &[u8], w: usize, h: usize, buf: &mut Vec<u8>) -> Result<()
         )));
     }
     buf.resize(w * h, 0);
-    for (i, chunk) in rgba.chunks_exact(4).enumerate() {
-        let r = chunk[0] as f32;
-        let g = chunk[1] as f32;
-        let b = chunk[2] as f32;
-        buf[i] = (0.299 * r + 0.587 * g + 0.114 * b) as u8;
+    let (pixels, _) = rgba.as_chunks::<4>();
+    for (dst, &[r, g, b, _]) in buf.iter_mut().zip(pixels) {
+        *dst = (0.299 * f32::from(r) + 0.587 * f32::from(g) + 0.114 * f32::from(b)) as u8;
     }
     Ok(())
 }

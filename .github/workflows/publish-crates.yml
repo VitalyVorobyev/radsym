@@ -25,6 +25,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          lfs: true # testdata/*.png is Git LFS-backed; perf_export_ringgrid decodes it
 
       - uses: dtolnay/rust-toolchain@stable
 
