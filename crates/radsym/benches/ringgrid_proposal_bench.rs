@@ -35,6 +35,13 @@ fn ringgrid_path() -> PathBuf {
         .join("ringgrid.png")
 }
 
+/// The smallest-effort smoothing the config accepts: `smoothing_factor` must be > 0, and both
+/// RSD paths skip the blur when `sigma = smoothing_factor * radius` is at most 0.5. At radius 22
+/// (and median radius 22 for 18..=26) this gives sigma 0.44, so the "vote only" cases time the
+/// voting pass alone.
+#[cfg(feature = "image-io")]
+const VOTE_ONLY_SMOOTHING: f32 = 0.02;
+
 #[cfg(feature = "image-io")]
 fn build_fixture() -> BenchFixture {
     let image = load_grayscale(ringgrid_path()).unwrap();
@@ -45,7 +52,7 @@ fn build_fixture() -> BenchFixture {
     single_vote_only.radii = vec![22];
     single_vote_only.gradient_threshold = 2.0;
     single_vote_only.polarity = Polarity::Dark;
-    single_vote_only.smoothing_factor = 0.0;
+    single_vote_only.smoothing_factor = VOTE_ONLY_SMOOTHING;
     let mut single_smoothed = RsdConfig::default();
     single_smoothed.radii = vec![22];
     single_smoothed.gradient_threshold = 2.0;
@@ -55,7 +62,7 @@ fn build_fixture() -> BenchFixture {
     multi_vote_only.radii = vec![18, 20, 22, 24, 26];
     multi_vote_only.gradient_threshold = 2.0;
     multi_vote_only.polarity = Polarity::Dark;
-    multi_vote_only.smoothing_factor = 0.0;
+    multi_vote_only.smoothing_factor = VOTE_ONLY_SMOOTHING;
     let mut multi_radius = RsdConfig::default();
     multi_radius.radii = radii;
     multi_radius.gradient_threshold = 2.0;
