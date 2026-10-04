@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-10-04
+
+Republish of 0.4.2 for crates.io. The `v0.4.2` tag published the npm and PyPI
+packages, but the crates.io job failed before publishing (its test step checked
+out the repository without Git LFS, so the PNG fixtures were pointer files), and
+the GitHub release job failed on a clippy lint in `radsym-wasm`. 0.4.2 is
+therefore not on crates.io; 0.4.3 is the same library on every registry.
+
+### Fixed
+
+- `radsym-wasm`: the RGBA-to-gray conversion uses `as_chunks::<4>()` instead of
+  `chunks_exact(4)` (clippy: "using `chunks_exact` with a constant chunk size").
+  Same output.
+- Release CI: the crates.io and GitHub release workflows check out LFS files
+  before running the tests.
+- `ringgrid_proposal_bench`: the two "vote only" cases set `smoothing_factor = 0.0`,
+  which `RsdConfig` has rejected since 0.2.0, so the release workflow's
+  `cargo test --all-targets` panicked on it. They now use 0.02, which is valid and
+  still below the blur threshold (sigma 0.44 at radius 22), so they keep timing
+  the voting pass alone.
+
 ## [0.4.2] - 2026-10-03
 
 Config-schema release: the circle-detection config now has a machine-readable
@@ -477,7 +498,8 @@ Breaking for the `radsym` crate and both binding packages.
 - Zero unsafe code; zero clippy warnings; 138 unit and integration tests.
 - mdBook documentation with full mathematical derivations.
 
-[Unreleased]: https://github.com/VitalyVorobyev/radsym/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/VitalyVorobyev/radsym/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/VitalyVorobyev/radsym/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/VitalyVorobyev/radsym/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/VitalyVorobyev/radsym/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/VitalyVorobyev/radsym/compare/v0.3.0...v0.4.0
